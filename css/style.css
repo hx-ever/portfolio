@@ -1,0 +1,326 @@
+/* ============ DESIGN TOKENS ============ */
+:root{
+  --paper:      #E7ECEE;   /* blueprint-paper background */
+  --paper-alt:  #DCE3E6;   /* panel / card background */
+  --ink:        #14213D;   /* primary text — deep navy */
+  --ink-soft:   #46586B;   /* secondary text */
+  --copper:     #B5651D;   /* primary accent — PCB copper trace */
+  --copper-dark:#8C4E16;   /* hover / active state */
+  --line:       #9FB1BA;   /* hairlines, grid, borders */
+  --pcb-green:  #2F6F4E;   /* rare accent — tags, status */
+
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body:    'IBM Plex Sans', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+
+  --gutter: clamp(1.5rem, 5vw, 5rem);
+  --max-width: 1120px;
+}
+
+*{ box-sizing: border-box; }
+html{ scroll-behavior: smooth; }
+
+body{
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a{ color: inherit; text-decoration: none; }
+h1, h2, h3{ font-family: var(--font-display); margin: 0; letter-spacing: -0.01em; }
+
+/* ============ TRACE — signature scroll spine ============ */
+.trace{
+  position: fixed;
+  left: clamp(1rem, 3vw, 2.5rem);
+  top: 0;
+  height: 100vh;
+  width: 48px;
+  z-index: 50;
+  display: none; /* shown from tablet up */
+}
+@media (min-width: 800px){ .trace{ display: block; } }
+
+.trace-line{
+  position: absolute;
+  left: 5px;
+  top: 8%;
+  height: 84%;
+  width: 2px;
+}
+.trace-line line{
+  stroke: var(--line);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.trace-vias{
+  position: relative;
+  list-style: none;
+  margin: 0; padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8% 0;
+}
+.trace-vias li a{
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  group: via-link;
+}
+.via{
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--line);
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+.via-label{
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.2s, transform 0.2s;
+  white-space: nowrap;
+}
+.trace-vias li a:hover .via-label,
+.trace-vias li a.active .via-label{
+  opacity: 1;
+  transform: translateX(0);
+}
+.trace-vias li a.active .via{
+  background: var(--copper);
+  border-color: var(--copper);
+  transform: scale(1.15);
+}
+
+/* ============ LAYOUT SHELLS ============ */
+main{ padding-left: 0; }
+section{
+  padding: clamp(3.5rem, 8vw, 7rem) var(--gutter);
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+@media (min-width: 800px){
+  section{ padding-left: calc(var(--gutter) + 60px); }
+}
+
+.section-title{
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.tag{
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--copper);
+  border: 1px solid var(--copper);
+  padding: 0.2rem 0.5rem;
+  border-radius: 2px;
+}
+.section-lede{
+  color: var(--ink-soft);
+  max-width: 42ch;
+  margin-bottom: 3rem;
+}
+
+/* ============ HERO ============ */
+.hero{
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding-top: clamp(4rem, 12vh, 8rem);
+  padding-bottom: clamp(4rem, 12vh, 8rem);
+}
+.hero-inner{ max-width: 640px; }
+.eyebrow{
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  color: var(--copper);
+  margin: 0 0 1rem;
+}
+.hero h1{
+  font-size: clamp(2.4rem, 6.5vw, 4rem);
+  line-height: 1.05;
+  margin-bottom: 0.75rem;
+}
+.hero h1 .accent{ color: var(--copper); }
+.hero-role{
+  font-size: 1.15rem;
+  color: var(--ink-soft);
+  margin: 0 0 2.5rem;
+}
+
+.spec-sheet{
+  border-top: 1px solid var(--line);
+  margin: 0 0 2.5rem;
+}
+.spec-row{
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.spec-row dt{
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  padding-top: 0.15rem;
+}
+.spec-row dd{ margin: 0; font-size: 0.95rem; }
+
+.hero-actions{ display: flex; gap: 1rem; flex-wrap: wrap; }
+.btn{
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  padding: 0.85rem 1.5rem;
+  border-radius: 2px;
+  border: 1.5px solid transparent;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  display: inline-block;
+}
+.btn-primary{ background: var(--copper); color: var(--paper); }
+.btn-primary:hover{ background: var(--copper-dark); }
+.btn-ghost{ border-color: var(--ink); color: var(--ink); }
+.btn-ghost:hover{ background: var(--ink); color: var(--paper); }
+
+/* ============ WORK / PROJECTS ============ */
+.project-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+}
+@media (min-width: 700px){
+  .project-grid{ grid-template-columns: 1fr 1fr; gap: 2rem; }
+}
+
+.project-card{
+  background: var(--paper-alt);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.project-card:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px -12px rgba(20, 33, 61, 0.25);
+}
+.project-media{
+  height: 180px;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 19px, var(--line) 19px, var(--line) 20px),
+    repeating-linear-gradient(90deg, transparent, transparent 19px, var(--line) 19px, var(--line) 20px);
+  background-color: var(--paper);
+  opacity: 0.6;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.project-media::after{
+  content: attr(data-placeholder);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  background: var(--paper);
+  padding: 0.3rem 0.6rem;
+  border: 1px dashed var(--line);
+}
+.project-body{ padding: 1.5rem; }
+.part-no{
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--copper);
+  margin: 0 0 0.4rem;
+}
+.project-body h3{ font-size: 1.25rem; margin-bottom: 0.75rem; }
+.project-problem{ font-size: 0.92rem; margin: 0 0 0.6rem; }
+.project-detail{ font-size: 0.92rem; color: var(--ink-soft); margin: 0 0 1rem; }
+.project-tags{
+  list-style: none;
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  padding: 0; margin: 0;
+}
+.project-tags li{
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--pcb-green);
+  border: 1px solid var(--pcb-green);
+  padding: 0.2rem 0.5rem;
+  border-radius: 2px;
+}
+
+/* ============ ABOUT ============ */
+.about-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+}
+@media (min-width: 700px){
+  .about-grid{ grid-template-columns: 1.3fr 1fr; }
+}
+.about-copy{ max-width: 56ch; font-size: 1.02rem; }
+.skills-strip{
+  list-style: none;
+  margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 0.6rem;
+  align-content: flex-start;
+}
+.skills-strip li{
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  border: 1px solid var(--line);
+  padding: 0.4rem 0.7rem;
+  border-radius: 2px;
+  color: var(--ink-soft);
+}
+
+/* ============ CONTACT ============ */
+.contact-lede{ color: var(--ink-soft); margin-bottom: 2rem; max-width: 42ch; }
+.contact-links{
+  display: flex; flex-wrap: wrap; gap: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+.contact-links a{
+  border-bottom: 1.5px solid var(--copper);
+  padding-bottom: 2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.contact-links a:hover{ color: var(--copper); }
+
+/* ============ FOOTER ============ */
+.site-footer{
+  padding: 2rem var(--gutter) 3rem;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+/* ============ ACCESSIBILITY ============ */
+a:focus-visible, button:focus-visible{
+  outline: 2px solid var(--copper);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce){
+  *{ transition: none !important; scroll-behavior: auto !important; }
+}

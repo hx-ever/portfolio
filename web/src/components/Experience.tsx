@@ -1,16 +1,21 @@
 "use client";
 
+import { useRef } from "react";
 import { EXPERIENCE, type ExperienceEntry } from "@/lib/experience";
 import { HERO_ACCENT } from "@/lib/sections";
 import { useFocusDistance, useSpineFill } from "@/lib/useFocusDistance";
+import { useScrollFriction } from "@/lib/useScrollFriction";
 import styles from "./Experience.module.css";
 
 export default function Experience() {
-  const { ref: trackRef, fill } = useSpineFill<HTMLDivElement>();
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const { ref: trackRef, fraction } = useSpineFill<HTMLDivElement>();
+  useScrollFriction(sectionRef);
 
   return (
     <section
       id="experience"
+      ref={sectionRef}
       className={styles.section}
       style={{ "--accent": HERO_ACCENT } as React.CSSProperties}
     >
@@ -24,8 +29,14 @@ export default function Experience() {
       </div>
 
       <div className={styles.timeline}>
-        <div ref={trackRef} className={styles.spineTrack} aria-hidden="true">
-          <div className={styles.spineFill} style={{ height: `${fill}px` }} />
+        {/* grid-row 1/-1 can't span implicit rows, so span the entry count */}
+        <div
+          ref={trackRef}
+          className={styles.spineTrack}
+          style={{ gridRow: `1 / ${EXPERIENCE.length + 1}` }}
+          aria-hidden="true"
+        >
+          <div className={styles.spineFill} style={{ transform: `scaleY(${fraction})` }} />
         </div>
 
         {EXPERIENCE.map((entry, i) => (
@@ -54,6 +65,7 @@ function Row({ entry, row }: { entry: ExperienceEntry; row: number }) {
         ref={ref}
         className={styles.card}
         data-side={entry.side}
+        data-focal=""
         style={cardStyle}
       >
         <span className={styles.range} style={{ color: `color-mix(in oklab, var(--accent) ${focus * 100}%, var(--dim))` }}>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
+import Nav from "@/components/Nav";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -36,6 +37,7 @@ export default function RootLayout({
       className={`${display.variable} ${mono.variable} ${body.variable}`}
     >
       <body>
+        <Nav />
         {children}
         <SpeedInsights />
         <Analytics />

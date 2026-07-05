@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; padding: 0; background: #101013; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+<section style="--accent: {{ accentColor }}; --ann-b: {{ annBlock }}; --ann-f: {{ annFlex }}; display: flex; align-items: flex-start; gap: 80px; padding: 72px; width: max-content; font-family: 'Instrument Sans', sans-serif; color: #F5F5F7;">
+
+  <!-- ============ 1a · EXPERIENCE — FULL PAGE ============ -->
+  <div id="1a" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="background: #F5F5F7; color: #131316; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;">1a</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8E8E93;">Experience — full page, FYP entry in focus · 1440×1720</span>
+    </div>
+
+    <div data-screen-label="Experience — full page" style="position: relative; width: 1440px; height: 1720px; background: #060607; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; box-shadow: 0 30px 90px rgba(0,0,0,0.55); overflow: hidden;">
+      <!-- ambient glows: spotlight sits at the focused entry -->
+      <div style="position: absolute; inset: 0; background: radial-gradient(640px 440px at 70% 71%, color-mix(in oklab, var(--accent, #2997FF) 15%, transparent), transparent 70%), radial-gradient(520px 420px at 8% 4%, rgba(191,90,242,0.09), transparent 62%);"></div>
+
+      <!-- liquid glass nav (carried over) -->
+      <div style="position: absolute; top: 28px; left: 120px; right: 120px; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; border-radius: 999px; background: rgba(28,28,30,0.55); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 16px 48px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.10); z-index: 5;">
+        <div style="display: flex; align-items: center; gap: 11px;">
+          <div style="width: 11px; height: 11px; background: linear-gradient(135deg, #0A84FF, #BF5AF2); border-radius: 3px; transform: rotate(45deg);"></div>
+          <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 21px; letter-spacing: -0.02em; color: #F5F5F7;">hxstudio</span>
+        </div>
+        <div style="display: flex; gap: 42px; font-size: 15px; font-weight: 500;">
+          <span style="color: #A1A1A6; cursor: pointer;" style-hover="color: #F5F5F7;">Designs</span>
+          <span style="color: #F5F5F7; cursor: pointer;">Experience</span>
+          <span style="color: #A1A1A6; cursor: pointer;" style-hover="color: #F5F5F7;">Contact</span>
+        </div>
+      </div>
+
+      <!-- page header -->
+      <div style="position: absolute; left: 120px; top: 152px;">
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.18em; color: #8E8E93;">EXPERIENCE — 2022 → 2026</div>
+        <h1 style="margin: 14px 0 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 56px; line-height: 1; letter-spacing: -0.03em; color: #F5F5F7;">Where I’ve been<span style="color: var(--accent, #2997FF);">.</span></h1>
+      </div>
+      <div style="display: var(--ann-f, flex); position: absolute; left: 120px; top: 278px; gap: 8px; max-width: 620px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: var(--accent, #2997FF);">
+        <span>✳</span>
+        <span>scroll spotlight — exactly ONE entry is sharp at a time (the one at viewport center); entries above and below blur progressively with distance</span>
+      </div>
+
+      <!-- focal band -->
+      <div style="position: absolute; left: 70px; right: 70px; top: 1230px; border-top: 1px dashed color-mix(in oklab, var(--accent, #2997FF) 35%, transparent);"></div>
+      <div style="display: var(--ann-b, block); position: absolute; right: 80px; top: 1206px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--accent, #2997FF);">focal zone — viewport center</div>
+
+      <!-- spine -->
+      <div style="position: absolute; left: 719px; top: 380px; width: 2px; height: 1180px; background: rgba(255,255,255,0.12);"></div>
+      <div style="position: absolute; left: 719px; top: 380px; width: 2px; height: 850px; background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--accent, #2997FF) 55%, transparent) 25%, var(--accent, #2997FF));"></div>
+      <div style="display: var(--ann-f, flex); position: absolute; left: 760px; top: 458px; gap: 7px; width: 240px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">
+        <span>✳</span>
+        <span>spine fills with accent down to the active entry</span>
+      </div>
+
+      <!-- nodes -->
+      <div style="position: absolute; left: 720px; top: 420px; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #55555C;"></div>
+      <div style="position: absolute; left: 720px; top: 690px; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #55555C;"></div>
+      <div style="position: absolute; left: 720px; top: 960px; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #55555C;"></div>
+      <div style="position: absolute; left: 720px; top: 1230px; transform: translate(-50%, -50%); width: 16px; height: 16px; border-radius: 50%; background: var(--accent, #2997FF); box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent, #2997FF) 22%, transparent), 0 0 26px color-mix(in oklab, var(--accent, #2997FF) 70%, transparent); z-index: 2;"></div>
+      <div style="position: absolute; left: 720px; top: 1500px; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #060607; border: 1.5px dashed #8E8E93;"></div>
+
+      <!-- connectors -->
+      <div style="position: absolute; left: 664px; top: 420px; width: 44px; border-top: 1px dashed rgba(255,255,255,0.18);"></div>
+      <div style="position: absolute; left: 732px; top: 690px; width: 44px; border-top: 1px dashed rgba(255,255,255,0.18);"></div>
+      <div style="position: absolute; left: 664px; top: 960px; width: 44px; border-top: 1px dashed rgba(255,255,255,0.18);"></div>
+      <div style="position: absolute; left: 732px; top: 1230px; width: 44px; border-top: 1px dashed color-mix(in oklab, var(--accent, #2997FF) 50%, transparent);"></div>
+      <div style="position: absolute; left: 664px; top: 1500px; width: 44px; border-top: 1px dashed rgba(255,255,255,0.18);"></div>
+
+      <!-- e1 · BEng — left, farthest from focus -->
+      <div style="position: absolute; left: 194px; top: 342px; width: 470px; padding: 22px 26px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 20px; filter: blur(7px); opacity: 0.22; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.12em; color: #6E6E73;">2022 — 2025</span>
+        <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.01em; color: #F5F5F7;">BEng Electronic Engineering</span>
+        <span style="font-size: 15px; font-weight: 500; color: #A1A1A6;">University of Manchester</span>
+        <span style="font-size: 14.5px; line-height: 1.55; color: #8E8E93;">First Class Honours — analogue circuits to embedded firmware and DSP.</span>
+      </div>
+
+      <!-- e2 · TSA Secretary — right -->
+      <div style="position: absolute; left: 776px; top: 612px; width: 470px; padding: 22px 26px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 20px; filter: blur(5px); opacity: 0.32; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.12em; color: #6E6E73;">2023 — 2024</span>
+        <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.01em; color: #F5F5F7;">Secretary</span>
+        <span style="font-size: 15px; font-weight: 500; color: #A1A1A6;">Taiwanese Student Association · UoM</span>
+        <span style="font-size: 14.5px; line-height: 1.55; color: #8E8E93;">Comms, events, and community for the Taiwanese student network.</span>
+      </div>
+
+      <!-- e3 · Treasurer — left, N−1 -->
+      <div style="position: absolute; left: 194px; top: 882px; width: 470px; padding: 22px 26px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 20px; filter: blur(3px); opacity: 0.5; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.12em; color: #6E6E73;">2024 — 2025</span>
+        <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.01em; color: #F5F5F7;">Treasurer</span>
+        <span style="font-size: 15px; font-weight: 500; color: #A1A1A6;">Table Tennis Team · UoM</span>
+        <span style="font-size: 14.5px; line-height: 1.55; color: #8E8E93;">Budgets, kit, and match-day logistics for the university club.</span>
+      </div>
+      <div style="display: var(--ann-f, flex); position: absolute; left: 776px; top: 928px; gap: 8px; width: 320px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.6; color: var(--accent, #2997FF);">
+        <span>✳</span>
+        <span>N−1 — just left focus: blurring + fading as it scrolls up ↑</span>
+      </div>
+
+      <!-- e4 · FYP — right, IN FOCUS -->
+      <div style="position: absolute; left: 776px; top: 1140px; width: 470px; padding: 24px 28px; background: rgba(32,32,36,0.92); border: 1px solid color-mix(in oklab, var(--accent, #2997FF) 45%, rgba(255,255,255,0.1)); border-radius: 20px; box-shadow: 0 24px 70px rgba(0,0,0,0.55), 0 0 44px color-mix(in oklab, var(--accent, #2997FF) 16%, transparent); transform: scale(1.03); z-index: 3; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.12em; color: var(--accent, #2997FF);">2024 — 2025 · FINAL YEAR PROJECT</span>
+        <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.01em; color: #F5F5F7;">Smart Environmental Sensing Network</span>
+        <span style="font-size: 15px; font-weight: 500; color: #A1A1A6;">University of Manchester</span>
+        <span style="font-size: 14.5px; line-height: 1.55; color: #C7C7CC;">ESP32 mesh with on-device AI (Edge Impulse) — environmental monitoring at the edge.</span>
+      </div>
+      <div style="display: var(--ann-f, flex); position: absolute; left: 194px; top: 1208px; width: 470px; justify-content: flex-end; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.6; color: var(--accent, #2997FF); text-align: right;">
+        <span style="max-width: 330px;">N — in focus: sharp, lit, slightly scaled; sits in the focal zone</span>
+        <span>✳</span>
+      </div>
+
+      <!-- e5 · NUS — left, N+1 -->
+      <div style="position: absolute; left: 194px; top: 1414px; width: 470px; padding: 22px 26px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 20px; filter: blur(3px); opacity: 0.5; display: flex; flex-direction: column; gap: 8px;">
+        <span style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.12em; color: #6E6E73;">2026 —</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; color: #FFFFFF; background: linear-gradient(90deg, #0A84FF, #BF5AF2); padding: 4px 10px; border-radius: 999px;">INCOMING · AUG 2026</span>
+        </span>
+        <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.01em; color: #F5F5F7;">MSc Engineering Design &amp; Innovation</span>
+        <span style="font-size: 15px; font-weight: 500; color: #A1A1A6;">NUS College of Design and Engineering</span>
+        <span style="font-size: 14.5px; line-height: 1.55; color: #8E8E93;">Design × engineering at NUS CDE, Singapore.</span>
+      </div>
+      <div style="display: var(--ann-f, flex); position: absolute; left: 776px; top: 1486px; gap: 8px; width: 320px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.6; color: var(--accent, #2997FF);">
+        <span>✳</span>
+        <span>N+1 — waiting below: still blurred, sharpens as you keep scrolling ↓</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 1b · SCROLL SEQUENCE ============ -->
+  <div id="1b" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="background: #F5F5F7; color: #131316; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;">1b</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8E8E93;">Scroll sequence — focus hands off N−1 → N → N+1 · three consecutive states</span>
+    </div>
+
+    <div data-screen-label="Experience — scroll sequence" style="display: flex; gap: 18px; align-items: flex-start;">
+
+      <!-- STATE 1 · focus e3 -->
+      <div style="display: flex; flex-direction: column; gap: 12px; width: 420px;">
+        <div style="position: relative; width: 420px; height: 600px; background: radial-gradient(340px 280px at 50% 50%, color-mix(in oklab, var(--accent, #2997FF) 12%, transparent), transparent 72%), #08080A; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 60px rgba(0,0,0,0.5);">
+          <div style="position: absolute; left: 209px; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.12);"></div>
+          <div style="position: absolute; left: 209px; top: 0; width: 2px; height: 300px; background: linear-gradient(180deg, transparent, var(--accent, #2997FF));"></div>
+          <div style="position: absolute; left: 14px; right: 14px; top: 300px; border-top: 1px dashed color-mix(in oklab, var(--accent, #2997FF) 30%, transparent);"></div>
+          <div style="position: absolute; right: 20px; top: 285px; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: var(--accent, #2997FF);">FOCAL</div>
+          <!-- nodes -->
+          <div style="position: absolute; left: 210px; top: 20px; transform: translate(-50%, -50%); width: 7px; height: 7px; border-radius: 50%; background: #55555C;"></div>
+          <div style="position: absolute; left: 210px; top: 160px; transform: translate(-50%, -50%); width: 7px; height: 7px; border-radius: 50%; background: #55555C;"></div>
+          <div style="position: absolute; left: 210px; top: 300px; transform: translate(-50%, -50%); width: 13px; height: 13px; border-radius: 50%; background: var(--accent, #2997FF); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent, #2997FF) 22%, transparent), 0 0 18px color-mix(in oklab, var(--accent, #2997FF) 70%, transparent); z-index: 2;"></div>
+          <div style="position: absolute; left: 210px; top: 440px; transform: translate(-50%, -50%); width: 7px; height: 7px; border-radius: 50%; background: #55555C;"></div>
+          <div style="position: absolute; left: 210px; top: 580px; transform: translate(-50%, -50%); width: 9px; height: 9px; border-radius: 50%; background: #08080A; border: 1px dashed #8E8E93;"></div>
+          <!-- cards -->
+          <div style="position: absolute; left: 18px; top: -3px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(3.5px); opacity: 0.3; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2022 — 2025</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">BEng EE</span>
+          </div>
+          <div style="position: absolute; left: 244px; top: 137px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(2px); opacity: 0.55; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2023 — 2024</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">TSA Secretary</span>
+          </div>
+          <div style="position: absolute; left: 18px; top: 277px; width: 158px; padding: 9px 12px; background: rgba(32,32,36,0.95); border: 1px solid color-mix(in oklab, var(--accent, #2997FF) 50%, transparent); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 22px color-mix(in oklab, var(--accent, #2997FF) 15%, transparent); z-index: 3; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: var(--accent, #2997FF);">2024 — 2025</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">TT Treasurer</span>
+          </div>
+          <div style="position: absolute; left: 244px; top: 417px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(2px); opacity: 0.55; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2024 — 2025</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">FYP — ESP32 AI</span>
+          </div>
+          <div style="position: absolute; left: 18px; top: 557px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(3.5px); opacity: 0.3; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2026 —</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">NUS MSc EDI</span>
+          </div>
+        </div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-align: center; color: #8E8E93;">state 1 · <span style="color: #F5F5F7;">Treasurer</span> in focus</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 600px; gap: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent, #2997FF);">
+        <span>scroll</span><span>↓</span><span>⟶</span>
+      </div>
+
+      <!-- STATE 2 · focus e4 -->
+      <div style="display: flex; flex-direction: column; gap: 12px; width: 420px;">
+        <div style="position: relative; width: 420px; height: 600px; background: radial-gradient(340px 280px at 50% 50%, color-mix(in oklab, var(--accent, #2997FF) 12%, transparent), transparent 72%), #08080A; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 60px rgba(0,0,0,0.5);">
+          <div style="position: absolute; left: 209px; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.12);"></div>
+          <div style="position: absolute; left: 209px; top: 0; width: 2px; height: 300px; background: linear-gradient(180deg, transparent, var(--accent, #2997FF));"></div>
+          <div style="position: absolute; left: 14px; right: 14px; top: 300px; border-top: 1px dashed color-mix(in oklab, var(--accent, #2997FF) 30%, transparent);"></div>
+          <div style="position: absolute; right: 20px; top: 285px; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: var(--accent, #2997FF);">FOCAL</div>
+          <!-- nodes -->
+          <div style="position: absolute; left: 210px; top: 20px; transform: translate(-50%, -50%); width: 7px; height: 7px; border-radius: 50%; background: #55555C;"></div>
+          <div style="position: absolute; left: 210px; top: 160px; transform: translate(-50%, -50%); width: 7px; height: 7px; border-radius: 50%; background: #55555C;"></div>
+          <div style="position: absolute; left: 210px; top: 300px; transform: translate(-50%, -50%); width: 13px; height: 13px; border-radius: 50%; background: var(--accent, #2997FF); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent, #2997FF) 22%, transparent), 0 0 18px color-mix(in oklab, var(--accent, #2997FF) 70%, transparent); z-index: 2;"></div>
+          <div style="position: absolute; left: 210px; top: 440px; transform: translate(-50%, -50%); width: 9px; height: 9px; border-radius: 50%; background: #08080A; border: 1px dashed #8E8E93;"></div>
+          <!-- cards -->
+          <div style="position: absolute; left: 244px; top: -3px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(3.5px); opacity: 0.3; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2023 — 2024</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">TSA Secretary</span>
+          </div>
+          <div style="position: absolute; left: 18px; top: 137px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(2px); opacity: 0.55; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2024 — 2025</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">TT Treasurer</span>
+          </div>
+          <div style="position: absolute; left: 244px; top: 277px; width: 158px; padding: 9px 12px; background: rgba(32,32,36,0.95); border: 1px solid color-mix(in oklab, var(--accent, #2997FF) 50%, transparent); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 22px color-mix(in oklab, var(--accent, #2997FF) 15%, transparent); z-index: 3; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: var(--accent, #2997FF);">2024 — 2025</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">FYP — ESP32 AI</span>
+          </div>
+          <div style="position: absolute; left: 18px; top: 417px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(2px); opacity: 0.55; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2026 —</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">NUS MSc EDI</span>
+          </div>
+        </div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-align: center; color: #8E8E93;">state 2 · +1 viewport — <span style="color: #F5F5F7;">FYP</span> takes focus</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 600px; gap: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent, #2997FF);">
+        <span>scroll</span><span>↓</span><span>⟶</span>
+      </div>
+
+      <!-- STATE 3 · focus e5 -->
+      <div style="display: flex; flex-direction: column; gap: 12px; width: 420px;">
+        <div style="position: relative; width: 420px; height: 600px; background: radial-gradient(340px 280px at 50% 50%, color-mix(in oklab, var(--accent, #2997FF) 12%, transparent), transparent 72%), #08080A; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 60px rgba(0,0,0,0.5);">
+          <div style="position: absolute; left: 209px; top: 0; height: 340px; width: 2px; background: rgba(255,255,255,0.12);"></div>
+          <div style="position: absolute; left: 209px; top: 0; width: 2px; height: 300px; background: linear-gradient(180deg, transparent, var(--accent, #2997FF));"></div>
+          <div style="position: absolute; left: 14px; right: 14px; top: 300px; border-top: 1px dashed color-mix(in oklab, var(--accent, #2997FF) 30%, transparent);"></div>
+          <div style="position: absolute; right: 20px; top: 285px; font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: var(--accent, #2997FF);">FOCAL</div>
+          <!-- nodes -->
+          <div style="position: absolute; left: 210px; top: 20px; transform: translate(-50%, -50%); width: 7px; height: 7px; border-radius: 50%; background: #55555C;"></div>
+          <div style="position: absolute; left: 210px; top: 160px; transform: translate(-50%, -50%); width: 7px; height: 7px; border-radius: 50%; background: #55555C;"></div>
+          <div style="position: absolute; left: 210px; top: 300px; transform: translate(-50%, -50%); width: 13px; height: 13px; border-radius: 50%; background: var(--accent, #2997FF); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent, #2997FF) 22%, transparent), 0 0 18px color-mix(in oklab, var(--accent, #2997FF) 70%, transparent); z-index: 2;"></div>
+          <!-- cards -->
+          <div style="position: absolute; left: 18px; top: -3px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(3.5px); opacity: 0.3; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2024 — 2025</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">TT Treasurer</span>
+          </div>
+          <div style="position: absolute; left: 244px; top: 137px; width: 158px; padding: 9px 12px; background: rgba(28,28,30,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px; filter: blur(2px); opacity: 0.55; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: #6E6E73;">2024 — 2025</span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">FYP — ESP32 AI</span>
+          </div>
+          <div style="position: absolute; left: 18px; top: 270px; width: 168px; padding: 9px 12px; background: rgba(32,32,36,0.95); border: 1px solid color-mix(in oklab, var(--accent, #2997FF) 50%, transparent); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 22px color-mix(in oklab, var(--accent, #2997FF) 15%, transparent); z-index: 3; display: flex; flex-direction: column; gap: 4px;">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 8.5px; letter-spacing: 0.1em; color: var(--accent, #2997FF);">2026 —</span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 7px; font-weight: 600; letter-spacing: 0.12em; color: #FFFFFF; background: linear-gradient(90deg, #0A84FF, #BF5AF2); padding: 2px 6px; border-radius: 999px;">INCOMING</span>
+            </span>
+            <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 12px; color: #F5F5F7;">NUS MSc EDI</span>
+          </div>
+          <div style="position: absolute; left: 210px; top: 420px; transform: translateX(-50%); font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.12em; color: #55555C;">— end · say hi → CONTACT</div>
+        </div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-align: center; color: #8E8E93;">state 3 · +2 — <span style="color: #F5F5F7;">NUS (incoming)</span> takes focus</div>
+      </div>
+    </div>
+
+    <!-- sequence annotation -->
+    <div style="display: var(--ann-f, flex); gap: 8px; width: 1330px; margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.65; color: var(--accent, #2997FF);">
+      <span>✳</span>
+      <span>focus hands off as a smooth crossfade — blur / opacity / scale interpolate over ~120px of scroll, so exactly one entry is crisp at any position; identical behaviour in reverse when scrolling up. Spine fill and node glow travel with the focus.</span>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;annotations&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Spec&quot; },
+  &quot;accent&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#2997FF&quot;, &quot;options&quot;: [&quot;#2997FF&quot;, &quot;#FF9F0A&quot;, &quot;#FF375F&quot;, &quot;#30D158&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Theme&quot; }
+}">
+class Component extends DCLogic {
+  renderVals() {
+    const ann = this.props.annotations ?? true;
+    return {
+      accentColor: this.props.accent ?? '#2997FF',
+      annBlock: ann ? 'block' : 'none',
+      annFlex: ann ? 'flex' : 'none'
+    };
+  }
+}
+</script>
+</body>
+</html>

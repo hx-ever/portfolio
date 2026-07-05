@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=Instrument+Sans:wght@400..700&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; padding: 0; background: #101013; }
+    * { box-sizing: border-box; }
+  </style>
+</helmet>
+<section style="--accent: {{ accentColor }}; --ann-b: {{ annBlock }}; --ann-f: {{ annFlex }}; display: flex; align-items: flex-start; gap: 80px; padding: 72px; width: max-content; font-family: 'Instrument Sans', sans-serif; color: #F5F5F7;">
+
+  <!-- ============ 1a · HERO ============ -->
+  <div id="1a" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="background: #F5F5F7; color: #131316; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;">1a</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8E8E93;">Hero — first viewport · 1440×900 · keynote-dark theme</span>
+    </div>
+
+    <div data-screen-label="Hero" style="position: relative; width: 1440px; height: 900px; background: #060607; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; box-shadow: 0 30px 90px rgba(0,0,0,0.55); overflow: hidden;">
+      <!-- ambient vibrant glows -->
+      <div style="position: absolute; inset: 0; background: radial-gradient(760px 540px at 76% 40%, color-mix(in oklab, var(--accent, #2997FF) 18%, transparent), transparent 66%), radial-gradient(620px 500px at 4% 98%, rgba(191,90,242,0.13), transparent 62%);"></div>
+
+      <!-- liquid glass nav (dark glass) -->
+      <div style="position: absolute; top: 28px; left: 120px; right: 120px; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; border-radius: 999px; background: rgba(28,28,30,0.55); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 16px 48px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.10);">
+        <div style="display: flex; align-items: center; gap: 11px;">
+          <div style="width: 11px; height: 11px; background: linear-gradient(135deg, #0A84FF, #BF5AF2); border-radius: 3px; transform: rotate(45deg);"></div>
+          <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 21px; letter-spacing: -0.02em; color: #F5F5F7;">hxstudio</span>
+        </div>
+        <div style="display: flex; gap: 42px; font-size: 15px; font-weight: 500;">
+          <span style="color: #A1A1A6; cursor: pointer;" style-hover="color: #F5F5F7;">Designs</span>
+          <span style="color: #A1A1A6; cursor: pointer;" style-hover="color: #F5F5F7;">Experience</span>
+          <span style="color: #A1A1A6; cursor: pointer;" style-hover="color: #F5F5F7;">Contact</span>
+        </div>
+      </div>
+      <!-- nav annotation -->
+      <div style="display: var(--ann-f, flex); position: absolute; top: 104px; left: 150px; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: var(--accent, #2997FF); max-width: 560px;">
+        <span>✳</span>
+        <span>liquid glass — rgba(28,28,30,.55) + blur(18px) · pill floats 28px off edges, never edge-to-edge · shadow deepens after 40px scroll · links route to separate pages (/designs /experience /contact)</span>
+      </div>
+
+      <!-- hero content -->
+      <div style="position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; align-items: center; padding: 0 120px; gap: 40px;">
+        <div>
+          <h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 80px; line-height: 1.03; letter-spacing: -0.03em; color: #F5F5F7; text-wrap: balance;">Hi, I am<br>Hsu Hsin-Wei<span style="color: var(--accent, #2997FF);">.</span></h1>
+          <p style="margin: 28px 0 0; display: flex; align-items: center; gap: 14px; font-size: 25px; font-weight: 600;">
+            <span style="width: 36px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, #0A84FF, #BF5AF2);"></span>
+            <span style="background: linear-gradient(93deg, #0A84FF 0%, #BF5AF2 35%, #FF375F 68%, #FF9F0A 100%); -webkit-background-clip: text; background-clip: text; color: transparent;">Design Engineer</span>
+          </p>
+        </div>
+
+        <!-- chibi character placeholder -->
+        <div style="position: relative; height: 640px;">
+          <div style="position: absolute; left: 50%; top: 40px; transform: translateX(-50%); width: 460px; height: 460px; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in oklab, var(--accent, #2997FF) 22%, transparent), transparent 72%);"></div>
+          <div style="position: absolute; left: calc(50% - 40px); top: 300px; width: 320px; height: 300px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,55,95,0.12), transparent 70%);"></div>
+          <!-- head -->
+          <div style="position: absolute; left: 50%; top: 72px; transform: translateX(-50%); width: 268px; height: 268px; border-radius: 50%; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0 9px, rgba(255,255,255,0) 9px 18px), #1B1B1F; border: 1.5px dashed #45454C; display: flex; align-items: center; justify-content: center;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.7; color: #8E8E93; text-align: center;">3D character<br>chibi “Hank”</span>
+          </div>
+          <!-- waving arm -->
+          <div style="position: absolute; left: calc(50% + 88px); top: 316px; width: 118px; height: 50px; border-radius: 999px; transform: rotate(-38deg); background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0 9px, rgba(255,255,255,0) 9px 18px), #1B1B1F; border: 1.5px dashed #45454C;"></div>
+          <!-- resting arm -->
+          <div style="position: absolute; left: calc(50% - 188px); top: 372px; width: 92px; height: 46px; border-radius: 999px; transform: rotate(24deg); background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0 9px, rgba(255,255,255,0) 9px 18px), #1B1B1F; border: 1.5px dashed #45454C;"></div>
+          <!-- body -->
+          <div style="position: absolute; left: 50%; top: 330px; transform: translateX(-50%); width: 202px; height: 152px; border-radius: 72px 72px 58px 58px; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0 9px, rgba(255,255,255,0) 9px 18px), #1B1B1F; border: 1.5px dashed #45454C;"></div>
+          <!-- floor glow -->
+          <div style="position: absolute; left: 50%; bottom: 108px; transform: translateX(-50%); width: 280px; height: 34px; border-radius: 50%; background: radial-gradient(50% 50% at 50% 50%, color-mix(in oklab, var(--accent, #2997FF) 20%, transparent), transparent 72%);"></div>
+          <div style="position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6E6E73;">「 stylized toylike render — big head, small body 」</div>
+        </div>
+      </div>
+
+      <!-- character annotation -->
+      <div style="display: var(--ann-f, flex); position: absolute; right: 44px; bottom: 96px; gap: 8px; width: 292px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.65; color: var(--accent, #2997FF);">
+        <span>✳</span>
+        <span>3D chibi Hank — mid-wave, warm smile, one eye winking. Idle float loop (2.4s) · gentle head-tracking toward cursor · waves once on page load. Rim-lit by the accent glow, keynote-style.</span>
+      </div>
+
+      <!-- scroll cue -->
+      <div style="position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.16em; color: #6E6E73;">SCROLL ↓</span>
+        <span style="display: var(--ann-b, block); font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--accent, #2997FF);">✳ fades after first scroll</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 1b · SHOWCASE 01, FULLY DESIGNED ============ -->
+  <div id="1b" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="background: #F5F5F7; color: #131316; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;">1b</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8E8E93;">Showcase section 01 of 05, representative · 1440×900</span>
+    </div>
+
+    <div data-screen-label="Showcase 01 — Lumen" style="position: relative; width: 1440px; height: 900px; background: linear-gradient(180deg, #060607 0%, #140D07 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; box-shadow: 0 30px 90px rgba(0,0,0,0.55); overflow: hidden;">
+      <!-- ghost index numeral -->
+      <div style="position: absolute; right: 84px; top: 96px; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 250px; line-height: 1; letter-spacing: -0.05em; color: rgba(255,255,255,0.06);">01</div>
+
+      <!-- persistent glass nav -->
+      <div style="position: absolute; top: 28px; left: 120px; right: 120px; height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; border-radius: 999px; background: rgba(28,28,30,0.55); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 20px 52px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10); z-index: 3;">
+        <div style="display: flex; align-items: center; gap: 11px;">
+          <div style="width: 11px; height: 11px; background: linear-gradient(135deg, #0A84FF, #BF5AF2); border-radius: 3px; transform: rotate(45deg);"></div>
+          <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 21px; letter-spacing: -0.02em; color: #F5F5F7;">hxstudio</span>
+        </div>
+        <div style="display: flex; gap: 42px; font-size: 15px; font-weight: 500;">
+          <span style="color: #F5F5F7; cursor: pointer;">Designs</span>
+          <span style="color: #A1A1A6; cursor: pointer;" style-hover="color: #F5F5F7;">Experience</span>
+          <span style="color: #A1A1A6; cursor: pointer;" style-hover="color: #F5F5F7;">Contact</span>
+        </div>
+      </div>
+
+      <div style="position: absolute; inset: 0; display: grid; grid-template-columns: 1.05fr 1fr; align-items: center; padding: 0 120px 0 100px; gap: 30px;">
+        <!-- model stage -->
+        <div style="position: relative; height: 660px;">
+          <!-- lamp light glow (vibrant amber, the "key point" of this section) -->
+          <div style="position: absolute; left: calc(50% - 240px); top: 40px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,159,10,0.42), rgba(255,105,10,0.10) 60%, transparent 74%);"></div>
+          <!-- lamp head -->
+          <div style="position: absolute; left: calc(50% - 128px); top: 128px; width: 142px; height: 142px; border-radius: 50%; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0 9px, rgba(255,255,255,0) 9px 18px), #1B1B1F; border: 1.5px dashed #4A4A50;"></div>
+          <!-- lamp stem -->
+          <div style="position: absolute; left: calc(50% - 92px); bottom: 148px; width: 32px; height: 248px; border-radius: 999px; transform: rotate(17deg); transform-origin: 50% 92%; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0 9px, rgba(255,255,255,0) 9px 18px), #1B1B1F; border: 1.5px dashed #4A4A50;"></div>
+          <!-- lamp base -->
+          <div style="position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); width: 246px; height: 42px; border-radius: 21px; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.05) 0 9px, rgba(255,255,255,0) 9px 18px), #1B1B1F; border: 1.5px dashed #4A4A50;"></div>
+          <!-- floor glow -->
+          <div style="position: absolute; left: 50%; bottom: 100px; transform: translateX(-50%); width: 340px; height: 32px; border-radius: 50%; background: radial-gradient(50% 50% at 50% 50%, rgba(255,159,10,0.20), transparent 72%);"></div>
+          <div style="position: absolute; left: 50%; bottom: 58px; transform: translateX(-50%); white-space: nowrap; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6E6E73;">「 3D model — “Lumen” desk lamp · matte ceramic + brass 」</div>
+          <!-- bloom annotation -->
+          <div style="display: var(--ann-f, flex); position: absolute; left: calc(50% + 44px); top: 128px; gap: 7px; width: 190px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">
+            <span>✳</span>
+            <span>light blooms on at 55% of section scroll — the only warm light on the black stage</span>
+          </div>
+        </div>
+
+        <!-- project text -->
+        <div style="position: relative; padding-left: 28px;">
+          <span style="display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 500; letter-spacing: 0.14em; color: #A1A1A6; border: 1px solid #3E3E44; border-radius: 999px; padding: 8px 16px;"><span style="color: var(--accent, #2997FF);">01</span> · PRODUCT — IOT</span>
+          <h2 style="margin: 24px 0 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 76px; line-height: 1; letter-spacing: -0.03em; color: #F5F5F7;">Lumen</h2>
+          <p style="margin: 22px 0 0; max-width: 430px; font-size: 18.5px; line-height: 1.65; color: #A1A1A6; text-wrap: pretty;">An ambient smart lamp and its companion app — hardware, firmware UI, and a light-scene design tool built as one system.</p>
+          <p style="margin: 30px 0 0;">
+            <span style="font-size: 16px; font-weight: 600; color: var(--accent, #2997FF); cursor: pointer; border-bottom: 1.5px solid color-mix(in oklab, var(--accent, #2997FF) 45%, transparent); padding-bottom: 3px;" style-hover="border-bottom: 1.5px solid var(--accent, #2997FF);">View case study →</span>
+          </p>
+          <span style="display: var(--ann-b, block); margin-top: 26px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--accent, #2997FF);">✳ text block slides up 24px + fades in as section enters</span>
+        </div>
+      </div>
+
+      <!-- section dot rail -->
+      <div style="position: absolute; right: 40px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        <span style="width: 6px; height: 22px; border-radius: 999px; background: var(--accent, #2997FF); box-shadow: 0 0 12px color-mix(in oklab, var(--accent, #2997FF) 65%, transparent);"></span>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: #3E3E44;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: #3E3E44;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: #3E3E44;"></span>
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: #3E3E44;"></span>
+      </div>
+      <div style="display: var(--ann-b, block); position: absolute; right: 62px; top: calc(50% - 64px); width: 120px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">✳ section rail — active dot stretches + glows</div>
+
+      <!-- scroll-scrub ruler -->
+      <div style="display: var(--ann-b, block); position: absolute; left: 100px; bottom: 30px; width: 600px; font-family: 'IBM Plex Mono', monospace; color: var(--accent, #2997FF);">
+        <div style="display: flex; gap: 8px; font-size: 11.5px; margin-bottom: 12px;"><span>✳</span><span>model is scroll-scrubbed — transform mapped to section progress (sticky stage):</span></div>
+        <div style="position: relative; height: 8px; margin: 0 4px 8px;">
+          <div style="position: absolute; left: 0; right: 0; top: 3px; height: 2px; background: color-mix(in oklab, var(--accent, #2997FF) 40%, transparent);"></div>
+          <div style="position: absolute; left: 0; top: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #2997FF);"></div>
+          <div style="position: absolute; left: 55%; top: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #2997FF);"></div>
+          <div style="position: absolute; right: 0; top: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #2997FF);"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10.5px;">
+          <span>0% · enters rotated −30°Y</span>
+          <span>55% · light blooms on</span>
+          <span>100% · settles at +18°Y</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 1c · FULL-PAGE FLOW ============ -->
+  <div id="1c" style="display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span style="background: #F5F5F7; color: #131316; font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;">1c</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #8E8E93;">Full-page flow — 6 viewports at 29% · one continuous scroll</span>
+    </div>
+
+    <div data-screen-label="Scroll flow strip" style="display: flex; gap: 20px; align-items: flex-start;">
+      <!-- filmstrip -->
+      <div style="width: 420px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 18px 60px rgba(0,0,0,0.5);">
+        <!-- mini hero -->
+        <div style="position: relative; height: 262px; background: radial-gradient(280px 200px at 76% 52%, rgba(41,151,255,0.20), transparent 70%), linear-gradient(180deg, #08080A, #0C0A14); border-bottom: 1px dashed rgba(255,255,255,0.14);">
+          <div style="position: absolute; top: 12px; left: 30px; right: 30px; height: 20px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border-radius: 999px; background: rgba(28,28,30,0.72); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 3px 10px rgba(0,0,0,0.4);">
+            <span style="width: 34px; height: 5px; border-radius: 3px; background: #F5F5F7;"></span>
+            <span style="display: flex; gap: 6px;"><span style="width: 16px; height: 4px; border-radius: 2px; background: #55555C;"></span><span style="width: 16px; height: 4px; border-radius: 2px; background: #55555C;"></span><span style="width: 16px; height: 4px; border-radius: 2px; background: #55555C;"></span></span>
+          </div>
+          <div style="position: absolute; inset: 44px 40px 0; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+              <span style="width: 148px; height: 15px; border-radius: 4px; background: #F5F5F7;"></span>
+              <span style="width: 106px; height: 15px; border-radius: 4px; background: #F5F5F7;"></span>
+              <span style="width: 82px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #0A84FF, #BF5AF2, #FF375F); margin-top: 5px;"></span>
+            </div>
+            <div style="position: relative; width: 90px; height: 112px;">
+              <span style="position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: 62px; height: 62px; border-radius: 50%; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.055) 0 6px, rgba(255,255,255,0) 6px 12px), #1A1A1E; border: 1px dashed #45454C;"></span>
+              <span style="position: absolute; left: 50%; top: 58px; transform: translateX(-50%); width: 46px; height: 38px; border-radius: 16px; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.055) 0 6px, rgba(255,255,255,0) 6px 12px), #1A1A1E; border: 1px dashed #45454C;"></span>
+            </div>
+          </div>
+        </div>
+        <!-- mini 01 — model left, amber -->
+        <div style="position: relative; height: 262px; background: radial-gradient(240px 190px at 18% 50%, rgba(255,159,10,0.22), transparent 70%), linear-gradient(180deg, #0C0A14, #140D06); border-bottom: 1px dashed rgba(255,255,255,0.14);">
+          <div style="position: absolute; inset: 0 40px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="width: 88px; height: 88px; border-radius: 50%; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.055) 0 6px, rgba(255,255,255,0) 6px 12px), #1A1A1E; border: 1px dashed #45454C;"></span>
+            <div style="display: flex; flex-direction: column; gap: 7px; align-items: flex-start;">
+              <span style="width: 56px; height: 12px; border-radius: 999px; border: 1px solid #4A4A50;"></span>
+              <span style="width: 118px; height: 13px; border-radius: 4px; background: #F5F5F7; margin-top: 3px;"></span>
+              <span style="width: 150px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+              <span style="width: 126px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+            </div>
+          </div>
+        </div>
+        <!-- mini 02 — model right, cyan -->
+        <div style="position: relative; height: 262px; background: radial-gradient(240px 190px at 82% 50%, rgba(90,200,250,0.20), transparent 70%), linear-gradient(180deg, #140D06, #081113); border-bottom: 1px dashed rgba(255,255,255,0.14);">
+          <div style="position: absolute; inset: 0 40px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 7px; align-items: flex-start;">
+              <span style="width: 56px; height: 12px; border-radius: 999px; border: 1px solid #4A4A50;"></span>
+              <span style="width: 118px; height: 13px; border-radius: 4px; background: #F5F5F7; margin-top: 3px;"></span>
+              <span style="width: 150px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+              <span style="width: 126px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+            </div>
+            <span style="width: 108px; height: 64px; border-radius: 14px; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.055) 0 6px, rgba(255,255,255,0) 6px 12px), #1A1A1E; border: 1px dashed #45454C;"></span>
+          </div>
+        </div>
+        <!-- mini 03 — model center, green -->
+        <div style="position: relative; height: 262px; background: radial-gradient(260px 170px at 50% 32%, rgba(48,209,88,0.18), transparent 72%), linear-gradient(180deg, #081113, #0A1309); border-bottom: 1px dashed rgba(255,255,255,0.14);">
+          <span style="position: absolute; left: 50%; top: 40px; transform: translateX(-50%); width: 172px; height: 92px; border-radius: 18px; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.055) 0 6px, rgba(255,255,255,0) 6px 12px), #1A1A1E; border: 1px dashed #45454C;"></span>
+          <div style="position: absolute; left: 40px; bottom: 38px; display: flex; flex-direction: column; gap: 7px;">
+            <span style="width: 108px; height: 12px; border-radius: 4px; background: #F5F5F7;"></span>
+            <span style="width: 142px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+          </div>
+        </div>
+        <!-- mini 04 — model left, blue -->
+        <div style="position: relative; height: 262px; background: radial-gradient(240px 190px at 16% 50%, rgba(10,132,255,0.20), transparent 70%), linear-gradient(180deg, #0A1309, #090D15); border-bottom: 1px dashed rgba(255,255,255,0.14);">
+          <div style="position: absolute; inset: 0 40px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="width: 80px; height: 80px; border-radius: 50%; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.055) 0 6px, rgba(255,255,255,0) 6px 12px), #1A1A1E; border: 1px dashed #45454C;"></span>
+            <div style="display: flex; align-items: center; gap: 18px;">
+              <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 76px; line-height: 1; letter-spacing: -0.04em; color: rgba(255,255,255,0.08);">04</span>
+              <div style="display: flex; flex-direction: column; gap: 7px;">
+                <span style="width: 96px; height: 13px; border-radius: 4px; background: #F5F5F7;"></span>
+                <span style="width: 118px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+                <span style="width: 96px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- mini 05 — model right + CTA, pink -->
+        <div style="position: relative; height: 262px; background: radial-gradient(240px 190px at 84% 50%, rgba(255,55,95,0.20), transparent 70%), linear-gradient(180deg, #090D15, #140913);">
+          <div style="position: absolute; inset: 0 40px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 7px; align-items: flex-start;">
+              <span style="width: 118px; height: 13px; border-radius: 4px; background: #F5F5F7;"></span>
+              <span style="width: 140px; height: 6px; border-radius: 3px; background: #4E4E55;"></span>
+              <span style="display: flex; align-items: center; justify-content: center; width: 92px; height: 24px; border-radius: 999px; background: var(--accent, #2997FF); box-shadow: 0 0 18px color-mix(in oklab, var(--accent, #2997FF) 55%, transparent); margin-top: 8px;"><span style="width: 44px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.95);"></span></span>
+            </div>
+            <span style="width: 84px; height: 84px; border-radius: 50%; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.055) 0 6px, rgba(255,255,255,0) 6px 12px), #1A1A1E; border: 1px dashed #45454C;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- per-section motion notes -->
+      <div style="display: var(--ann-b, block); width: 252px;">
+        <div style="height: 262px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-left: 14px; border-left: 1.5px dashed color-mix(in oklab, var(--accent, #2997FF) 50%, transparent);">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #E8E8EA;">hero — accent blue glow</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">chibi Hank waves on load · winks on hover · nav glass lifts on scroll</span>
+        </div>
+        <div style="height: 262px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-left: 14px; border-left: 1.5px dashed color-mix(in oklab, var(--accent, #2997FF) 50%, transparent);">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #E8E8EA;">01 · Lumen — amber glow</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">lamp rotates −30°→+18°Y with scroll · light blooms at 55%</span>
+        </div>
+        <div style="height: 262px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-left: 14px; border-left: 1.5px dashed color-mix(in oklab, var(--accent, #2997FF) 50%, transparent);">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #E8E8EA;">02 · Wayfarer — cyan glow</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">glasses unfold as section enters · lens HUD fades in, scrubbed by scroll</span>
+        </div>
+        <div style="height: 262px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-left: 14px; border-left: 1.5px dashed color-mix(in oklab, var(--accent, #2997FF) 50%, transparent);">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #E8E8EA;">03 · Keycap — green glow</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">keyboard explodes into keycaps mid-section → reassembles on exit</span>
+        </div>
+        <div style="height: 262px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-left: 14px; border-left: 1.5px dashed color-mix(in oklab, var(--accent, #2997FF) 50%, transparent);">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #E8E8EA;">04 · Pulse — blue glow</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">ring orbits camera 360° · stat cards orbit in behind it</span>
+        </div>
+        <div style="height: 262px; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-left: 14px; border-left: 1.5px dashed color-mix(in oklab, var(--accent, #2997FF) 50%, transparent);">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; color: #E8E8EA;">05 · Echo — pink glow · CTA</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; line-height: 1.6; color: var(--accent, #2997FF);">headphones tilt toward viewer · waveform ripple · closes with contact CTA</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- global motion intent -->
+    <div style="display: var(--ann-b, block); width: 692px; margin-top: 8px; border: 1.5px dashed color-mix(in oklab, var(--accent, #2997FF) 55%, transparent); border-radius: 14px; padding: 18px 22px; background: rgba(255,255,255,0.045);">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; color: var(--accent, #2997FF); margin-bottom: 12px;">MOTION INTENT — WHOLE PAGE · KEYNOTE-DARK</div>
+      <div style="display: flex; flex-direction: column; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; line-height: 1.65; color: var(--accent, #2997FF);">
+        <div style="display: flex; gap: 8px;"><span>✳</span><span>one continuous, uninterrupted scroll — the stage stays near-black throughout; each section's vibrant glow (blue → amber → cyan → green → blue → pink) cross-fades into the next, no hard cuts</span></div>
+        <div style="display: flex; gap: 8px;"><span>✳</span><span>each model sits on a sticky stage; rotation / pose / explode transforms are scrubbed by section scroll progress, so motion is buttery in both directions</span></div>
+        <div style="display: flex; gap: 8px;"><span>✳</span><span>vibrant color is reserved for key points only — glows behind models, gradient tagline, active states, CTAs; everything else stays white/gray on black</span></div>
+        <div style="display: flex; gap: 8px;"><span>✳</span><span>gentle scroll-snap (proximity) at each viewport boundary · dark glass nav persists throughout, shadow deepens after 40px</span></div>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;annotations&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Spec&quot; },
+  &quot;accent&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#2997FF&quot;, &quot;options&quot;: [&quot;#2997FF&quot;, &quot;#FF9F0A&quot;, &quot;#FF375F&quot;, &quot;#30D158&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Theme&quot; }
+}">
+class Component extends DCLogic {
+  renderVals() {
+    const ann = this.props.annotations ?? true;
+    return {
+      accentColor: this.props.accent ?? '#2997FF',
+      annBlock: ann ? 'block' : 'none',
+      annFlex: ann ? 'flex' : 'none'
+    };
+  }
+}
+</script>
+</body>
+</html>

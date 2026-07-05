@@ -1,0 +1,97 @@
+export type Layout = "model-left" | "model-right" | "model-center";
+
+export interface ShowcaseSection {
+  index: string; // "01".."05"
+  id: string;
+  name: string;
+  tag: string;
+  description: string;
+  cta: string;
+  accent: string;
+  glow: string; // rgba glow color used behind the model
+  layout: Layout;
+  /** background gradient this section fades from -> to, threading into the next section */
+  gradientFrom: string;
+  gradientTo: string;
+  motion: string;
+}
+
+export const HERO_ACCENT = "#2997FF";
+
+export const SHOWCASES: ShowcaseSection[] = [
+  {
+    index: "01",
+    id: "lumen",
+    name: "Lumen",
+    tag: "PRODUCT — IOT",
+    description:
+      "An ambient smart lamp and its companion app — hardware, firmware UI, and a light-scene design tool built as one system.",
+    cta: "View case study",
+    accent: "#FF9F0A",
+    glow: "255,159,10",
+    layout: "model-left",
+    gradientFrom: "#060607",
+    gradientTo: "#140D07",
+    motion: "lamp rotates −30°→+18°Y with scroll · light blooms at 55%",
+  },
+  {
+    index: "02",
+    id: "wayfarer",
+    name: "Wayfarer",
+    tag: "PRODUCT — WEARABLE AR",
+    description:
+      "Lightweight AR glasses with an on-lens HUD — optics, industrial design, and the companion app for building custom overlays.",
+    cta: "View case study",
+    accent: "#5AC8FA",
+    glow: "90,200,250",
+    layout: "model-right",
+    gradientFrom: "#140D06",
+    gradientTo: "#081113",
+    motion: "glasses unfold as section enters · lens HUD fades in, scrubbed by scroll",
+  },
+  {
+    index: "03",
+    id: "keycap",
+    name: "Keycap",
+    tag: "TOOL — 3D CONFIGURATOR",
+    description:
+      "A browser-based keyboard configurator — pick a layout, swap switches and keycaps, and preview it exploded in real time.",
+    cta: "View case study",
+    accent: "#30D158",
+    glow: "48,209,88",
+    layout: "model-center",
+    gradientFrom: "#081113",
+    gradientTo: "#0A1309",
+    motion: "keyboard explodes into keycaps mid-section → reassembles on exit",
+  },
+  {
+    index: "04",
+    id: "pulse",
+    name: "Pulse",
+    tag: "PRODUCT — WEARABLE HEALTH",
+    description:
+      "A smart ring for recovery tracking — sensor hardware, a readiness algorithm, and the dashboard that explains it plainly.",
+    cta: "View case study",
+    accent: "#0A84FF",
+    glow: "10,132,255",
+    layout: "model-left",
+    gradientFrom: "#0A1309",
+    gradientTo: "#090D15",
+    motion: "ring orbits camera 360° · stat cards orbit in behind it",
+  },
+  {
+    index: "05",
+    id: "echo",
+    name: "Echo",
+    tag: "PRODUCT — AUDIO",
+    description:
+      "Spatial audio headphones tuned by ear shape — a fitting app, adaptive DSP, and the sound design behind the presets.",
+    cta: "Get in touch",
+    accent: "#FF375F",
+    glow: "255,55,95",
+    layout: "model-right",
+    gradientFrom: "#090D15",
+    gradientTo: "#140913",
+    motion: "headphones tilt toward viewer · waveform ripple · closes with contact CTA",
+  },
+];

@@ -1,30 +1,25 @@
-# Hank Hsu — Portfolio
+# CODING AGENTS: READ THIS FIRST
 
-Static site. No build step, no framework — plain HTML/CSS/JS, so it deploys instantly and loads fast.
+This is a **handoff bundle** from Claude Design (claude.ai/design).
 
-## Before you deploy — fill these in
+A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
 
-1. **`index.html`**
-   - `href="mailto:your.email@example.com"` → your real email
-   - `href="https://linkedin.com/in/yourprofile"` → your LinkedIn
-   - `href="https://github.com/yourusername"` → your GitHub
-   - `href="/resume.pdf"` → add a `resume.pdf` file in the project root, or remove the button
-2. **`images/`** — swap the dashed placeholder boxes for real photos:
-   - Each `.project-media` div currently shows a placeholder grid with a label. Replace with:
-     `<img src="images/your-photo.jpg" alt="...">` inside the div, and remove the `data-placeholder` attribute.
-   - Good shots: the physical PCB, the drone mid-build, the buggy on track, the display + encoders. Real hardware photos outperform renders here.
-3. **Project copy** — the four project blocks (ESP32 mesh, FPV stack, buggy, encoder UI) are drafted from what I know of your work. Check every technical detail before this goes live — I may have details slightly off, and you'll want to add your own specifics (sensor types, board revision, what broke and how you fixed it).
+## What you should do — IMPORTANT
 
-## Deploy to Vercel (free)
+**Read the chat transcripts first.** There are 1 chat transcript(s) in `chats/`. The transcripts show the full back-and-forth between the user and the design assistant — they tell you **what the user actually wants** and **where they landed** after iterating. Don't skip them. The final HTML files are the output, but the chat is where the intent lives.
 
-1. Push this folder to a new GitHub repo.
-2. Go to vercel.com → sign in with GitHub → "Add New Project" → select the repo.
-3. Framework preset: **Other** (it's static, no build command needed).
-4. Click Deploy. You'll get a live URL like `hank-portfolio.vercel.app` in under a minute.
-5. Every future `git push` auto-redeploys.
+**Read `project/hxstudio Portfolio v2 (dark).dc.html` in full.** The user had this file open when they triggered the handoff, so it's almost certainly the primary design they want built. Read it top to bottom — don't skim. Then **follow its imports**: open every file it pulls in (shared components, CSS, scripts) so you understand how the pieces fit together before you start implementing.
 
-Optional later: buy a domain (~$10–15/yr) and add it under Project → Settings → Domains in Vercel. Not required — the free subdomain is fully fine to put on a resume.
+**If anything is ambiguous, ask the user to confirm before you start implementing.** It's much cheaper to clarify scope up front than to build the wrong thing.
 
-## Local preview
+## About the design files
 
-Just open `index.html` in a browser — no server needed since there's no build step.
+The design medium is **HTML/CSS/JS** — these are prototypes, not production code. Your job is to **recreate them pixel-perfectly** in whatever technology makes sense for the target codebase (React, Vue, native, whatever fits). Match the visual output; don't copy the prototype's internal structure unless it happens to fit.
+
+**Don't render these files in a browser or take screenshots unless the user asks you to.** Everything you need — dimensions, colors, layout rules — is spelled out in the source. Read the HTML and CSS directly; a screenshot won't tell you anything they don't.
+
+## Bundle contents
+
+- `README.md` — this file
+- `chats/` — conversation transcripts (read these!)
+- `project/` — the `portfolio` project files (HTML prototypes, assets, components)

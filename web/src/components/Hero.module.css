@@ -1,0 +1,98 @@
+.hero {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background: #060607;
+  scroll-snap-align: start;
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(760px 540px at 76% 40%, color-mix(in oklab, #2997ff 18%, transparent), transparent 66%),
+    radial-gradient(620px 500px at 4% 98%, rgba(191, 90, 242, 0.13), transparent 62%);
+}
+
+.content {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  padding: 0 clamp(24px, 8vw, 120px);
+  gap: 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: clamp(40px, 6vw, 80px);
+  line-height: 1.03;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  text-wrap: balance;
+}
+
+.dot {
+  color: #2997ff;
+}
+
+.tagline {
+  margin: 28px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: clamp(18px, 2vw, 25px);
+  font-weight: 600;
+}
+
+.taglineBar {
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #0a84ff, #bf5af2);
+  flex-shrink: 0;
+}
+
+.taglineText {
+  background: linear-gradient(93deg, #0a84ff 0%, #bf5af2 35%, #ff375f 68%, #ff9f0a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stage {
+  position: relative;
+  height: min(70vh, 640px);
+}
+
+.scrollCue {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+  transition: opacity 0.5s ease;
+}
+
+.scrollCue.hidden {
+  opacity: 0;
+}
+
+@media (max-width: 860px) {
+  .content {
+    grid-template-columns: 1fr;
+    padding-top: 100px;
+    gap: 12px;
+  }
+  .stage {
+    height: 40vh;
+  }
+}

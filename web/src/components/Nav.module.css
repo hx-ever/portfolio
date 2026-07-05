@@ -1,0 +1,66 @@
+.nav {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: min(1200px, calc(100vw - 32px));
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(16px, 3vw, 30px);
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.55);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: box-shadow 0.4s ease;
+}
+
+.nav.scrolled {
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, #0a84ff, #bf5af2);
+  flex-shrink: 0;
+}
+
+.links {
+  display: flex;
+  gap: clamp(20px, 3vw, 40px);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.links a {
+  color: var(--muted);
+  transition: color 0.25s ease;
+  white-space: nowrap;
+}
+
+.links a:hover,
+.links a.active {
+  color: var(--fg);
+}

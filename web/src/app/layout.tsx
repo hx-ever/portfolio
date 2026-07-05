@@ -1,0 +1,39 @@
+import type { Metadata } from "next";
+import { Bricolage_Grotesque, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
+import "./globals.css";
+
+const display = Bricolage_Grotesque({
+  variable: "--font-display",
+  subsets: ["latin"],
+});
+
+const mono = IBM_Plex_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
+const body = Instrument_Sans({
+  variable: "--font-body",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "hxstudio — Hsu Hsin-Wei, Design Engineer",
+  description: "Portfolio of Hsu Hsin-Wei (Hank), Design Engineer.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="en"
+      className={`${display.variable} ${mono.variable} ${body.variable}`}
+    >
+      <body>{children}</body>
+    </html>
+  );
+}

@@ -7,8 +7,13 @@ import { useEffect, useRef, useState } from "react";
  * `range` pixels away) of this element from the viewport's vertical
  * center. Powers scroll-driven focus effects like the Experience timeline,
  * where the entry nearest center reads sharp and others blur/fade out.
+ *
+ * Distances within `plateau` px of center report 0, so the entry stays
+ * fully sharp across a window around center rather than at a single
+ * point; beyond it, t ramps to 1 on a smoothstep (flat near the plateau
+ * edge, steeper mid-transition).
  */
-export function useFocusDistance<T extends HTMLElement>(range = 320) {
+export function useFocusDistance<T extends HTMLElement>(range = 320, plateau = 100) {
   const ref = useRef<T | null>(null);
   const [t, setT] = useState(1);
 
@@ -23,7 +28,8 @@ export function useFocusDistance<T extends HTMLElement>(range = 320) {
       const cardCenter = rect.top + rect.height / 2;
       const viewportCenter = window.innerHeight / 2;
       const dist = Math.abs(cardCenter - viewportCenter);
-      setT(Math.min(1, dist / range));
+      const u = Math.min(1, Math.max(0, (dist - plateau) / (range - plateau)));
+      setT(u * u * (3 - 2 * u));
     };
 
     const onScroll = () => {
@@ -39,7 +45,7 @@ export function useFocusDistance<T extends HTMLElement>(range = 320) {
       window.removeEventListener("resize", onScroll);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [range]);
+  }, [range, plateau]);
 
   return { ref, t };
 }

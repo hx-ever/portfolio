@@ -3,13 +3,14 @@
 import { useRef, useState } from "react";
 import { EXPERIENCE, type ExperienceEntry } from "@/lib/experience";
 import { HERO_ACCENT } from "@/lib/sections";
-import { useFocusDistance, useSpineFill } from "@/lib/useFocusDistance";
+import { useActiveEntry, useFocusDistance, useSpineFill } from "@/lib/useFocusDistance";
 import { useScrollFriction } from "@/lib/useScrollFriction";
 import styles from "./Experience.module.css";
 
 export default function Experience() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const { ref: trackRef, fraction } = useSpineFill<HTMLDivElement>();
+  const activeIndex = useActiveEntry(sectionRef);
   useScrollFriction(sectionRef);
 
   return (
@@ -40,7 +41,7 @@ export default function Experience() {
         </div>
 
         {EXPERIENCE.map((entry, i) => (
-          <Row key={entry.id} entry={entry} row={i + 1} />
+          <Row key={entry.id} entry={entry} row={i + 1} active={i === activeIndex} />
         ))}
       </div>
     </section>
@@ -48,13 +49,19 @@ export default function Experience() {
 }
 
 const MAX_TILT = 10; // degrees at the card's edges
+const HOVER_SCALE = 1.06;
 
-function Row({ entry, row }: { entry: ExperienceEntry; row: number }) {
+function Row({
+  entry,
+  row,
+  active, // the single scroll-focused entry — the only one hover affects
+}: {
+  entry: ExperienceEntry;
+  row: number;
+  active: boolean;
+}) {
   const { ref, t } = useFocusDistance<HTMLDivElement>();
   const focus = 1 - t;
-  // Hover only works on the entry the scroll system holds in its clear
-  // plateau; everything still blurred must ignore the cursor entirely.
-  const active = t === 0;
 
   const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
   const [hovered, setHovered] = useState(false);
@@ -81,11 +88,13 @@ function Row({ entry, row }: { entry: ExperienceEntry; row: number }) {
   const rx = active ? tilt.rx : 0;
   const ry = active ? tilt.ry : 0;
 
+  const scale = (1 + Math.pow(focus, 3) * 0.03) * (clear ? HOVER_SCALE : 1);
+
   const cardStyle = {
     gridRow: row,
     filter: clear ? "none" : `blur(${(t * 7).toFixed(2)}px)`,
     opacity: clear ? 1 : 0.22 + focus * 0.78,
-    transform: `perspective(700px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${1 + Math.pow(focus, 3) * 0.03})`,
+    transform: `perspective(700px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${scale.toFixed(3)})`,
     "--focus": focus,
   } as React.CSSProperties;
 
@@ -115,6 +124,15 @@ function Row({ entry, row }: { entry: ExperienceEntry; row: number }) {
         className={styles.node}
         data-incoming={entry.incoming ?? false}
         style={{ gridRow: row, "--focus": focus } as React.CSSProperties}
+      />
+
+      {/* Spine-to-card connector: visible only for the active entry, and
+          fades away while it is hovered (the card "detaches" to be examined). */}
+      <div
+        className={styles.connector}
+        data-side={entry.side}
+        style={{ gridRow: row, opacity: active && !hovered ? 1 : 0 }}
+        aria-hidden="true"
       />
     </>
   );

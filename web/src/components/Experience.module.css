@@ -44,11 +44,12 @@
 }
 
 .timeline {
+  --cgap: clamp(24px, 4vw, 44px);
   position: relative;
   display: grid;
   grid-template-columns: 1fr 64px 1fr;
   row-gap: clamp(48px, 8vh, 96px);
-  column-gap: clamp(24px, 4vw, 44px);
+  column-gap: var(--cgap);
 }
 
 .spineTrack {
@@ -87,6 +88,32 @@
   border: 1.5px dashed color-mix(in oklab, var(--accent) calc(var(--focus) * 100%), #8e8e93);
 }
 
+/* Spine-to-card connector for the active entry. Spans from the spine
+   center (middle of the 64px column) across the column gap to the card's
+   nearest edge; opacity is driven inline from the active/hover state. */
+.connector {
+  grid-column: 2;
+  align-self: center;
+  width: calc(32px + var(--cgap));
+  height: 2px;
+  background: color-mix(in oklab, var(--accent) 85%, transparent);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--accent) 45%, transparent);
+  border-radius: 1px;
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.connector[data-side="left"] {
+  justify-self: start;
+  margin-left: calc(-1 * var(--cgap));
+}
+
+.connector[data-side="right"] {
+  justify-self: end;
+  margin-right: calc(-1 * var(--cgap));
+}
+
 .card {
   position: relative;
   width: 100%;
@@ -113,23 +140,6 @@
 .card[data-side="right"] {
   grid-column: 3;
   justify-self: start;
-}
-
-.card::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: clamp(24px, 3vw, 40px);
-  border-top: 1px dashed
-    color-mix(in oklab, var(--accent) calc(var(--focus) * 50%), rgba(255, 255, 255, 0.18));
-}
-
-.card[data-side="left"]::before {
-  right: -40px;
-}
-
-.card[data-side="right"]::before {
-  left: -40px;
 }
 
 .range {
@@ -172,8 +182,8 @@
 
 @media (max-width: 760px) {
   .timeline {
+    --cgap: 20px;
     grid-template-columns: 40px 1fr;
-    column-gap: 20px;
   }
   .spineTrack {
     grid-column: 1;
@@ -187,7 +197,13 @@
     justify-self: stretch;
     max-width: none;
   }
-  .card::before {
-    display: none;
+  /* single-column layout: every card sits right of the spine */
+  .connector[data-side="left"],
+  .connector[data-side="right"] {
+    grid-column: 1;
+    justify-self: end;
+    margin-left: 0;
+    margin-right: calc(-1 * var(--cgap));
+    width: calc(20px + var(--cgap));
   }
 }

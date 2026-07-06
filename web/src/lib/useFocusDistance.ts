@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
+
+/** Distance from viewport center (px) within which an entry is fully sharp. */
+export const FOCUS_PLATEAU = 150;
 
 /**
  * Normalized distance (0 = centered in the viewport, 1 = at or beyond
@@ -15,7 +18,7 @@ import { useEffect, useRef, useState } from "react";
  * the scroll-friction hold zone so the held entry reads comfortably for
  * the whole sticky stretch.
  */
-export function useFocusDistance<T extends HTMLElement>(range = 320, plateau = 150) {
+export function useFocusDistance<T extends HTMLElement>(range = 320, plateau = FOCUS_PLATEAU) {
   const ref = useRef<T | null>(null);
   const [t, setT] = useState(1);
 
@@ -50,6 +53,57 @@ export function useFocusDistance<T extends HTMLElement>(range = 320, plateau = 1
   }, [range, plateau]);
 
   return { ref, t };
+}
+
+/**
+ * Index of the single "active" entry: the `[data-focal]` element inside
+ * the container nearest the viewport center, provided it sits within the
+ * clarity plateau; -1 when none qualifies. The one source of truth for
+ * everything gated on "the active entry" (hover tilt/clarity/scale and
+ * the spine connector), so at most one entry is ever interactive even
+ * when two are simultaneously inside their own clarity plateaus.
+ */
+export function useActiveEntry<T extends HTMLElement>(ref: RefObject<T | null>) {
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  useEffect(() => {
+    const container = ref.current;
+    if (!container) return;
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const els = container.querySelectorAll<HTMLElement>("[data-focal]");
+      const focal = window.innerHeight / 2;
+      let best = -1;
+      let min = Infinity;
+      els.forEach((el, i) => {
+        const rect = el.getBoundingClientRect();
+        const d = Math.abs(rect.top + rect.height / 2 - focal);
+        if (d < min) {
+          min = d;
+          best = i;
+        }
+      });
+      setActiveIndex(min <= FOCUS_PLATEAU ? best : -1);
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [ref]);
+
+  return activeIndex;
 }
 
 /**

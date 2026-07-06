@@ -62,7 +62,11 @@
 .tooltip {
   position: absolute;
   left: 0;
-  top: -46px;
+  /* rest: bottom edge sits 14px above the icons' resting top edge, which is
+     (dock 96px - icon 56px) / 2 = 20px down from the dock top; 20 - 14 = 6.
+     The JS-driven translateY then tracks the hovered icon's rise so the gap
+     holds while the icon lifts. */
+  bottom: calc(100% - 6px);
   padding: 7px 14px;
   border-radius: 999px;
   font-size: 13px;
@@ -77,10 +81,12 @@
   opacity: 0;
   translate: 0 6px;
   pointer-events: none;
+  /* transform timing matches .icon exactly so the tooltip and the icon's
+     lift resolve as one motion, never overlapping mid-animation */
   transition:
     opacity 200ms ease,
     translate 200ms ease,
-    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform 170ms cubic-bezier(0.3, 1.35, 0.5, 1);
 }
 
 .tooltip[data-visible="true"] {
@@ -154,7 +160,7 @@
 /* keyboard focus mirrors the fully-magnified hover state */
 .icon:focus-visible {
   outline: none;
-  transform: translateY(-18px) scale(1.5);
+  transform: translateY(-18px) scale(1.35);
   filter: brightness(1.28);
   box-shadow: 0 16px 34px rgba(41, 151, 255, 0.5);
 }

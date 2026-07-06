@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { HERO_ACCENT } from "@/lib/sections";
 import styles from "./Contact.module.css";
 
-const MAX_SCALE = 0.5; // icon under cursor reaches 1 + 0.5 = 1.5x
+const MAX_SCALE = 0.35; // icon under cursor reaches 1 + 0.35 = 1.35x
 const MAX_LIFT = 18; // px upward at full magnification
-const RADIUS = 130; // falloff radius; adjacent icons land ~1.15-1.25x
+const RADIUS = 130; // falloff radius; neighbors shrink proportionally
+// The 14px tooltip-to-icon gap lives in the CSS rest position (.tooltip
+// bottom); topRise() keeps it constant while the icon lifts.
 
 const ICONS = [
   {
@@ -32,11 +34,12 @@ const ICONS = [
 export default function Contact() {
   const dockRef = useRef<HTMLDivElement | null>(null);
   const iconRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const reducedMotion = useRef(false);
 
-  // Tooltip anchor: which icon it names and the x (px, dock-relative) it
-  // centers over. Updates only when the nearest icon changes, not per move.
-  const [active, setActive] = useState<{ index: number; x: number }>({ index: -1, x: 0 });
+  // Which icon the tooltip names (label + visibility). Position is written
+  // imperatively so it shares the icons' exact transition timing.
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
     reducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -52,6 +55,34 @@ export default function Contact() {
     const u = Math.min(Math.abs(dx) / RADIUS, 1);
     const c = Math.cos((u * Math.PI) / 2);
     return c * c;
+  };
+
+  // How far the icon's top edge has risen at influence g: the lift plus the
+  // scale growth (transform-origin is the icon's bottom).
+  const topRise = (g: number, iconHeight: number) => g * (MAX_LIFT + MAX_SCALE * iconHeight);
+
+  /**
+   * Anchor the tooltip over icon `i` at influence `g`. The tooltip's rest
+   * position already sits TOOLTIP_GAP above the icon's rest top edge, and
+   * this translateY tracks the icon's rise. Both elements retarget the
+   * same transition curve at the same moments, so the gap holds
+   * mid-animation too. `snap` places it without transition (first
+   * appearance / keyboard jumps).
+   */
+  const positionTooltip = (i: number, g: number, snap: boolean) => {
+    const tip = tooltipRef.current;
+    const el = iconRefs.current[i];
+    if (!tip || !el) return;
+    const rise = reducedMotion.current ? 0 : topRise(g, el.offsetHeight);
+    const transform = `translate(calc(${iconCenter(i).toFixed(0)}px - 50%), ${(-rise).toFixed(1)}px)`;
+    if (snap) {
+      tip.style.transition = "none";
+      tip.style.transform = transform;
+      void tip.offsetWidth;
+      tip.style.transition = "";
+    } else {
+      tip.style.transform = transform;
+    }
   };
 
   const onDockMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -84,9 +115,10 @@ export default function Contact() {
       el.style.boxShadow = `0 ${(6 + 10 * g).toFixed(0)}px ${(14 + 20 * g).toFixed(0)}px rgba(41, 151, 255, ${(0.5 * g).toFixed(3)})`;
     });
 
-    if (nearest !== active.index) {
-      setActive({ index: nearest, x: iconCenter(nearest) });
+    if (nearest >= 0) {
+      positionTooltip(nearest, influence(cursorX - iconCenter(nearest)), activeIndex === -1);
     }
+    if (nearest !== activeIndex) setActiveIndex(nearest);
   };
 
   const onDockMouseLeave = () => {
@@ -96,13 +128,16 @@ export default function Contact() {
       el.style.filter = "";
       el.style.boxShadow = "";
     });
-    setActive((a) => ({ ...a, index: -1 }));
+    setActiveIndex(-1);
   };
 
-  // Keyboard focus mirrors hover: CSS :focus-visible supplies the
-  // magnified/glow state; here we just anchor the tooltip.
-  const onIconFocus = (i: number) => setActive({ index: i, x: iconCenter(i) });
-  const onIconBlur = () => setActive((a) => ({ ...a, index: -1 }));
+  // Keyboard focus mirrors hover: CSS :focus-visible supplies the fully
+  // magnified state, so anchor the tooltip at full influence.
+  const onIconFocus = (i: number) => {
+    positionTooltip(i, 1, true);
+    setActiveIndex(i);
+  };
+  const onIconBlur = () => setActiveIndex(-1);
 
   // Soft ripple expanding from the clicked icon. The host span is owned by
   // React; ripples are appended imperatively and clean themselves up.
@@ -124,21 +159,17 @@ export default function Contact() {
       <div className={styles.glow} aria-hidden="true" />
 
       <span className={styles.eyebrow}>CONTACT</span>
-      <h2 className={styles.headline}>Let&rsquo;s Talk</h2>
-      <p className={styles.support}>
-        Interested in internships, embedded systems, robotics,
-        <br />
-        or simply connecting.
-      </p>
+      <h2 className={styles.headline}>Let&rsquo;s Build</h2>
+      <p className={styles.support}>Interested in design engineering roles.</p>
 
       <div className={styles.dockWrap}>
         <div
+          ref={tooltipRef}
           className={styles.tooltip}
-          data-visible={active.index >= 0}
-          style={{ transform: `translate(calc(${active.x}px - 50%), 0)` }}
+          data-visible={activeIndex >= 0}
           aria-hidden="true"
         >
-          {active.index >= 0 ? ICONS[active.index].label : ""}
+          {activeIndex >= 0 ? ICONS[activeIndex].label : ""}
         </div>
 
         <div

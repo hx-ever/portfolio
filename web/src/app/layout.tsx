@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, IBM_Plex_Mono, Instrument_Sans } from "next/font/g
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import Nav from "@/components/Nav";
+import AnalyticsTracker from "@/components/AnalyticsTracker";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -38,6 +39,7 @@ export default function RootLayout({
     >
       <body>
         <Nav />
+        <AnalyticsTracker />
         {children}
         <SpeedInsights />
         <Analytics />

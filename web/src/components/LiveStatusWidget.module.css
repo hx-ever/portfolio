@@ -1,0 +1,134 @@
+.section {
+  display: flex;
+  justify-content: center;
+  padding: clamp(8px, 3vh, 32px) 24px clamp(48px, 8vh, 88px);
+  background: var(--bg);
+}
+
+/* Frosted glass — same material tokens as the Contact dock. */
+.card {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 3vw, 28px);
+  padding: 16px clamp(20px, 3vw, 30px);
+  border-radius: 999px;
+  background: rgba(28, 28, 32, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.online {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.onlineText,
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.num {
+  font-family: var(--font-mono), monospace;
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.label {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.divider {
+  width: 1px;
+  height: 26px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+/* ============ online pulse ============ */
+
+.dotWrap {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* blue family, never green */
+  background: var(--accent);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--accent) 70%, transparent);
+}
+
+/* Blurred duplicate behind the dot, breathing slowly — "alive", not "alert". */
+.halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  filter: blur(2px);
+  transform: translate(-50%, -50%);
+  animation: haloPulse 3s ease-in-out infinite;
+}
+
+@keyframes haloPulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(2.6);
+    opacity: 0;
+  }
+}
+
+.unavailable {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+@media (max-width: 560px) {
+  .card {
+    flex-direction: column;
+    gap: 12px;
+    border-radius: 24px;
+    padding: 20px 28px;
+  }
+  .divider {
+    width: 40px;
+    height: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .halo {
+    animation: none;
+    opacity: 0.4;
+  }
+}

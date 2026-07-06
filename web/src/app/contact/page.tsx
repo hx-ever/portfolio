@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Contact from "@/components/Contact";
+import LiveStatusWidget from "@/components/LiveStatusWidget";
 import WorldMap from "@/components/WorldMap";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export default function ContactPage() {
   return (
     <main>
       <Contact />
+      <LiveStatusWidget />
       <WorldMap />
     </main>
   );

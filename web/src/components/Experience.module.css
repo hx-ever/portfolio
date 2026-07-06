@@ -101,6 +101,8 @@
   will-change: filter, transform, opacity;
   /* touch-side of the magnetic focus effect (wheel gets JS friction) */
   scroll-snap-align: center;
+  /* smooths the hover tilt and its reset back to flat */
+  transition: transform 160ms ease-out;
 }
 
 .card[data-side="left"] {

@@ -11,9 +11,11 @@ import { useEffect, useRef, useState } from "react";
  * Distances within `plateau` px of center report 0, so the entry stays
  * fully sharp across a window around center rather than at a single
  * point; beyond it, t ramps to 1 on a smoothstep (flat near the plateau
- * edge, steeper mid-transition).
+ * edge, steeper mid-transition). The plateau is deliberately wider than
+ * the scroll-friction hold zone so the held entry reads comfortably for
+ * the whole sticky stretch.
  */
-export function useFocusDistance<T extends HTMLElement>(range = 320, plateau = 100) {
+export function useFocusDistance<T extends HTMLElement>(range = 320, plateau = 150) {
   const ref = useRef<T | null>(null);
   const [t, setT] = useState(1);
 

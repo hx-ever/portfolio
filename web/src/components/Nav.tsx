@@ -119,7 +119,11 @@ export default function Nav() {
         >
           Experience
         </Link>
-        <Link href="/#contact" onMouseEnter={onLinkEnter}>
+        <Link
+          href="/contact"
+          onMouseEnter={onLinkEnter}
+          className={pathname === "/contact" ? styles.active : undefined}
+        >
           Contact
         </Link>
       </div>

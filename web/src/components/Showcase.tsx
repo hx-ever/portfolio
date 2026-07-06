@@ -62,7 +62,7 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
           </span>
           <h2 className={styles.title}>{section.name}</h2>
           <p className={styles.description}>{section.description}</p>
-          <a href={section.id === "echo" ? "#contact" : "#"} className={styles.cta}>
+          <a href={section.id === "echo" ? "/contact" : "#"} className={styles.cta}>
             {section.cta} →
           </a>
         </div>

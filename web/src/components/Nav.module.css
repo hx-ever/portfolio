@@ -11,20 +11,67 @@
   justify-content: space-between;
   padding: 0 clamp(16px, 3vw, 30px);
   border-radius: 999px;
-  background: rgba(28, 28, 30, 0.55);
-  backdrop-filter: blur(18px) saturate(1.6);
-  -webkit-backdrop-filter: blur(18px) saturate(1.6);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  overflow: hidden; /* clips the oversized specular layer and edge distortion */
+  background: rgba(24, 24, 27, 0.14);
+  /* glass edge catching light */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  /* refraction: noise-displaced backdrop; browsers that can't do url()
+     in backdrop-filter keep the plain blur declaration above */
+  backdrop-filter: blur(20px) saturate(180%) url(#lg-distortion);
+  /* floating above the page */
   box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.45),
+    0 12px 40px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: box-shadow 0.4s ease;
+  transition: box-shadow 400ms ease;
 }
 
 .nav.scrolled {
   box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 20px 60px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* "Thicker" glass while a link is hovered: deeper shadow + brighter
+   specular (the blur increase itself is local to the hover pill). */
+.nav[data-thick="true"] {
+  box-shadow:
+    0 22px 68px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* Specular highlight: an angled sheen plus a soft top-edge hotspot that
+   slides a few px toward the cursor via --spec-shift. */
+.nav::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -20px;
+  right: -20px;
+  pointer-events: none;
+  background:
+    radial-gradient(420px 64px at 26% -12%, rgba(255, 255, 255, 0.16), transparent 70%),
+    linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.02) 32%,
+      transparent 55%
+    );
+  transform: translateX(var(--spec-shift, 0px));
+  opacity: 0.8;
+  transition: transform 250ms ease-out, opacity 300ms ease;
+}
+
+.nav[data-thick="true"]::before {
+  opacity: 1;
+}
+
+.defs {
+  position: absolute;
+  width: 0;
+  height: 0;
 }
 
 .brand {
@@ -35,7 +82,9 @@
   font-weight: 700;
   font-size: 19px;
   letter-spacing: -0.02em;
-  color: var(--fg);
+  color: var(--fg); /* solid text, never on raw glass */
+  position: relative;
+  z-index: 1;
 }
 
 .mark {
@@ -48,14 +97,20 @@
 }
 
 .links {
+  position: relative;
   display: flex;
-  gap: clamp(20px, 3vw, 40px);
+  align-items: center;
+  gap: clamp(4px, 1vw, 12px);
   font-size: 14px;
   font-weight: 500;
 }
 
 .links a {
-  color: var(--muted);
+  position: relative;
+  z-index: 1; /* text sits on top of the glass pill */
+  padding: 8px 14px;
+  border-radius: 999px;
+  color: var(--muted); /* solid color, full contrast */
   transition: color 0.25s ease;
   white-space: nowrap;
 }
@@ -63,4 +118,65 @@
 .links a:hover,
 .links a.active {
   color: var(--fg);
+}
+
+/* Hover pill: one continuous glass shape that slides and resizes between
+   links. Its own stronger backdrop blur is the local "thicker material". */
+.pill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 38px;
+  margin-top: -19px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(26px) saturate(200%);
+  backdrop-filter: blur(26px) saturate(200%);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  opacity: 0;
+  scale: 0.85;
+  pointer-events: none;
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease,
+    scale 320ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+.pill[data-visible="true"] {
+  opacity: 1;
+  scale: 1;
+}
+
+/* Appearing from hidden (or reduced motion): position/size snap into
+   place while opacity and scale still ease. */
+.pill.snap {
+  transition-property: opacity, scale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav::before,
+  .pill {
+    transition: none;
+  }
+}
+
+/* Reduced transparency / increased contrast: solid bar, no glass tricks. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .nav {
+    background: rgba(24, 24, 27, 0.97);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .nav::before {
+    display: none;
+  }
+  .pill {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.14);
+  }
 }

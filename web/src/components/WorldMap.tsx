@@ -12,9 +12,11 @@ const LAT_TOP = 85;
 const LAT_BOTTOM = -58;
 const ASPECT = (LAT_TOP - LAT_BOTTOM) / 360; // height = width * ASPECT
 
-const SPACING = 7; // px between dot centers
-const HOVER_RADIUS = 100; // px cursor light radius
-const LOC_RADIUS_FRAC = 0.016; // highlight cluster radius as fraction of width
+const SPACING = 3.5; // px between dot centers — fine enough for small islands
+const MASK_SCALE = 2; // rasterize the landmass mask at 2x for narrow features
+const SIGMA = 70; // Gaussian falloff width for the cursor glow (px)
+const GAUSS_K = 1 / (2 * SIGMA * SIGMA);
+const LOC_RADIUS_FRAC = 0.009; // highlight cluster radius as fraction of width
 const PULSE_MS = 4000; // breathing period for highlighted clusters
 
 const DIM = { r: 148, g: 160, b: 178 }; // resting dot tint
@@ -27,7 +29,8 @@ const LOCATIONS = [
   { label: "SHANGHAI", lon: 121.47, lat: 31.23, dx: 14, dy: -18 },
 ];
 
-const STEPS = 24; // intensity quantization for the color lookup tables
+const STEPS = 24; // intensity quantization for the sprite atlas
+const SPRITE = 8; // sprite box size in css px
 
 interface Dot {
   x: number;
@@ -55,19 +58,22 @@ const mix = (
 const rgba = (c: { r: number; g: number; b: number }, a: number) =>
   `rgba(${c.r.toFixed(0)}, ${c.g.toFixed(0)}, ${c.b.toFixed(0)}, ${a.toFixed(3)})`;
 
-// Base dots: dim gray-blue at rest ramping to the blue accent when lit.
+// Base dots: always-visible muted tint at rest, ramping to the blue accent.
+// The rest alpha keeps the whole map clearly readable with no cursor at all.
 const BASE_LUT = Array.from({ length: STEPS + 1 }, (_, i) => {
   const t = i / STEPS;
-  return rgba(mix(DIM, BLUE, t), 0.12 + 0.82 * t);
+  return rgba(mix(DIM, BLUE, t), 0.24 + 0.7 * t);
 });
-// Highlight clusters: blue/purple blend, never fully dim.
+// Highlight clusters: blue/purple blend, never dim.
 const LOC_LUT = Array.from({ length: STEPS + 1 }, (_, i) => {
   const t = i / STEPS;
   return rgba(mix(mix(BLUE, PURPLE, 0.4), mix(BLUE, PURPLE, 0.15), t), 0.3 + 0.7 * t);
 });
 
-// Smooth cosine-squared falloff, same family as the dock magnification.
-const falloff = (dist: number, radius: number) => {
+const dotRadius = (t: number) => 1.05 + 0.55 * t;
+
+// Cosine-squared falloff for the static location clusters.
+const clusterFalloff = (dist: number, radius: number) => {
   const u = Math.min(dist / radius, 1);
   const c = Math.cos((u * Math.PI) / 2);
   return c * c;
@@ -93,6 +99,7 @@ export default function WorldMap() {
 
     let dots: Dot[] = [];
     let locPoints: { x: number; y: number; r: number }[] = [];
+    let sprites: HTMLCanvasElement[][] = [];
     let W = 0;
     let H = 0;
     const cursor = { x: -1e6, y: -1e6 };
@@ -105,6 +112,25 @@ export default function WorldMap() {
       y: ((LAT_TOP - lat) / (LAT_TOP - LAT_BOTTOM)) * H,
     });
 
+    // Pre-render one dot sprite per palette and intensity step; per-frame
+    // drawing is then pure blits, which keeps the finer grid (~3x the old
+    // dot count) comfortably within frame budget.
+    const buildSprites = (dpr: number) => {
+      sprites = [BASE_LUT, LOC_LUT].map((lut) =>
+        lut.map((color, i) => {
+          const c = document.createElement("canvas");
+          c.width = c.height = Math.ceil(SPRITE * dpr);
+          const sctx = c.getContext("2d")!;
+          sctx.scale(dpr, dpr);
+          sctx.fillStyle = color;
+          sctx.beginPath();
+          sctx.arc(SPRITE / 2, SPRITE / 2, dotRadius(i / STEPS), 0, Math.PI * 2);
+          sctx.fill();
+          return c;
+        })
+      );
+    };
+
     const build = () => {
       W = wrap.clientWidth;
       H = Math.round(W * ASPECT);
@@ -113,35 +139,55 @@ export default function WorldMap() {
       canvas.height = H * dpr;
       canvas.style.height = `${H}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      buildSprites(dpr);
 
-      // Rasterize landmass once, then sample the pixel grid for dot sites.
+      // Rasterize the landmass vectors at 2x resolution so narrow features
+      // (straits, small islands) survive, then sample the grid for dot sites.
       const mask = document.createElement("canvas");
-      mask.width = W;
-      mask.height = H;
+      mask.width = W * MASK_SCALE;
+      mask.height = H * MASK_SCALE;
       const mctx = mask.getContext("2d");
       if (!mctx) return;
+      mctx.scale(MASK_SCALE, MASK_SCALE);
       mctx.fillStyle = "#fff";
       mctx.beginPath();
       for (const polygon of polygons) {
         for (const ring of polygon) {
-          ring.forEach(([lon, lat], i) => {
-            const p = project(lon, lat);
-            if (i === 0) mctx.moveTo(p.x, p.y);
-            else mctx.lineTo(p.x, p.y);
+          // Unwrap longitudes so antimeridian-crossing rings (Chukotka,
+          // Fiji) don't draw a chord across the whole map; stamping the
+          // path at ±360° puts the overflowing part back on the far side.
+          let prev = ring[0][0];
+          const unwrapped = ring.map(([lon, lat]) => {
+            while (lon - prev > 180) lon -= 360;
+            while (lon - prev < -180) lon += 360;
+            prev = lon;
+            return [lon, lat] as [number, number];
           });
-          mctx.closePath();
+          for (const shift of [-360, 0, 360]) {
+            unwrapped.forEach(([lon, lat], i) => {
+              const p = project(lon + shift, lat);
+              if (i === 0) mctx.moveTo(p.x, p.y);
+              else mctx.lineTo(p.x, p.y);
+            });
+            mctx.closePath();
+          }
         }
       }
       mctx.fill();
-      const pixels = mctx.getImageData(0, 0, W, H).data;
+      const pixels = mctx.getImageData(0, 0, mask.width, mask.height).data;
+      const landAt = (x: number, y: number) => {
+        const mx = Math.min(mask.width - 1, Math.round(x * MASK_SCALE));
+        const my = Math.min(mask.height - 1, Math.round(y * MASK_SCALE));
+        return pixels[(my * mask.width + mx) * 4 + 3] >= 128;
+      };
 
-      const locR = Math.max(10, W * LOC_RADIUS_FRAC);
+      const locR = Math.max(8, W * LOC_RADIUS_FRAC);
       locPoints = LOCATIONS.map((l) => ({ ...project(l.lon, l.lat), r: locR }));
 
       const locWeight = (x: number, y: number) => {
         let g = 0;
         for (const p of locPoints) {
-          g = Math.max(g, falloff(Math.hypot(x - p.x, y - p.y), p.r));
+          g = Math.max(g, clusterFalloff(Math.hypot(x - p.x, y - p.y), p.r));
         }
         return g;
       };
@@ -149,25 +195,30 @@ export default function WorldMap() {
       dots = [];
       for (let y = SPACING / 2; y < H; y += SPACING) {
         for (let x = SPACING / 2; x < W; x += SPACING) {
-          const alpha = pixels[(Math.round(y) * W + Math.round(x)) * 4 + 3];
-          if (alpha < 128) continue;
+          if (!landAt(x, y)) continue;
           dots.push({ x, y, locG: locWeight(x, y), cur: 0 });
         }
       }
 
       // Guarantee each marked location has a visible cluster even where the
-      // 110m landmass omits small islands (Singapore).
+      // landmass data omits small islands (Singapore at 110m): a small
+      // diamond of dots rather than a square block.
       for (const p of locPoints) {
         const near = dots.some(
           (d) => d.locG > 0.3 && Math.hypot(d.x - p.x, d.y - p.y) < p.r
         );
         if (near) continue;
-        for (let oy = -1; oy <= 1; oy++) {
-          for (let ox = -1; ox <= 1; ox++) {
-            const x = p.x + ox * SPACING;
-            const y = p.y + oy * SPACING;
-            dots.push({ x, y, locG: locWeight(x, y), cur: 0 });
-          }
+        const offsets = [
+          [0, 0],
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ];
+        for (const [ox, oy] of offsets) {
+          const x = p.x + ox * SPACING;
+          const y = p.y + oy * SPACING;
+          dots.push({ x, y, locG: locWeight(x, y), cur: 0 });
         }
       }
 
@@ -200,8 +251,15 @@ export default function WorldMap() {
         ctx.stroke();
       }
 
+      const half = SPRITE / 2;
       for (const dot of dots) {
-        const hoverG = falloff(Math.hypot(dot.x - cursor.x, dot.y - cursor.y), HOVER_RADIUS);
+        // Gaussian falloff of the cursor glow: continuous, no radius cutoff,
+        // approaching the baseline asymptotically so no edge is visible.
+        const dx = dot.x - cursor.x;
+        const dy = dot.y - cursor.y;
+        let hoverG = Math.exp(-(dx * dx + dy * dy) * GAUSS_K);
+        if (hoverG < 0.004) hoverG = 0;
+
         const base = dot.locG * (0.5 + 0.3 * pulse);
         const target = Math.min(1, base + hoverG);
         dot.cur += (target - dot.cur) * ease;
@@ -209,11 +267,8 @@ export default function WorldMap() {
         else dot.cur = target;
 
         const idx = Math.round(dot.cur * STEPS);
-        ctx.fillStyle = dot.locG > 0.12 ? LOC_LUT[idx] : BASE_LUT[idx];
-        const r = 1.4 + 0.7 * dot.cur;
-        ctx.beginPath();
-        ctx.arc(dot.x, dot.y, r, 0, Math.PI * 2);
-        ctx.fill();
+        const palette = dot.locG > 0.12 ? 1 : 0;
+        ctx.drawImage(sprites[palette][idx], dot.x - half, dot.y - half, SPRITE, SPRITE);
       }
 
       // Keep animating while visible: the pulse is continuous, and hover

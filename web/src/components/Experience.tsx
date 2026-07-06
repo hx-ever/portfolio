@@ -127,11 +127,14 @@ function Row({
       />
 
       {/* Spine-to-card connector: visible only for the active entry, and
-          fades away while it is hovered (the card "detaches" to be examined). */}
+          retracts while it is hovered (the card "detaches" to be examined).
+          Visibility is a data attribute so CSS can give the draw-out and
+          retract transitions different durations and easings. */}
       <div
         className={styles.connector}
         data-side={entry.side}
-        style={{ gridRow: row, opacity: active && !hovered ? 1 : 0 }}
+        data-visible={active && !hovered}
+        style={{ gridRow: row }}
         aria-hidden="true"
       />
     </>

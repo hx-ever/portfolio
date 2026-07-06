@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -94,9 +95,14 @@ export default function Nav() {
         </filter>
       </svg>
 
-      <Link href="/" className={styles.brand}>
-        <span className={styles.mark} aria-hidden="true" />
-        hxstudio
+      <Link href="/" className={styles.brand} aria-label="Hsu Hsin-Wei — home">
+        <Image
+          src="/hankhsu_logo_icon.svg"
+          alt=""
+          width={29}
+          height={32}
+          priority
+        />
       </Link>
       <div ref={linksRef} className={styles.links} onMouseLeave={onLinksLeave}>
         <span

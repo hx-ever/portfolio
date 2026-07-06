@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Experience from "@/components/Experience";
 
 export const metadata: Metadata = {
-  title: "Experience — hxstudio",
+  title: "Experience — Hsu Hsin-Wei",
   description:
     "Where Hsu Hsin-Wei has been — education, roles, and projects, 2022 → 2026.",
 };

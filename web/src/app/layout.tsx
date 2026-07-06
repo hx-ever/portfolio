@@ -22,7 +22,7 @@ const body = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "hxstudio — Hsu Hsin-Wei, Design Engineer",
+  title: "Hsu Hsin-Wei — Design Portfolio",
   description: "Portfolio of Hsu Hsin-Wei (Hank), Design Engineer.",
 };
 

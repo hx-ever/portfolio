@@ -77,23 +77,8 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-family: var(--font-display), sans-serif;
-  font-weight: 700;
-  font-size: 19px;
-  letter-spacing: -0.02em;
-  color: var(--fg); /* solid text, never on raw glass */
   position: relative;
   z-index: 1;
-}
-
-.mark {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  transform: rotate(45deg);
-  background: linear-gradient(135deg, #0a84ff, #bf5af2);
-  flex-shrink: 0;
 }
 
 .links {

@@ -9,13 +9,27 @@
 .glow {
   position: absolute;
   inset: 0;
+  z-index: 0;
   background:
     radial-gradient(760px 540px at 76% 40%, color-mix(in oklab, #2997ff 18%, transparent), transparent 66%),
     radial-gradient(620px 500px at 4% 98%, rgba(191, 90, 242, 0.13), transparent 62%);
 }
 
+/* Full-viewport-width character layer, above the text so no part of the
+   character is ever clipped or covered while he's on screen. pointer-events
+   are off so the empty canvas never blocks selecting the headline. */
+.characterLayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
 .content {
   position: relative;
+  z-index: 1;
   height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -65,13 +79,9 @@
   color: transparent;
 }
 
-.stage {
-  position: relative;
-  height: min(70vh, 640px);
-}
-
 .scrollCue {
   position: absolute;
+  z-index: 3;
   bottom: 26px;
   left: 50%;
   transform: translateX(-50%);
@@ -89,10 +99,7 @@
 @media (max-width: 860px) {
   .content {
     grid-template-columns: 1fr;
+    align-items: start;
     padding-top: 100px;
-    gap: 12px;
-  }
-  .stage {
-    height: 40vh;
   }
 }

@@ -19,8 +19,16 @@ export default function Hero() {
   return (
     <section id="top" className={styles.hero}>
       <div className={styles.glow} aria-hidden="true" />
+      {/* Full-width character layer: sits above the background and text so the
+          walk-in path is never clipped by a container edge or covered. */}
+      <div className={styles.characterLayer} aria-hidden="true">
+        <ModelCanvas cameraPosition={[0, 0.15, 4.6]} fov={30}>
+          <HeroCharacter />
+        </ModelCanvas>
+      </div>
+
       <div className={styles.content}>
-        <div>
+        <div className={styles.copy}>
           <h1 className={styles.headline}>
             Hi, I am
             <br />
@@ -30,11 +38,6 @@ export default function Hero() {
             <span className={styles.taglineBar} />
             <span className={styles.taglineText}>Design Engineer</span>
           </p>
-        </div>
-        <div className={styles.stage}>
-          <ModelCanvas cameraPosition={[0, 0.15, 4.6]} fov={30}>
-            <HeroCharacter />
-          </ModelCanvas>
         </div>
       </div>
       <div className={`${styles.scrollCue} ${scrolledOnce ? styles.hidden : ""}`}>

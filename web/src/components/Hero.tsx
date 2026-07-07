@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ModelCanvas from "./three/ModelCanvas";
-import ChibiCharacter from "./three/ChibiCharacter";
+import HeroCharacter from "./three/HeroCharacter";
 import styles from "./Hero.module.css";
 
 export default function Hero() {
@@ -33,7 +33,7 @@ export default function Hero() {
         </div>
         <div className={styles.stage}>
           <ModelCanvas cameraPosition={[0, 0.15, 4.6]} fov={30}>
-            <ChibiCharacter />
+            <HeroCharacter />
           </ModelCanvas>
         </div>
       </div>

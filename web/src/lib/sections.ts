@@ -70,11 +70,12 @@ export const SHOWCASES: ShowcaseSection[] = [
   {
     index: "04",
     id: "pulse",
-    name: "Pulse",
-    tag: "PRODUCT — WEARABLE HEALTH",
+    name: "CoreLink",
+    tag: "FINAL YEAR PROJECT — EMBEDDED AI",
     description:
-      "A smart ring for recovery tracking — sensor hardware, a readiness algorithm, and the dashboard that explains it plainly.",
+      "A lightweight AI framework for context-aware smart home networks — ESP32 edge devices running on-device sensor fusion and adaptive logic for air quality and lighting control, without a cloud round-trip.",
     cta: "View case study",
+    href: "https://github.com/hx-ever/IndividualProject",
     accent: "#0A84FF",
     glow: "10,132,255",
     layout: "model-left",

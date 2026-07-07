@@ -86,11 +86,12 @@ export const SHOWCASES: ShowcaseSection[] = [
   {
     index: "05",
     id: "echo",
-    name: "Echo",
-    tag: "PRODUCT — AUDIO",
+    name: "Arx",
+    tag: "BUILD — FPV DRONE",
     description:
-      "Spatial audio headphones tuned by ear shape — a fitting app, adaptive DSP, and the sound design behind the presets.",
-    cta: "Get in touch",
+      "A four-propeller ESP32 drone, built from an open community design and adapted with a custom-designed 3D-printed frame — phone-controlled flight, hands-on with FC/ESC wiring and build tuning.",
+    cta: "View case study",
+    href: "https://github.com/hx-ever/ESP32-Drone",
     accent: "#FF375F",
     glow: "255,55,95",
     layout: "model-right",

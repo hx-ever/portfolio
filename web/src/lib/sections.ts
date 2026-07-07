@@ -22,10 +22,10 @@ export const SHOWCASES: ShowcaseSection[] = [
   {
     index: "01",
     id: "lumen",
-    name: "Lumen",
-    tag: "PRODUCT — IOT",
+    name: "AuraEyez",
+    tag: "PRODUCT — EMBEDDED SYSTEMS",
     description:
-      "An ambient smart lamp and its companion app — hardware, firmware UI, and a light-scene design tool built as one system.",
+      "An ESP32-powered smart assistant with animated RoboEyes on an OLED display, motion-triggered wake behavior, and a two-knob control interface — enclosure, PCB, and firmware built as one system.",
     cta: "View case study",
     accent: "#FF9F0A",
     glow: "255,159,10",

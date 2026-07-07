@@ -37,10 +37,10 @@ export const SHOWCASES: ShowcaseSection[] = [
   {
     index: "02",
     id: "wayfarer",
-    name: "Wayfarer",
-    tag: "PRODUCT — WEARABLE AR",
+    name: "Land Rover",
+    tag: "TEAM LEAD — ROBOTICS",
     description:
-      "Lightweight AR glasses with an on-lens HUD — optics, industrial design, and the companion app for building custom overlays.",
+      "An autonomous line-following buggy I led a five-person team to build — STM32 control, dual-loop PID steering, and a hybrid analogue/digital sensor array, engineered from chassis to firmware.",
     cta: "View case study",
     accent: "#5AC8FA",
     glow: "90,200,250",

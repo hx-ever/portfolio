@@ -7,6 +7,8 @@ export interface ShowcaseSection {
   tag: string;
   description: string;
   cta: string;
+  /** case-study link target; an http(s) URL opens in a new tab */
+  href?: string;
   accent: string;
   glow: string; // rgba glow color used behind the model
   layout: Layout;
@@ -52,11 +54,12 @@ export const SHOWCASES: ShowcaseSection[] = [
   {
     index: "03",
     id: "keycap",
-    name: "Keycap",
-    tag: "TOOL — 3D CONFIGURATOR",
+    name: "Hxkeys Air",
+    tag: "PRODUCT — INPUT DEVICE",
     description:
-      "A browser-based keyboard configurator — pick a layout, swap switches and keycaps, and preview it exploded in real time.",
+      "A custom 10-key macropad running KMK firmware on a Seeed Studio XIAO RP2040 — PCB, 3D-printed enclosure, and firmware designed and built as one system.",
     cta: "View case study",
+    href: "https://github.com/hx-ever/KMK-macropad",
     accent: "#30D158",
     glow: "48,209,88",
     layout: "model-center",

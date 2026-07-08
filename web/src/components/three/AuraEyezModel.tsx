@@ -6,6 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
+import { relBox } from "./relBox";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
 const MODEL = "/auraeyez.glb";
@@ -143,27 +144,6 @@ function roundRect(
   ctx.arcTo(x, y + h, x, y, rr);
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
-}
-
-/**
- * Bounding box of `root`'s meshes in the GLB scene-root frame. `inv` is the
- * inverse of the scene root's matrixWorld: multiplying it in cancels every
- * ancestor transform, so measurements stay correct even when the shared
- * useGLTF scene is still attached to a scaled/rotated tree (e.g. on remount
- * or fast-refresh) — measuring plain world boxes there would be contaminated.
- */
-function relBox(root: THREE.Object3D, inv: THREE.Matrix4) {
-  const box = new THREE.Box3();
-  const tmp = new THREE.Box3();
-  const m = new THREE.Matrix4();
-  root.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh || !mesh.geometry) return;
-    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-    tmp.copy(mesh.geometry.boundingBox!).applyMatrix4(m.multiplyMatrices(inv, mesh.matrixWorld));
-    box.union(tmp);
-  });
-  return box;
 }
 
 /**

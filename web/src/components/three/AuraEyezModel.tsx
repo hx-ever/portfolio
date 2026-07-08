@@ -22,10 +22,12 @@ const KNOB_MATERIAL = "Paint - Enamel Glossy (Yellow)"; // amber paint kept as-i
 // target; no pupils, no angled lids.
 const TEX_W = 512;
 const TEX_H = 256;
-const EYE_W = 150;
-const EYE_H = 172;
+const EYE_W = 135;
+const EYE_H = 155;
 const EYE_GAP = 96; // half-distance between the two eye centres
-const EYE_R = 46; // corner radius
+const EYE_R = 41; // corner radius
+const EYE_GLOW_BLUR = 22; // soft white halo around each eye (canvas shadow)
+const EYE_GLOW = "rgba(255,255,255,0.55)";
 const GAZE_RANGE_X = 40; // whole-eye travel toward the cursor
 const GAZE_RANGE_Y = 20;
 // RoboEyes curiosity: the outer eye on the side the gaze leans toward grows
@@ -36,14 +38,25 @@ const BLINK_PERIOD = 4.2; // seconds between blinks
 const BLINK_DUR = 0.16; // total blink length
 
 // --- one-time drop-in entrance (per session, like the hero walk-in) ---
+// Beats: anticipation hang → gravity fall → impact compression → big slow
+// bounce → smaller faster bounce → settle, with the 360° spin timed to land
+// alongside the bounces. ~2.1s from trigger to hand-off.
 const DROP_KEY = "hx_aura_drop_played"; // sessionStorage flag
 const DROP_TRIGGER = 0.15; // section progress at which the drop starts
-const DROP_START_Y = 2.6; // world units above rest — fully above the frame
-// Damped spring (per unit mass) driving both the fall and the 360° spin:
-// ω≈5.1 rad/s, ζ≈0.68 — gravity-like acceleration in, one clear overshoot
-// bounce and a faint second wobble, settled in ~1.2s.
-const SPRING_K = 26;
-const SPRING_C = 6.9;
+const DROP_START_Y = 2.1; // world units above rest — just above the frame
+const DROP_HOLD = 0.35; // anticipation beat before gravity wins
+const GRAVITY = 8; // world units/s² — ~0.72s accelerating fall
+// Stiff lossy floor spring engaged while y < 0: every impact squashes for a
+// readable beat (~0.12s) and rebounds at ~0.35x speed, so each bounce is both
+// smaller and quicker than the last — a real bouncing-object rhythm that a
+// single linear spring can't produce.
+const FLOOR_K = 800;
+const FLOOR_C = 15.5;
+// The spin is its own slower damped spring (ω≈3.6, ζ≈0.62): it crosses its
+// mark right around first impact, overshoots ~25° with angular momentum and
+// wobbles back, settling with the last bounce.
+const ROT_K = 13;
+const ROT_C = 4.5;
 
 function dropAlreadyPlayed() {
   try {
@@ -129,7 +142,8 @@ export default function AuraEyezModel({
 
   // Drop-in entrance state; skipped entirely when already played this session.
   const drop = useRef<{
-    phase: "waiting" | "falling" | "done";
+    phase: "waiting" | "hold" | "falling" | "done";
+    hold: number;
     y: number;
     vy: number;
     rot: number;
@@ -137,8 +151,8 @@ export default function AuraEyezModel({
   } | null>(null);
   if (drop.current == null) {
     drop.current = dropAlreadyPlayed()
-      ? { phase: "done", y: 0, vy: 0, rot: 0, vrot: 0 }
-      : { phase: "waiting", y: DROP_START_Y, vy: 0, rot: 0, vrot: 0 };
+      ? { phase: "done", hold: 0, y: 0, vy: 0, rot: 0, vrot: 0 }
+      : { phase: "waiting", hold: 0, y: DROP_START_Y, vy: 0, rot: 0, vrot: 0 };
   }
 
   const { scene } = useGLTF(MODEL);
@@ -258,6 +272,12 @@ export default function AuraEyezModel({
     const oy = ny * GAZE_RANGE_Y;
     const lid = 1 - blink * 0.92; // eye height factor while blinking
 
+    // Pure white eyes with a soft white halo. The glow is a canvas shadow on
+    // the same fill, so it moves and reshapes with each eye (gaze + curiosity).
+    ctx.save();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.shadowColor = EYE_GLOW;
+    ctx.shadowBlur = EYE_GLOW_BLUR;
     for (const side of [-1, 1]) {
       const cx = TEX_W / 2 + side * EYE_GAP + nx * GAZE_RANGE_X;
       const cy = TEX_H / 2 + oy;
@@ -265,14 +285,10 @@ export default function AuraEyezModel({
       const lean = Math.max(0, side * nx);
       const h = EYE_H * (1 + CURIOSITY * lean) * lid;
 
-      // eye body — warm amber, subtle vertical gradient (OLED "on" look)
-      const g = ctx.createLinearGradient(cx, cy - h / 2, cx, cy + h / 2);
-      g.addColorStop(0, "#FFD98C");
-      g.addColorStop(1, "#EEA53A");
-      ctx.fillStyle = g;
       roundRect(ctx, cx - EYE_W / 2, cy - h / 2, EYE_W, h, EYE_R);
       ctx.fill();
     }
+    ctx.restore();
     texture.needsUpdate = true;
   };
 
@@ -305,23 +321,39 @@ export default function AuraEyezModel({
         d.rot = targetY - Math.PI * 2;
         group.current.position.y = d.y;
         group.current.rotation.y = d.rot;
-        if (progress >= DROP_TRIGGER) d.phase = "falling";
-      } else if (d.phase === "falling") {
-        // One damped spring drives both axes (semi-implicit Euler), so the
-        // fall's bounce and the spin's overshoot share the same momentum.
-        const dt = Math.min(delta, 1 / 30);
-        d.vy += (-SPRING_K * d.y - SPRING_C * d.vy) * dt;
-        d.y += d.vy * dt;
-        d.vrot += (-SPRING_K * (d.rot - targetY) - SPRING_C * d.vrot) * dt;
-        d.rot += d.vrot * dt;
+        if (progress >= DROP_TRIGGER) d.phase = "hold";
+      } else if (d.phase === "hold") {
+        // Anticipation beat: a still hang before the release.
+        d.hold += delta;
         group.current.position.y = d.y;
         group.current.rotation.y = d.rot;
-        // Sub-visible residuals — hand off early; the scroll lerp absorbs them.
+        if (d.hold >= DROP_HOLD) d.phase = "falling";
+      } else if (d.phase === "falling") {
+        // Fixed 1/120s sub-steps: the stiff floor spring is framerate-
+        // sensitive at raw frame dt (janky frames inflate the rebound), so
+        // integrate in small equal slices for a consistent bounce everywhere.
+        let remaining = Math.min(delta, 0.1);
+        while (remaining > 0) {
+          const dt = Math.min(remaining, 1 / 120);
+          remaining -= dt;
+          // Ballistic fall under gravity; below the rest line the stiff lossy
+          // floor spring takes over — compression beat, then a weaker rebound.
+          if (d.y > 0) d.vy -= GRAVITY * dt;
+          else d.vy += (-FLOOR_K * d.y - FLOOR_C * d.vy - GRAVITY) * dt;
+          d.y += d.vy * dt;
+          // The spin keeps its own momentum: overshoots the mark, wobbles back.
+          d.vrot += (-ROT_K * (d.rot - targetY) - ROT_C * d.vrot) * dt;
+          d.rot += d.vrot * dt;
+        }
+        group.current.position.y = d.y;
+        group.current.rotation.y = d.rot;
+        // Hand off once both axes are resting (the floor holds y at ~-0.01);
+        // the residual wobble here is a pixel or two — the lerp absorbs it.
         const settled =
-          Math.abs(d.y) < 0.005 &&
-          Math.abs(d.vy) < 0.05 &&
-          Math.abs(d.rot - targetY) < 0.01 &&
-          Math.abs(d.vrot) < 0.05;
+          Math.abs(d.y) < 0.03 &&
+          Math.abs(d.vy) < 0.45 &&
+          Math.abs(d.rot - targetY) < 0.035 &&
+          Math.abs(d.vrot) < 0.25;
         if (settled) {
           d.phase = "done";
           group.current.position.y = 0;

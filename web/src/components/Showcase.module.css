@@ -10,6 +10,8 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* a section's model may drive this during its entrance (AuraEyez power-on) */
+  opacity: var(--glow-opacity, 1);
   background: radial-gradient(
     440px 400px at 24% 48%,
     rgba(var(--glow-rgb), 0.4),

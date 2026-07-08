@@ -17,11 +17,11 @@ const KNOB_MESHES: readonly string[] = ["Body1008", "Body1009"]; // left (-x) an
 const GLASS_MESH = "Body5002"; // the OLED cover glass — the visible display area
 const CAD_AMBER_MATERIAL = "Paint - Enamel Glossy (Yellow)"; // shared by knob caps + backplate
 
-// Device palette, coordinated with the site's dark-neutral system (the warm
-// amber section glow/halo accents are untouched — this is the model only).
-const BODY_COLOR = "#DCD9D2"; // shell: light warm-neutral gray
-const PLATE_COLOR = "#D8D5CE"; // backplate: a touch deeper than the shell
-const KNOB_COLOR = "#343941"; // knobs: brushed dark graphite
+// Device palette. The body shell keeps its ORIGINAL imported color (the CAD's
+// near-white ABS); only the knobs and the distinct backplate mesh are themed —
+// vivid saturated amber-golds that echo the section's accent.
+const PLATE_COLOR = "#F5A50F"; // backplate: saturated amber enamel
+const KNOB_COLOR = "#FFAD1F"; // knobs: vivid metallic gold
 
 // --- OLED screen (canvas texture) geometry, in canvas pixels ---
 // Eye look & behaviour follow the FluxGarage RoboEyes library (default mood +
@@ -44,41 +44,87 @@ const CURIOSITY = 0.18;
 const BLINK_PERIOD = 4.2; // seconds between blinks
 const BLINK_DUR = 0.16; // total blink length
 
-// --- one-time drop-in entrance (per session, like the hero walk-in) ---
-// Beats: anticipation hang → gravity fall → impact compression → big slow
-// bounce → smaller faster bounce → settle, with the 360° spin timed to land
-// alongside the bounces. ~2.1s from trigger to hand-off.
-const DROP_KEY = "hx_aura_drop_played"; // sessionStorage flag
-const DROP_TRIGGER = 0.15; // section progress at which the drop starts
-const DROP_START_Y = 2.1; // world units above rest — just above the frame
-const DROP_HOLD = 0.35; // anticipation beat before gravity wins
-const GRAVITY = 8; // world units/s² — ~0.72s accelerating fall
-// Stiff lossy floor spring engaged while y < 0: every impact squashes for a
-// readable beat (~0.12s) and rebounds at ~0.35x speed, so each bounce is both
-// smaller and quicker than the last — a real bouncing-object rhythm that a
-// single linear spring can't produce.
-const FLOOR_K = 800;
-const FLOOR_C = 15.5;
-// The spin is its own slower damped spring (ω≈3.6, ζ≈0.62): it crosses its
-// mark right around first impact, overshoots ~25° with angular momentum and
-// wobbles back, settling with the last bounce.
-const ROT_K = 13;
-const ROT_C = 4.5;
+// --- one-time "power-on" entrance (per session, like the hero walk-in) ---
+// The device never moves: it sits in place dark, a light sweep crosses the
+// body revealing its true materials, the screen double-flickers and the eyes
+// fade in, and the section's amber glow blooms up alongside them.
+const POWER_KEY = "hx_aura_power_played"; // sessionStorage flag
+const POWER_TRIGGER = 0.15; // section progress at which the sequence starts
+// Timeline, seconds from trigger:
+const T_SWEEP_START = 0.2; // "off" hold before anything changes
+const T_SWEEP_END = 0.85; // sweep fully across the body (~0.65s)
+const T_FLICK1 = 0.68; // screen boot — as the sweep clears the screen area
+const D_FLICK = 0.07; // first flash length (off→on→off→on rhythm)
+const T_FLICK2 = 0.82; // second flash, fading out as the panel settles
+const D_FLICK2 = 0.18;
+const T_EYES = 0.9; // eyes fade/scale in as the flicker settles
+const D_EYES = 0.35;
+const T_GLOW = 1.1; // ambient bloom, overlapping the eye fade
+const D_GLOW = 0.45;
+const T_DONE = 1.55; // sweep start → full glow ≈ 1.35s
+// Sweep front travel in world-x (device face is ~1.55 wide, centred).
+const SWEEP_FROM = -1.2;
+const SWEEP_TO = 1.2;
 
-function dropAlreadyPlayed() {
+// Shared shader uniform for the sweep front's world-x. Module-level so the
+// GLB's cached materials (compiled once, kept across mounts) always read the
+// live value: -10 parks everything dark, 10 is fully lit/normal.
+const sweepUniform = { value: 10 };
+
+/**
+ * Injects the power-on sweep into a standard/physical material (idempotent):
+ * fragments left of the sweep front render at their true color, everything
+ * ahead of it stays near-black, and a soft emissive band rides the front.
+ */
+function injectSweep(mat: THREE.MeshStandardMaterial) {
+  if (mat.userData.sweepInjected) return;
+  mat.userData.sweepInjected = true;
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uSweep = sweepUniform;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float vSweepX;")
+      .replace(
+        "#include <begin_vertex>",
+        "#include <begin_vertex>\nvSweepX = (modelMatrix * vec4(position, 1.0)).x;"
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying float vSweepX;\nuniform float uSweep;"
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        float sweepLit = smoothstep(vSweepX - 0.05, vSweepX + 0.3, uSweep);
+        diffuseColor.rgb *= mix(0.05, 1.0, sweepLit);`
+      )
+      .replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+        float sweepD = (uSweep - vSweepX) / 0.15;
+        totalEmissiveRadiance += vec3(1.0, 0.96, 0.88) * exp(-sweepD * sweepD) * 0.55;`
+      );
+  };
+}
+
+function powerAlreadyPlayed() {
   try {
-    return sessionStorage.getItem(DROP_KEY) === "1";
+    return sessionStorage.getItem(POWER_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-function markDropPlayed() {
+function markPowerPlayed() {
   try {
-    sessionStorage.setItem(DROP_KEY, "1");
+    sessionStorage.setItem(POWER_KEY, "1");
   } catch {
     /* private mode — fall back to replaying, harmless */
   }
+}
+
+function easeOutCubic(p: number) {
+  return 1 - Math.pow(1 - p, 3);
 }
 
 function roundRect(
@@ -128,8 +174,10 @@ function relBox(root: THREE.Object3D, inv: THREE.Matrix4) {
  *    section and ease back to centre when it leaves — perspective-correct as
  *    the device rotates;
  *  - each rotary knob cap raycasts hover and gets a soft amber halo;
- *  - on its first scroll into view each session it drops in under a damped
- *    spring with a full 360° spin, then hands off to the scroll-scrub;
+ *  - on its first scroll into view each session it "powers on" in place: a
+ *    light sweep reveals the body, the screen double-flickers and the eyes
+ *    fade in, and the section's amber glow blooms up — no motion, only
+ *    materials and light;
  *  - the whole device rotates with scroll via the shared progress prop, so
  *    these interactions layer on top of the existing scroll-scrub system.
  */
@@ -147,20 +195,14 @@ export default function AuraEyezModel({
   const glow = useRef([0, 0]);
   const gaze = useRef({ x: 0, y: 0 });
 
-  // Drop-in entrance state; skipped entirely when already played this session.
-  const drop = useRef<{
-    phase: "waiting" | "hold" | "falling" | "done";
-    hold: number;
-    y: number;
-    vy: number;
-    rot: number;
-    vrot: number;
-  } | null>(null);
-  if (drop.current == null) {
-    drop.current = dropAlreadyPlayed()
-      ? { phase: "done", hold: 0, y: 0, vy: 0, rot: 0, vrot: 0 }
-      : { phase: "waiting", hold: 0, y: DROP_START_Y, vy: 0, rot: 0, vrot: 0 };
+  // Power-on entrance state; skipped entirely when already played this session.
+  const power = useRef<{ phase: "waiting" | "running" | "done"; t: number } | null>(null);
+  if (power.current == null) {
+    power.current = { phase: powerAlreadyPlayed() ? "done" : "waiting", t: 0 };
   }
+  // The section's DOM glow element is driven via a CSS variable during the
+  // ambient-bloom step; resolved lazily from the canvas' ancestors.
+  const sectionEl = useRef<HTMLElement | null>(null);
 
   const { scene } = useGLTF(MODEL);
 
@@ -193,9 +235,10 @@ export default function AuraEyezModel({
     const knobMat = new THREE.MeshStandardMaterial({
       color: KNOB_COLOR,
       metalness: 0.9,
-      roughness: 0.45, // brushed, not mirror — spreads the highlight
-      envMapIntensity: 0.3,
+      roughness: 0.25, // tactile premium metal — tighter highlight
+      envMapIntensity: 0.5,
     });
+    injectSweep(knobMat);
     const seen = new Set<THREE.Material>();
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -213,11 +256,12 @@ export default function AuraEyezModel({
         // The CAD export leaves metallicFactor at the glTF default (1.0), and
         // fully-metallic surfaces render dark without an environment map —
         // these parts are plastic, so kill the metalness. Keep the room-env
-        // reflection subtle on the plastics; it's the knobs' effect.
+        // reflection subtle on the plastics; it's the knobs' effect. The body
+        // shell keeps its original imported color.
         std.metalness = 0.05;
         std.envMapIntensity = 0.12;
-        if (std.name === "ABS (White)") std.color.set(BODY_COLOR);
-        else if (std.name === CAD_AMBER_MATERIAL) std.color.set(PLATE_COLOR);
+        if (std.name === CAD_AMBER_MATERIAL) std.color.set(PLATE_COLOR);
+        injectSweep(std);
       }
     });
 
@@ -294,37 +338,50 @@ export default function AuraEyezModel({
   // Redraw the eyes onto the canvas for the given eased gaze offset + blink.
   // RoboEyes default mood: two solid rounded rects that slide as a pair toward
   // the gaze; curiosity grows only the outer eye on the lean side, from centre.
+  // The canvas is transparent — the GLB's own cover glass is the display
+  // background. `eyeAlpha` fades/scales the eyes in during the power-on boot;
+  // `flash` paints the boot flicker's white flashes.
   const draw = (
     ctx: CanvasRenderingContext2D,
     texture: THREE.CanvasTexture,
     nx: number,
     ny: number,
-    blink: number
+    blink: number,
+    eyeAlpha: number,
+    flash: number
   ) => {
     ctx.clearRect(0, 0, TEX_W, TEX_H);
-    ctx.fillStyle = "#07070a";
-    ctx.fillRect(0, 0, TEX_W, TEX_H);
 
-    const oy = ny * GAZE_RANGE_Y;
-    const lid = 1 - blink * 0.92; // eye height factor while blinking
-
-    // Pure white eyes with a soft white halo. The glow is a canvas shadow on
-    // the same fill, so it moves and reshapes with each eye (gaze + curiosity).
-    ctx.save();
-    ctx.fillStyle = "#FFFFFF";
-    ctx.shadowColor = EYE_GLOW;
-    ctx.shadowBlur = EYE_GLOW_BLUR;
-    for (const side of [-1, 1]) {
-      const cx = TEX_W / 2 + side * EYE_GAP + nx * GAZE_RANGE_X;
-      const cy = TEX_H / 2 + oy;
-      // lean ∈ [0,1]: how far the gaze has moved toward this eye's own side
-      const lean = Math.max(0, side * nx);
-      const h = EYE_H * (1 + CURIOSITY * lean) * lid;
-
-      roundRect(ctx, cx - EYE_W / 2, cy - h / 2, EYE_W, h, EYE_R);
-      ctx.fill();
+    if (flash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${(flash * 0.85).toFixed(3)})`;
+      ctx.fillRect(0, 0, TEX_W, TEX_H);
     }
-    ctx.restore();
+
+    if (eyeAlpha > 0) {
+      const oy = ny * GAZE_RANGE_Y;
+      const lid = 1 - blink * 0.92; // eye height factor while blinking
+      const grow = easeOutCubic(eyeAlpha); // fade + scale in together
+
+      // Pure white eyes with a soft white halo. The glow is a canvas shadow on
+      // the same fill, so it moves and reshapes with each eye (gaze + curiosity).
+      ctx.save();
+      ctx.globalAlpha = grow;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.shadowColor = EYE_GLOW;
+      ctx.shadowBlur = EYE_GLOW_BLUR * grow;
+      for (const side of [-1, 1]) {
+        const cx = TEX_W / 2 + side * EYE_GAP + nx * GAZE_RANGE_X;
+        const cy = TEX_H / 2 + oy;
+        // lean ∈ [0,1]: how far the gaze has moved toward this eye's own side
+        const lean = Math.max(0, side * nx);
+        const w = EYE_W * grow;
+        const h = EYE_H * (1 + CURIOSITY * lean) * lid * grow;
+
+        roundRect(ctx, cx - w / 2, cy - h / 2, w, h, EYE_R * grow);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
     texture.needsUpdate = true;
   };
 
@@ -347,58 +404,61 @@ export default function AuraEyezModel({
       screenMat.current.needsUpdate = true;
     }
 
-    // Scroll target — shared with the siblings' scroll-scrub pattern.
-    const targetY = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(-26, 20, progress));
-    const d = drop.current!;
+    // Scroll-linked rotation — same lerp-toward-target pattern as the
+    // siblings; the model never moves during the power-on, so this runs
+    // unconditionally from the very first frame.
     if (group.current) {
-      if (d.phase === "waiting") {
-        // Parked above the frame, pre-wound a full turn behind the scroll
-        // target; the drop starts the first time the section scrolls into view.
-        d.rot = targetY - Math.PI * 2;
-        group.current.position.y = d.y;
-        group.current.rotation.y = d.rot;
-        if (progress >= DROP_TRIGGER) d.phase = "hold";
-      } else if (d.phase === "hold") {
-        // Anticipation beat: a still hang before the release.
-        d.hold += delta;
-        group.current.position.y = d.y;
-        group.current.rotation.y = d.rot;
-        if (d.hold >= DROP_HOLD) d.phase = "falling";
-      } else if (d.phase === "falling") {
-        // Fixed 1/120s sub-steps: the stiff floor spring is framerate-
-        // sensitive at raw frame dt (janky frames inflate the rebound), so
-        // integrate in small equal slices for a consistent bounce everywhere.
-        let remaining = Math.min(delta, 0.1);
-        while (remaining > 0) {
-          const dt = Math.min(remaining, 1 / 120);
-          remaining -= dt;
-          // Ballistic fall under gravity; below the rest line the stiff lossy
-          // floor spring takes over — compression beat, then a weaker rebound.
-          if (d.y > 0) d.vy -= GRAVITY * dt;
-          else d.vy += (-FLOOR_K * d.y - FLOOR_C * d.vy - GRAVITY) * dt;
-          d.y += d.vy * dt;
-          // The spin keeps its own momentum: overshoots the mark, wobbles back.
-          d.vrot += (-ROT_K * (d.rot - targetY) - ROT_C * d.vrot) * dt;
-          d.rot += d.vrot * dt;
-        }
-        group.current.position.y = d.y;
-        group.current.rotation.y = d.rot;
-        // Hand off once both axes are resting (the floor holds y at ~-0.01);
-        // the residual wobble here is a pixel or two — the lerp absorbs it.
-        const settled =
-          Math.abs(d.y) < 0.03 &&
-          Math.abs(d.vy) < 0.45 &&
-          Math.abs(d.rot - targetY) < 0.035 &&
-          Math.abs(d.vrot) < 0.25;
-        if (settled) {
-          d.phase = "done";
-          group.current.position.y = 0;
-          markDropPlayed();
-        }
-      } else {
-        // Scroll-linked rotation — same lerp-toward-target as the siblings.
-        group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.08);
+      const targetY = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(-26, 20, progress));
+      group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.08);
+    }
+
+    // Power-on sequence: off hold → light sweep → screen boot → ambient bloom.
+    // Everything is driven by material/light state; position never changes.
+    const pw = power.current!;
+    if (sectionEl.current == null) {
+      sectionEl.current = gl.domElement.closest("section");
+      // Park the section's amber glow at zero until the bloom step.
+      if (pw.phase !== "done") sectionEl.current?.style.setProperty("--glow-opacity", "0");
+    }
+    let eyeAlpha = 1;
+    let flash = 0;
+    if (pw.phase === "waiting") {
+      sweepUniform.value = -10; // whole body parked dark
+      eyeAlpha = 0;
+      if (progress >= POWER_TRIGGER) {
+        pw.phase = "running";
+        pw.t = 0;
       }
+    } else if (pw.phase === "running") {
+      pw.t += delta;
+      const t = pw.t;
+      // light sweep front, world-x
+      sweepUniform.value =
+        t < T_SWEEP_START
+          ? -10
+          : t >= T_SWEEP_END
+            ? 10
+            : THREE.MathUtils.lerp(
+                SWEEP_FROM,
+                SWEEP_TO,
+                (t - T_SWEEP_START) / (T_SWEEP_END - T_SWEEP_START)
+              );
+      // screen boot: flash → off → flash fading out → eyes fade in
+      if (t >= T_FLICK1 && t < T_FLICK1 + D_FLICK) flash = 1;
+      else if (t >= T_FLICK2 && t < T_FLICK2 + D_FLICK2)
+        flash = 1 - (t - T_FLICK2) / D_FLICK2;
+      eyeAlpha = THREE.MathUtils.clamp((t - T_EYES) / D_EYES, 0, 1);
+      // ambient bloom, overlapping the eye fade
+      const glow01 = THREE.MathUtils.clamp((t - T_GLOW) / D_GLOW, 0, 1);
+      sectionEl.current?.style.setProperty("--glow-opacity", glow01.toFixed(3));
+      if (t >= T_DONE) {
+        pw.phase = "done";
+        sweepUniform.value = 10;
+        sectionEl.current?.style.setProperty("--glow-opacity", "1");
+        markPowerPlayed();
+      }
+    } else {
+      sweepUniform.value = 10; // steady state — fully lit
     }
 
     // Eyes: ease the gaze toward the cursor while inside; back to centre when out.
@@ -413,7 +473,7 @@ export default function AuraEyezModel({
     const half = BLINK_DUR / 2;
     const blink = t < half ? t / half : t < BLINK_DUR ? (BLINK_DUR - t) / half : 0;
 
-    draw(g.ctx, g.texture, gaze.current.x, gaze.current.y, blink);
+    draw(g.ctx, g.texture, gaze.current.x, gaze.current.y, blink, eyeAlpha, flash);
 
     // Knob halos: ~180ms ease toward hovered/rest (independent of the eyes).
     for (let i = 0; i < rings.current.length; i++) {
@@ -444,10 +504,11 @@ export default function AuraEyezModel({
               />
             </group>
 
-            {/* OLED screen: canvas-textured plane on the cover glass (texture bound in useFrame) */}
+            {/* OLED eyes: transparent canvas plane over the cover glass — the
+                GLB's own glass is the display background (texture bound in useFrame) */}
             <mesh position={layout.eye.pos}>
               <planeGeometry args={[layout.eye.w, layout.eye.h]} />
-              <meshBasicMaterial ref={screenMat} toneMapped={false} />
+              <meshBasicMaterial ref={screenMat} transparent depthWrite={false} toneMapped={false} />
             </mesh>
 
             {/* knob hover halos */}

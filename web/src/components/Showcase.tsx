@@ -1,18 +1,21 @@
 "use client";
 
-import type { ComponentType } from "react";
+import type { ComponentType, RefObject } from "react";
 import ModelCanvas from "./three/ModelCanvas";
-import LumenModel from "./three/LumenModel";
+import AuraEyezModel from "./three/AuraEyezModel";
 import WayfarerModel from "./three/WayfarerModel";
 import KeycapModel from "./three/KeycapModel";
 import PulseModel from "./three/PulseModel";
 import EchoModel from "./three/EchoModel";
 import { useSectionProgress } from "@/lib/useSectionProgress";
+import { useSectionPointer, type SectionPointer } from "@/lib/useSectionPointer";
 import type { ShowcaseSection } from "@/lib/sections";
 import styles from "./Showcase.module.css";
 
-const MODELS: Record<string, ComponentType<{ progress: number }>> = {
-  lumen: LumenModel,
+type ModelProps = { progress: number; pointer?: RefObject<SectionPointer> };
+
+const MODELS: Record<string, ComponentType<ModelProps>> = {
+  lumen: AuraEyezModel,
   wayfarer: WayfarerModel,
   keycap: KeycapModel,
   pulse: PulseModel,
@@ -21,6 +24,7 @@ const MODELS: Record<string, ComponentType<{ progress: number }>> = {
 
 export default function Showcase({ section }: { section: ShowcaseSection }) {
   const { ref, progress } = useSectionProgress<HTMLElement>();
+  const pointer = useSectionPointer(ref);
   const Model = MODELS[section.id];
   const reveal = Math.min(1, progress / 0.2);
 
@@ -46,7 +50,7 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
       <div className={styles.layout}>
         <div className={styles.stage}>
           <ModelCanvas cameraPosition={[0, 0, 4]} fov={34}>
-            <Model progress={progress} />
+            <Model progress={progress} pointer={pointer} />
           </ModelCanvas>
         </div>
 

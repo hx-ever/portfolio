@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { matteDark } from "./materials";
 import SceneLights from "./SceneLights";
 
-const ACCENT = "#5AC8FA";
+const ACCENT = "#30D158";
 
 function Temple({ side, unfold }: { side: "left" | "right"; unfold: number }) {
   const group = useRef<THREE.Group>(null);

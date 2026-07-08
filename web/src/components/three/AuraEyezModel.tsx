@@ -17,6 +17,8 @@ const TARGET_WIDTH = 1.55; // world units the 80mm device face is scaled to fill
 const KNOB_MESHES: readonly string[] = ["Body1008", "Body1009"]; // left (-x) and right (+x) knob caps
 const GLASS_MESH = "Body5002"; // the OLED cover glass — the visible display area
 const CAD_AMBER_MATERIAL = "Paint - Enamel Glossy (Yellow)"; // shared by knob caps + backplate
+const OLED_FRAME_MATERIAL = "Plastic - Glossy (Black)"; // screen bezel — kept as imported
+const PIR_LENS_MATERIAL = "Glass - Medium Color"; // PIR dome between the knobs
 
 // Device palette. The body shell keeps its ORIGINAL imported color (the CAD's
 // near-white ABS); only the knobs and the distinct backplate mesh are themed —
@@ -54,10 +56,9 @@ const POWER_TRIGGER = 0.15; // section progress at which the sequence starts
 // Timeline, seconds from trigger:
 const T_SWEEP_START = 0.2; // "off" hold before anything changes
 const T_SWEEP_END = 0.85; // sweep fully across the body (~0.65s)
-const T_FLICK1 = 0.68; // screen boot — as the sweep clears the screen area
-const D_FLICK = 0.07; // first flash length (off→on→off→on rhythm)
-const T_FLICK2 = 0.82; // second flash, fading out as the panel settles
-const D_FLICK2 = 0.18;
+const T_BOOT = 0.68; // screen boot — as the sweep clears the screen area
+const D_BOOT = 0.37; // backlight fades in smoothly over the same window
+const SCREEN_LIT = 0.22; // settled backlight level — a normally-lit panel, not a flash
 const T_EYES = 0.9; // eyes fade/scale in as the flicker settles
 const D_EYES = 0.35;
 const T_GLOW = 1.1; // ambient bloom, overlapping the eye fade
@@ -74,8 +75,11 @@ const sweepUniform = { value: 10 };
 
 /**
  * Injects the power-on sweep into a standard/physical material (idempotent):
- * fragments left of the sweep front render at their true color, everything
- * ahead of it stays near-black, and a soft emissive band rides the front.
+ * fragments left of the sweep front render at their true look, everything
+ * ahead of it is dimmed to a dark-but-readable tone, and a soft warm band
+ * rides the front. The dim scales the FINAL output (post-lighting), because
+ * dielectric specular/env response is independent of diffuseColor — dimming
+ * only the diffuse leaves the body's sheen fully bright.
  */
 function injectSweep(mat: THREE.MeshStandardMaterial) {
   if (mat.userData.sweepInjected) return;
@@ -94,16 +98,12 @@ function injectSweep(mat: THREE.MeshStandardMaterial) {
         "#include <common>\nvarying float vSweepX;\nuniform float uSweep;"
       )
       .replace(
-        "#include <color_fragment>",
-        `#include <color_fragment>
+        "#include <dithering_fragment>",
+        `#include <dithering_fragment>
         float sweepLit = smoothstep(vSweepX - 0.05, vSweepX + 0.3, uSweep);
-        diffuseColor.rgb *= mix(0.05, 1.0, sweepLit);`
-      )
-      .replace(
-        "#include <emissivemap_fragment>",
-        `#include <emissivemap_fragment>
         float sweepD = (uSweep - vSweepX) / 0.15;
-        totalEmissiveRadiance += vec3(1.0, 0.96, 0.88) * exp(-sweepD * sweepD) * 0.55;`
+        gl_FragColor.rgb = gl_FragColor.rgb * mix(0.16, 1.0, sweepLit)
+          + vec3(1.0, 0.96, 0.88) * exp(-sweepD * sweepD) * 0.4;`
       );
   };
 }
@@ -233,6 +233,27 @@ export default function AuraEyezModel({
         const std = mat as THREE.MeshStandardMaterial;
         if (!std.isMeshStandardMaterial || seen.has(std)) continue;
         seen.add(std);
+        injectSweep(std); // everything takes part in the power-on sweep
+        // OLED bezel: original glossy-black as imported, no overrides.
+        if (std.name === OLED_FRAME_MATERIAL) continue;
+        // PIR lens: frosted glass — transmissive with a faint frost tint so
+        // it reads as a distinct component rather than a dark dot.
+        if (std.name === PIR_LENS_MATERIAL) {
+          const phys = std as THREE.MeshPhysicalMaterial;
+          phys.color.set("#DDE2E2");
+          phys.metalness = 0;
+          phys.roughness = 0.28;
+          phys.envMapIntensity = 0.9;
+          if (phys.isMeshPhysicalMaterial) {
+            phys.transmission = 0.75;
+            phys.thickness = 0.004;
+            phys.ior = 1.4;
+          } else {
+            phys.transparent = true;
+            phys.opacity = 0.55;
+          }
+          continue;
+        }
         // The CAD export leaves metallicFactor at the glTF default (1.0), and
         // fully-metallic surfaces render dark without an environment map —
         // these parts are plastic, so kill the metalness. Keep the room-env
@@ -241,7 +262,6 @@ export default function AuraEyezModel({
         std.metalness = 0.05;
         std.envMapIntensity = 0.12;
         if (std.name === CAD_AMBER_MATERIAL) std.color.set(PLATE_COLOR);
-        injectSweep(std);
       }
     });
 
@@ -320,7 +340,8 @@ export default function AuraEyezModel({
   // the gaze; curiosity grows only the outer eye on the lean side, from centre.
   // The canvas is transparent — the GLB's own cover glass is the display
   // background. `eyeAlpha` fades/scales the eyes in during the power-on boot;
-  // `flash` paints the boot flicker's white flashes.
+  // `lit` is the panel backlight alpha — it fades in during boot and holds
+  // at SCREEN_LIT, so the settled screen reads as a normally-lit display.
   const draw = (
     ctx: CanvasRenderingContext2D,
     texture: THREE.CanvasTexture,
@@ -328,12 +349,12 @@ export default function AuraEyezModel({
     ny: number,
     blink: number,
     eyeAlpha: number,
-    flash: number
+    lit: number
   ) => {
     ctx.clearRect(0, 0, TEX_W, TEX_H);
 
-    if (flash > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${(flash * 0.85).toFixed(3)})`;
+    if (lit > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${lit.toFixed(3)})`;
       ctx.fillRect(0, 0, TEX_W, TEX_H);
     }
 
@@ -401,10 +422,11 @@ export default function AuraEyezModel({
       if (pw.phase !== "done") sectionEl.current?.style.setProperty("--glow-opacity", "0");
     }
     let eyeAlpha = 1;
-    let flash = 0;
+    let lit = SCREEN_LIT;
     if (pw.phase === "waiting") {
       sweepUniform.value = -10; // whole body parked dark
       eyeAlpha = 0;
+      lit = 0;
       if (progress >= POWER_TRIGGER) {
         pw.phase = "running";
         pw.t = 0;
@@ -423,10 +445,8 @@ export default function AuraEyezModel({
                 SWEEP_TO,
                 (t - T_SWEEP_START) / (T_SWEEP_END - T_SWEEP_START)
               );
-      // screen boot: flash → off → flash fading out → eyes fade in
-      if (t >= T_FLICK1 && t < T_FLICK1 + D_FLICK) flash = 1;
-      else if (t >= T_FLICK2 && t < T_FLICK2 + D_FLICK2)
-        flash = 1 - (t - T_FLICK2) / D_FLICK2;
+      // screen boot: the backlight fades in smoothly to its resting level
+      lit = SCREEN_LIT * easeOutCubic(THREE.MathUtils.clamp((t - T_BOOT) / D_BOOT, 0, 1));
       eyeAlpha = THREE.MathUtils.clamp((t - T_EYES) / D_EYES, 0, 1);
       // ambient bloom, overlapping the eye fade
       const glow01 = THREE.MathUtils.clamp((t - T_GLOW) / D_GLOW, 0, 1);
@@ -453,7 +473,7 @@ export default function AuraEyezModel({
     const half = BLINK_DUR / 2;
     const blink = t < half ? t / half : t < BLINK_DUR ? (BLINK_DUR - t) / half : 0;
 
-    draw(g.ctx, g.texture, gaze.current.x, gaze.current.y, blink, eyeAlpha, flash);
+    draw(g.ctx, g.texture, gaze.current.x, gaze.current.y, blink, eyeAlpha, lit);
 
     // Knob halos: ~180ms ease toward hovered/rest (independent of the eyes).
     for (let i = 0; i < rings.current.length; i++) {

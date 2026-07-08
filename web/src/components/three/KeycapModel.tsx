@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
 
-const ACCENT = "#30D158";
+const ACCENT = "#5AC8FA";
 const MODEL = "/hxkeysair.glb";
 const TARGET_LONG = 1.62; // world units the board's long axis is scaled to fill
 
@@ -45,9 +46,16 @@ const MCU_NODE = "Arduino_Pro_Micro1";
 const ASSEMBLE_KEY = "hx_keys_assembled"; // sessionStorage flag
 const ASSEMBLE_TRIGGER = 0.15; // section progress at which convergence starts
 const HOLD = 0.3; // exploded-view beat before anything moves
-const DUR = 0.55; // each part's fall (ease-in: released, then accelerates)
-const SNAP_DUR = 0.09; // arrival snap: quick compress into the board + settle
-const SNAP_DEPTH = 0.05; // compress amplitude, as a fraction of the part's lift
+// One damped spring drives every part's convergence (the same integrator
+// family as the site's other entrance physics): released from rest it
+// genuinely accelerates, velocity stays continuous through arrival, and a
+// ~2% overshoot seats it — a tight mechanical snap, not a bounce. Every part
+// shares the same spring; only the release delays differ, so the whole
+// assembly reads as one coordinated event. Sub-stepped for framerate
+// independence.
+const SPRING_K = 90;
+const SPRING_C = 14.8; // ζ≈0.78 — fall ~0.42s, tiny overshoot, quick settle
+const SETTLE_TAIL = 0.85; // per-part time from release to visually seated
 const KEYCAP_DELAY = 0.14; // keycaps release after the switches (two-stage snap)
 const KEYCAP_WAVE = 0.15; // left-to-right stagger across the board
 // Exploded lifts along the board's up axis, in GLB units (metres — real scale)
@@ -76,14 +84,13 @@ function markAssembled() {
 }
 
 const hash01 = (i: number) => ((i * 47) % 19) / 19; // deterministic per-part jitter
-const easeInCubic = (p: number) => p * p * p;
 
 interface Unit {
   node: THREE.Object3D;
   rest: THREE.Vector3;
   /** node-local direction+magnitude of the exploded offset */
   off: THREE.Vector3;
-  /** node-local unit of the board's up axis (for snap dip + key press) */
+  /** node-local unit of the board's up axis (for the key press) */
   up: THREE.Vector3;
   delay: number;
 }
@@ -104,6 +111,8 @@ export default function KeycapModel({ progress }: { progress: number }) {
   const group = useRef<THREE.Group>(null);
   const pressed = useRef(-1); // index into keycap units, -1 = none
   const pressAmt = useRef<number[]>([]);
+  // per-part spring state for the convergence (1 = exploded, 0 = seated)
+  const springs = useRef<{ s: number; v: number }[]>([]);
 
   const asm = useRef<{ phase: "waiting" | "running" | "done"; t: number } | null>(null);
   if (asm.current == null) {
@@ -111,6 +120,17 @@ export default function KeycapModel({ progress }: { progress: number }) {
   }
 
   const { scene } = useGLTF(MODEL);
+
+  // Procedural room environment (no assets), scoped to this section's own
+  // Canvas — it's what gives the plastics believable surface response instead
+  // of a flat, uniformly-lit look.
+  const gl = useThree((s) => s.gl);
+  const envTex = useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    return tex;
+  }, [gl]);
 
   const layout = useMemo(() => {
     scene.updateWorldMatrix(true, true);
@@ -130,6 +150,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
         if (!std.isMeshStandardMaterial || seen.has(std)) continue;
         seen.add(std);
         std.metalness = 0.05;
+        std.envMapIntensity = 0.1; // subtle room reflections on the plastics
       }
     });
 
@@ -192,13 +213,44 @@ export default function KeycapModel({ progress }: { progress: number }) {
     const mcu = makeUnit(MCU_NODE, MCU_LIFT, MCU_SIDE, 0.04);
     const moving = [...capUnits, ...swUnits, ...(mcu ? [mcu] : [])];
 
+    // Keycap plastic reads smoother than the matte case/PCB: cap meshes get
+    // cloned materials with a subtle clearcoat sheen (cloned so parts that
+    // share a material with the caps keep their matte finish).
+    const capClones = new Map<THREE.Material, THREE.Material>();
+    const capMaterial = (m: THREE.Material) => {
+      if (m.userData.capClone) return m; // already themed on a previous mount
+      let clone = capClones.get(m);
+      if (!clone) {
+        clone = m.clone();
+        clone.userData.capClone = true;
+        const phys = clone as THREE.MeshPhysicalMaterial;
+        phys.roughness = 0.5;
+        phys.envMapIntensity = 0.18;
+        if (phys.isMeshPhysicalMaterial) {
+          phys.clearcoat = 0.08;
+          phys.clearcoatRoughness = 0.4;
+        }
+        capClones.set(m, clone);
+      }
+      return clone;
+    };
+    for (const u of capUnits) {
+      u.node.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.material = Array.isArray(mesh.material)
+          ? mesh.material.map(capMaterial)
+          : capMaterial(mesh.material);
+      });
+    }
+
     return {
       center,
       scale: TARGET_LONG / size.y,
       capUnits,
       capXY,
       moving,
-      lastLanding: Math.max(...moving.map((u) => u.delay)) + DUR + SNAP_DUR,
+      lastLanding: Math.max(...moving.map((u) => u.delay)) + SETTLE_TAIL,
       // invisible hover plane sits just above the assembled keycap tops
       planeZ: device.max.z - center.z + 0.004,
       planeSize: [size.x * 1.3, size.y * 1.15] as [number, number],
@@ -233,31 +285,34 @@ export default function KeycapModel({ progress }: { progress: number }) {
       a.phase = "running";
       a.t = 0;
     }
-    if (a.phase === "running") a.t += delta;
-
-    for (const u of layout.moving) {
-      // f: 1 = fully exploded, 0 = seated. Ease-in fall = released, then
-      // accelerates into the board; the landing gets a quick compress-and-
-      // settle dip — a mechanical snap, not a bouncy spring.
-      let f = 1;
-      let dip = 0;
-      if (a.phase === "done") {
-        f = 0;
-      } else if (a.phase === "running") {
-        const local = a.t - HOLD - u.delay;
-        const p = THREE.MathUtils.clamp(local / DUR, 0, 1);
-        f = 1 - easeInCubic(p);
-        if (local > DUR && local < DUR + SNAP_DUR) {
-          const w = (local - DUR) / SNAP_DUR;
-          dip = -Math.sin(Math.PI * w) * SNAP_DEPTH * u.off.length();
+    if (springs.current.length !== layout.moving.length) {
+      springs.current = layout.moving.map(() => ({ s: 1, v: 0 }));
+    }
+    if (a.phase === "waiting") {
+      for (const u of layout.moving) u.node.position.copy(u.rest).addScaledVector(u.off, 1);
+    } else if (a.phase === "running") {
+      // Fixed sub-steps keep the shared spring identical on every framerate;
+      // each part starts integrating once its release delay has elapsed.
+      let remaining = Math.min(delta, 0.1);
+      while (remaining > 0) {
+        const dt = Math.min(remaining, 1 / 120);
+        remaining -= dt;
+        a.t += dt;
+        for (let i = 0; i < layout.moving.length; i++) {
+          if (a.t - HOLD - layout.moving[i].delay <= 0) continue;
+          const sp = springs.current[i];
+          sp.v += (-SPRING_K * sp.s - SPRING_C * sp.v) * dt;
+          sp.s += sp.v * dt;
         }
       }
-      u.node.position.copy(u.rest).addScaledVector(u.off, f).addScaledVector(u.up, dip);
-    }
-    if (a.phase === "running" && a.t >= HOLD + layout.lastLanding) {
-      a.phase = "done";
-      for (const u of layout.moving) u.node.position.copy(u.rest);
-      markAssembled();
+      layout.moving.forEach((u, i) => {
+        u.node.position.copy(u.rest).addScaledVector(u.off, springs.current[i].s);
+      });
+      if (a.t >= HOLD + layout.lastLanding) {
+        a.phase = "done";
+        for (const u of layout.moving) u.node.position.copy(u.rest);
+        markAssembled();
+      }
     }
 
     // Nearest-key hover press: one key at a time, quick tight spring-back.
@@ -280,6 +335,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
 
   return (
     <>
+      <primitive object={envTex} attach="environment" />
       <SceneLights accent={ACCENT} accentIntensity={0.6} />
       {/* static tilt so the key field faces the camera; scroll rotation inside */}
       <group rotation={[0.55, 0, 0]} position={[0, -0.12, 0]}>

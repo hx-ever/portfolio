@@ -1,13 +1,19 @@
 "use client";
 
-import { useRef, type RefObject } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef, type RefObject } from "react";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { matteDark } from "./materials";
 import SceneLights from "./SceneLights";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
+const MODEL = "/auraeyez.glb";
 const ACCENT = "#F0B24A"; // warm amber — matches the device's knob + section glow
+const TARGET_WIDTH = 1.55; // world units the 80mm device face is scaled to fill
+
+// GLB mesh names (GLTFLoader strips the dots from Blender's "Body1.008" etc.)
+const KNOB_MESHES: readonly string[] = ["Body1008", "Body1009"]; // left (-x) and right (+x) knob caps
+const GLASS_MESH = "Body5002"; // the OLED cover glass — the visible display area
 
 // --- OLED screen (canvas texture) geometry, in canvas pixels ---
 const TEX_W = 512;
@@ -40,73 +46,36 @@ function roundRect(
   ctx.closePath();
 }
 
-/** A rotary encoder knob that glows softly amber while hovered. */
-function Knob({
-  position,
-  accent,
-}: {
-  position: [number, number, number];
-  accent: string;
-}) {
-  const ring = useRef<THREE.Mesh>(null);
-  const hovered = useRef(false);
-  const glow = useRef(0);
-
-  useFrame(() => {
-    // ~180ms ease toward the hovered/rest target (independent of the eyes).
-    const target = hovered.current ? 1 : 0;
-    glow.current = THREE.MathUtils.lerp(glow.current, target, 0.15);
-    const mat = ring.current?.material as THREE.MeshBasicMaterial | undefined;
-    if (mat) mat.opacity = glow.current * 0.7;
-    if (ring.current) {
-      const s = 1 + glow.current * 0.14;
-      ring.current.scale.set(s, s, 1);
-    }
+/**
+ * Bounding box of `root`'s meshes in the GLB scene-root frame. `inv` is the
+ * inverse of the scene root's matrixWorld: multiplying it in cancels every
+ * ancestor transform, so measurements stay correct even when the shared
+ * useGLTF scene is still attached to a scaled/rotated tree (e.g. on remount
+ * or fast-refresh) — measuring plain world boxes there would be contaminated.
+ */
+function relBox(root: THREE.Object3D, inv: THREE.Matrix4) {
+  const box = new THREE.Box3();
+  const tmp = new THREE.Box3();
+  const m = new THREE.Matrix4();
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    tmp.copy(mesh.geometry.boundingBox!).applyMatrix4(m.multiplyMatrices(inv, mesh.matrixWorld));
+    box.union(tmp);
   });
-
-  return (
-    <group position={position}>
-      {/* soft glow halo, sits just behind the knob face */}
-      <mesh ref={ring} position={[0, 0, -0.015]}>
-        <ringGeometry args={[0.135, 0.22, 48]} />
-        <meshBasicMaterial
-          color={accent}
-          transparent
-          opacity={0}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
-      {/* knob body — the circular face points at the camera (+Z) */}
-      <mesh
-        rotation={[Math.PI / 2, 0, 0]}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          hovered.current = true;
-        }}
-        onPointerOut={() => {
-          hovered.current = false;
-        }}
-      >
-        <cylinderGeometry args={[0.12, 0.125, 0.11, 40]} />
-        <meshStandardMaterial color="#2b2b30" roughness={0.5} metalness={0.35} />
-      </mesh>
-      {/* amber position indicator on the knob face */}
-      <mesh position={[0, 0.055, 0.058]}>
-        <boxGeometry args={[0.02, 0.07, 0.012]} />
-        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} />
-      </mesh>
-    </group>
-  );
+  return box;
 }
 
 /**
- * The AuraEyez desk assistant: a matte dark gadget with an OLED panel showing
- * two RoboEyes and two rotary knobs. The eyes track the cursor (eased) while it
- * is inside the section and ease back to centre when it leaves; each knob glows
- * on hover. The whole device rotates with scroll via the shared progress prop,
- * so these interactions layer on top of the existing scroll-scrub system.
+ * The AuraEyez desk assistant — the real CAD assembly (converted GLB) with the
+ * interactive layers placed on its actual parts:
+ *  - a canvas-textured plane sits on the OLED cover glass, so the RoboEyes
+ *    track the cursor (eased) while it is inside the section and ease back to
+ *    centre when it leaves — perspective-correct as the device rotates;
+ *  - each rotary knob cap raycasts hover and gets a soft amber halo;
+ *  - the whole device rotates with scroll via the shared progress prop, so
+ *    these interactions layer on top of the existing scroll-scrub system.
  */
 export default function AuraEyezModel({
   progress,
@@ -117,7 +86,79 @@ export default function AuraEyezModel({
 }) {
   const group = useRef<THREE.Group>(null);
   const screenMat = useRef<THREE.MeshBasicMaterial>(null);
+  const rings = useRef<(THREE.Mesh | null)[]>([null, null]);
+  const hovered = useRef([false, false]);
+  const glow = useRef([0, 0]);
   const pupil = useRef({ x: 0, y: 0 });
+
+  const { scene } = useGLTF(MODEL);
+
+  // Measure the CAD assembly once: overall fit, plus where the OLED glass and
+  // the two knob caps sit — expressed in the face-to-camera frame (the device
+  // face points -Y in the file; the -90° X rotation below turns it to +Z).
+  const layout = useMemo(() => {
+    scene.updateWorldMatrix(true, true);
+    const inv = new THREE.Matrix4().copy(scene.matrixWorld).invert();
+
+    // Only the knob caps take part in pointer raycasts — the assembly has 67
+    // meshes and hover only cares about the knobs. Idempotent on the cached scene.
+    scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh && !KNOB_MESHES.includes(mesh.name)) mesh.raycast = () => {};
+    });
+
+    const device = relBox(scene, inv);
+    const center = device.getCenter(new THREE.Vector3());
+    const size = device.getSize(new THREE.Vector3());
+    // GLB world point -> position in the rotated frame (device re-centred).
+    const post = (x: number, y: number, z: number): [number, number, number] => [
+      x - center.x,
+      z - center.z,
+      -(y - center.y),
+    ];
+
+    const glass = scene.getObjectByName(GLASS_MESH);
+    const gBox = relBox(glass ?? scene, inv);
+    const gCenter = gBox.getCenter(new THREE.Vector3());
+    const gSize = gBox.getSize(new THREE.Vector3());
+
+    const knobs = KNOB_MESHES.map((name) => {
+      const knob = scene.getObjectByName(name);
+      const box = relBox(knob ?? scene, inv);
+      const c = box.getCenter(new THREE.Vector3());
+      return {
+        // halo sits at the knob's base, just proud of the shell face
+        pos: post(c.x, box.max.y - 0.0008, c.z),
+        radius: (box.max.x - box.min.x) / 2,
+      };
+    });
+
+    return {
+      center,
+      scale: TARGET_WIDTH / size.x,
+      // eye plane hovers a hair's breadth in front of the cover glass
+      eye: { pos: post(gCenter.x, gBox.min.y - 0.0004, gCenter.z), w: gSize.x, h: gSize.z },
+      knobs,
+    };
+  }, [scene]);
+
+  // Soft annular glow sprite for the knob halos — transparent under the knob,
+  // peaking just past its edge, fading out. Reads as light, not as a solid ring.
+  const halo = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const ctx = c.getContext("2d")!;
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, "rgba(240,178,74,0)");
+    g.addColorStop(0.42, "rgba(240,178,74,0)");
+    g.addColorStop(0.56, "rgba(240,178,74,0.85)");
+    g.addColorStop(1, "rgba(240,178,74,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
 
   // The OLED canvas + its texture live in a ref (mutable, render-persistent),
   // lazily created once. The Canvas only mounts in the browser (behind an
@@ -179,6 +220,15 @@ export default function AuraEyezModel({
     texture.needsUpdate = true;
   };
 
+  // Knob hover — R3F bubbles child-mesh hits up to the <primitive> handlers,
+  // and everything except the knob caps has raycasting disabled above.
+  const setKnobHover = (e: ThreeEvent<PointerEvent>, value: boolean) => {
+    const i = KNOB_MESHES.indexOf(e.object.name);
+    if (i === -1) return;
+    if (value) e.stopPropagation();
+    hovered.current[i] = value;
+  };
+
   useFrame((state) => {
     const g = gfx.current;
     if (!g) return;
@@ -208,34 +258,67 @@ export default function AuraEyezModel({
     const blink = t < half ? t / half : t < BLINK_DUR ? (BLINK_DUR - t) / half : 0;
 
     draw(g.ctx, g.texture, pupil.current.x, pupil.current.y, blink);
+
+    // Knob halos: ~180ms ease toward hovered/rest (independent of the eyes).
+    for (let i = 0; i < rings.current.length; i++) {
+      glow.current[i] = THREE.MathUtils.lerp(glow.current[i], hovered.current[i] ? 1 : 0, 0.15);
+      const ring = rings.current[i];
+      if (!ring) continue;
+      (ring.material as THREE.MeshBasicMaterial).opacity = glow.current[i] * 0.55;
+      const s = 1 + glow.current[i] * 0.1;
+      ring.scale.set(s, s, 1);
+    }
   });
 
   return (
     <>
       <SceneLights accent={ACCENT} accentIntensity={0.6} />
       {/* static tilt for depth; scroll rotation lives on the inner group */}
-      <group rotation={[-0.09, 0, 0]} scale={1.05}>
+      <group rotation={[-0.09, 0, 0]}>
         <group ref={group}>
-          {/* body */}
-          <mesh>
-            <boxGeometry args={[1.5, 1.24, 0.5]} />
-            <meshStandardMaterial {...matteDark} />
-          </mesh>
-          {/* screen bezel */}
-          <mesh position={[0, 0.12, 0.251]}>
-            <boxGeometry args={[1.28, 0.74, 0.02]} />
-            <meshStandardMaterial color="#0a0a0d" roughness={0.4} metalness={0.1} />
-          </mesh>
-          {/* OLED screen with tracked eyes (texture bound in useFrame) */}
-          <mesh position={[0, 0.12, 0.263]}>
-            <planeGeometry args={[1.16, 0.62]} />
-            <meshBasicMaterial ref={screenMat} toneMapped={false} />
-          </mesh>
-          {/* knobs */}
-          <Knob position={[-0.42, -0.44, 0.25]} accent={ACCENT} />
-          <Knob position={[0.42, -0.44, 0.25]} accent={ACCENT} />
+          <group scale={layout.scale}>
+            {/* the CAD assembly, re-centred and rotated face-to-camera */}
+            <group rotation={[-Math.PI / 2, 0, 0]}>
+              <primitive
+                object={scene}
+                position={[-layout.center.x, -layout.center.y, -layout.center.z]}
+                onPointerOver={(e: ThreeEvent<PointerEvent>) => setKnobHover(e, true)}
+                onPointerOut={(e: ThreeEvent<PointerEvent>) => setKnobHover(e, false)}
+              />
+            </group>
+
+            {/* OLED screen: canvas-textured plane on the cover glass (texture bound in useFrame) */}
+            <mesh position={layout.eye.pos}>
+              <planeGeometry args={[layout.eye.w, layout.eye.h]} />
+              <meshBasicMaterial ref={screenMat} toneMapped={false} />
+            </mesh>
+
+            {/* knob hover halos */}
+            {layout.knobs.map((k, i) => (
+              <mesh
+                key={i}
+                ref={(m) => {
+                  rings.current[i] = m;
+                }}
+                position={k.pos}
+              >
+                {/* knob edge lands at the gradient's peak (~0.56 of half-extent) */}
+                <planeGeometry args={[k.radius * 3.6, k.radius * 3.6]} />
+                <meshBasicMaterial
+                  map={halo}
+                  transparent
+                  opacity={0}
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                  toneMapped={false}
+                />
+              </mesh>
+            ))}
+          </group>
         </group>
       </group>
     </>
   );
 }
+
+useGLTF.preload(MODEL);

@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useRef, type RefObject } from "react";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
@@ -14,7 +15,13 @@ const TARGET_WIDTH = 1.55; // world units the 80mm device face is scaled to fill
 // GLB mesh names (GLTFLoader strips the dots from Blender's "Body1.008" etc.)
 const KNOB_MESHES: readonly string[] = ["Body1008", "Body1009"]; // left (-x) and right (+x) knob caps
 const GLASS_MESH = "Body5002"; // the OLED cover glass — the visible display area
-const KNOB_MATERIAL = "Paint - Enamel Glossy (Yellow)"; // amber paint kept as-is
+const CAD_AMBER_MATERIAL = "Paint - Enamel Glossy (Yellow)"; // shared by knob caps + backplate
+
+// Device palette, coordinated with the site's dark-neutral system (the warm
+// amber section glow/halo accents are untouched — this is the model only).
+const BODY_COLOR = "#DCD9D2"; // shell: light warm-neutral gray
+const PLATE_COLOR = "#D8D5CE"; // backplate: a touch deeper than the shell
+const KNOB_COLOR = "#343941"; // knobs: brushed dark graphite
 
 // --- OLED screen (canvas texture) geometry, in canvas pixels ---
 // Eye look & behaviour follow the FluxGarage RoboEyes library (default mood +
@@ -157,6 +164,18 @@ export default function AuraEyezModel({
 
   const { scene } = useGLTF(MODEL);
 
+  // A procedural room environment (no assets), scoped to this section's own
+  // Canvas: it's what makes the graphite knobs read as metal — punctual
+  // lights alone leave camera-facing metal faces black. Attached to the
+  // scene declaratively below.
+  const gl = useThree((s) => s.gl);
+  const envTex = useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    return tex;
+  }, [gl]);
+
   // Measure the CAD assembly once: overall fit, plus where the OLED glass and
   // the two knob caps sit — expressed in the face-to-camera frame (the device
   // face points -Y in the file; the -90° X rotation below turns it to +Z).
@@ -166,22 +185,39 @@ export default function AuraEyezModel({
 
     // Only the knob caps take part in pointer raycasts — the assembly has 67
     // meshes and hover only cares about the knobs. Idempotent on the cached scene.
+    //
+    // Materials, re-themed to the site palette: the CAD's amber paint is
+    // shared by the knob caps AND the backplate, so the knobs get their own
+    // brushed-graphite material (dark, metallic, clearly separated from the
+    // light body) while the plate joins the warm-neutral body scheme.
+    const knobMat = new THREE.MeshStandardMaterial({
+      color: KNOB_COLOR,
+      metalness: 0.9,
+      roughness: 0.45, // brushed, not mirror — spreads the highlight
+      envMapIntensity: 0.3,
+    });
     const seen = new Set<THREE.Material>();
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
-      if (!KNOB_MESHES.includes(mesh.name)) mesh.raycast = () => {};
-      // The CAD export leaves metallicFactor at the glTF default (1.0), and
-      // fully-metallic surfaces render dark without an environment map — the
-      // real cause of the body reading heavy. This is plastic: kill the
-      // metalness so the near-white shell actually reads light. The amber
-      // knob/plate paint keeps its glossy metallic look untouched.
+      if (KNOB_MESHES.includes(mesh.name)) {
+        mesh.material = knobMat; // stays raycastable for the hover halo
+        return;
+      }
+      mesh.raycast = () => {};
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const mat of mats) {
         const std = mat as THREE.MeshStandardMaterial;
         if (!std.isMeshStandardMaterial || seen.has(std)) continue;
         seen.add(std);
-        if (std.name !== KNOB_MATERIAL) std.metalness = 0.05;
+        // The CAD export leaves metallicFactor at the glTF default (1.0), and
+        // fully-metallic surfaces render dark without an environment map —
+        // these parts are plastic, so kill the metalness. Keep the room-env
+        // reflection subtle on the plastics; it's the knobs' effect.
+        std.metalness = 0.05;
+        std.envMapIntensity = 0.12;
+        if (std.name === "ABS (White)") std.color.set(BODY_COLOR);
+        else if (std.name === CAD_AMBER_MATERIAL) std.color.set(PLATE_COLOR);
       }
     });
 
@@ -392,6 +428,7 @@ export default function AuraEyezModel({
 
   return (
     <>
+      <primitive object={envTex} attach="environment" />
       <SceneLights accent={ACCENT} accentIntensity={0.6} />
       {/* static tilt for depth; scroll rotation lives on the inner group */}
       <group rotation={[-0.09, 0, 0]}>

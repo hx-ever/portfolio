@@ -29,12 +29,12 @@ export const SHOWCASES: ShowcaseSection[] = [
     description:
       "An ESP32-powered smart assistant with animated RoboEyes on an OLED display, motion-triggered wake behavior, and a two-knob control interface — enclosure, PCB, and firmware built as one system.",
     cta: "View case study",
-    accent: "#FF9F0A",
-    glow: "255,159,10",
+    accent: "#F0B24A",
+    glow: "240,178,74",
     layout: "model-left",
     gradientFrom: "#060607",
     gradientTo: "#140D07",
-    motion: "lamp rotates −30°→+18°Y with scroll · light blooms at 55%",
+    motion: "AuraEyez device rotates with scroll · eyes track cursor · knob hover glow",
   },
   {
     index: "02",

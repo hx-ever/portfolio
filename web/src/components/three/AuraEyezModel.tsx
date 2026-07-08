@@ -14,19 +14,52 @@ const TARGET_WIDTH = 1.55; // world units the 80mm device face is scaled to fill
 // GLB mesh names (GLTFLoader strips the dots from Blender's "Body1.008" etc.)
 const KNOB_MESHES: readonly string[] = ["Body1008", "Body1009"]; // left (-x) and right (+x) knob caps
 const GLASS_MESH = "Body5002"; // the OLED cover glass — the visible display area
+const KNOB_MATERIAL = "Paint - Enamel Glossy (Yellow)"; // amber paint kept as-is
 
 // --- OLED screen (canvas texture) geometry, in canvas pixels ---
+// Eye look & behaviour follow the FluxGarage RoboEyes library (default mood +
+// "curiosity"): solid rounded-rect eyes that slide as a pair toward the gaze
+// target; no pupils, no angled lids.
 const TEX_W = 512;
 const TEX_H = 256;
 const EYE_W = 150;
 const EYE_H = 172;
 const EYE_GAP = 96; // half-distance between the two eye centres
-const PUPIL_W = 74;
-const PUPIL_H = 82;
-const PUPIL_RANGE_X = 26; // max pupil travel toward cursor (subtle)
-const PUPIL_RANGE_Y = 22;
+const EYE_R = 46; // corner radius
+const GAZE_RANGE_X = 40; // whole-eye travel toward the cursor
+const GAZE_RANGE_Y = 20;
+// RoboEyes curiosity: the outer eye on the side the gaze leans toward grows
+// taller in proportion to the horizontal displacement (up to 1.18x at full
+// lean) — the "leaning in to look" effect.
+const CURIOSITY = 0.18;
 const BLINK_PERIOD = 4.2; // seconds between blinks
 const BLINK_DUR = 0.16; // total blink length
+
+// --- one-time drop-in entrance (per session, like the hero walk-in) ---
+const DROP_KEY = "hx_aura_drop_played"; // sessionStorage flag
+const DROP_TRIGGER = 0.15; // section progress at which the drop starts
+const DROP_START_Y = 2.6; // world units above rest — fully above the frame
+// Damped spring (per unit mass) driving both the fall and the 360° spin:
+// ω≈5.1 rad/s, ζ≈0.68 — gravity-like acceleration in, one clear overshoot
+// bounce and a faint second wobble, settled in ~1.2s.
+const SPRING_K = 26;
+const SPRING_C = 6.9;
+
+function dropAlreadyPlayed() {
+  try {
+    return sessionStorage.getItem(DROP_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markDropPlayed() {
+  try {
+    sessionStorage.setItem(DROP_KEY, "1");
+  } catch {
+    /* private mode — fall back to replaying, harmless */
+  }
+}
 
 function roundRect(
   ctx: CanvasRenderingContext2D,
@@ -71,9 +104,12 @@ function relBox(root: THREE.Object3D, inv: THREE.Matrix4) {
  * The AuraEyez desk assistant — the real CAD assembly (converted GLB) with the
  * interactive layers placed on its actual parts:
  *  - a canvas-textured plane sits on the OLED cover glass, so the RoboEyes
- *    track the cursor (eased) while it is inside the section and ease back to
- *    centre when it leaves — perspective-correct as the device rotates;
+ *    (default mood + curiosity) track the cursor while it is inside the
+ *    section and ease back to centre when it leaves — perspective-correct as
+ *    the device rotates;
  *  - each rotary knob cap raycasts hover and gets a soft amber halo;
+ *  - on its first scroll into view each session it drops in under a damped
+ *    spring with a full 360° spin, then hands off to the scroll-scrub;
  *  - the whole device rotates with scroll via the shared progress prop, so
  *    these interactions layer on top of the existing scroll-scrub system.
  */
@@ -89,7 +125,21 @@ export default function AuraEyezModel({
   const rings = useRef<(THREE.Mesh | null)[]>([null, null]);
   const hovered = useRef([false, false]);
   const glow = useRef([0, 0]);
-  const pupil = useRef({ x: 0, y: 0 });
+  const gaze = useRef({ x: 0, y: 0 });
+
+  // Drop-in entrance state; skipped entirely when already played this session.
+  const drop = useRef<{
+    phase: "waiting" | "falling" | "done";
+    y: number;
+    vy: number;
+    rot: number;
+    vrot: number;
+  } | null>(null);
+  if (drop.current == null) {
+    drop.current = dropAlreadyPlayed()
+      ? { phase: "done", y: 0, vy: 0, rot: 0, vrot: 0 }
+      : { phase: "waiting", y: DROP_START_Y, vy: 0, rot: 0, vrot: 0 };
+  }
 
   const { scene } = useGLTF(MODEL);
 
@@ -102,9 +152,23 @@ export default function AuraEyezModel({
 
     // Only the knob caps take part in pointer raycasts — the assembly has 67
     // meshes and hover only cares about the knobs. Idempotent on the cached scene.
+    const seen = new Set<THREE.Material>();
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (mesh.isMesh && !KNOB_MESHES.includes(mesh.name)) mesh.raycast = () => {};
+      if (!mesh.isMesh) return;
+      if (!KNOB_MESHES.includes(mesh.name)) mesh.raycast = () => {};
+      // The CAD export leaves metallicFactor at the glTF default (1.0), and
+      // fully-metallic surfaces render dark without an environment map — the
+      // real cause of the body reading heavy. This is plastic: kill the
+      // metalness so the near-white shell actually reads light. The amber
+      // knob/plate paint keeps its glossy metallic look untouched.
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const mat of mats) {
+        const std = mat as THREE.MeshStandardMaterial;
+        if (!std.isMeshStandardMaterial || seen.has(std)) continue;
+        seen.add(std);
+        if (std.name !== KNOB_MATERIAL) std.metalness = 0.05;
+      }
     });
 
     const device = relBox(scene, inv);
@@ -177,45 +241,37 @@ export default function AuraEyezModel({
     gfx.current = { ctx, texture };
   }
 
-  // Redraw the eyes onto the canvas for the given eased pupil offset + blink.
+  // Redraw the eyes onto the canvas for the given eased gaze offset + blink.
+  // RoboEyes default mood: two solid rounded rects that slide as a pair toward
+  // the gaze; curiosity grows only the outer eye on the lean side, from centre.
   const draw = (
     ctx: CanvasRenderingContext2D,
     texture: THREE.CanvasTexture,
-    px: number,
-    py: number,
+    nx: number,
+    ny: number,
     blink: number
   ) => {
     ctx.clearRect(0, 0, TEX_W, TEX_H);
     ctx.fillStyle = "#07070a";
     ctx.fillRect(0, 0, TEX_W, TEX_H);
 
-    const cy = TEX_H / 2;
-    const ox = px * PUPIL_RANGE_X;
-    const oy = py * PUPIL_RANGE_Y;
-    const lid = 1 - blink * 0.9; // eye height factor while blinking
+    const oy = ny * GAZE_RANGE_Y;
+    const lid = 1 - blink * 0.92; // eye height factor while blinking
 
-    for (const sign of [-1, 1]) {
-      const cx = TEX_W / 2 + sign * EYE_GAP;
-      const h = EYE_H * lid;
+    for (const side of [-1, 1]) {
+      const cx = TEX_W / 2 + side * EYE_GAP + nx * GAZE_RANGE_X;
+      const cy = TEX_H / 2 + oy;
+      // lean ∈ [0,1]: how far the gaze has moved toward this eye's own side
+      const lean = Math.max(0, side * nx);
+      const h = EYE_H * (1 + CURIOSITY * lean) * lid;
 
       // eye body — warm amber, subtle vertical gradient (OLED "on" look)
       const g = ctx.createLinearGradient(cx, cy - h / 2, cx, cy + h / 2);
       g.addColorStop(0, "#FFD98C");
       g.addColorStop(1, "#EEA53A");
       ctx.fillStyle = g;
-      roundRect(ctx, cx - EYE_W / 2, cy - h / 2, EYE_W, h, 46 * lid);
+      roundRect(ctx, cx - EYE_W / 2, cy - h / 2, EYE_W, h, EYE_R);
       ctx.fill();
-
-      if (blink < 0.45) {
-        // pupil — dark rounded square shifted toward the cursor
-        ctx.fillStyle = "#0b0b0e";
-        roundRect(ctx, cx - PUPIL_W / 2 + ox, cy - PUPIL_H / 2 + oy, PUPIL_W, PUPIL_H, 24);
-        ctx.fill();
-        // catch-light for a little life
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        roundRect(ctx, cx - PUPIL_W / 2 + ox + 12, cy - PUPIL_H / 2 + oy + 11, 17, 19, 8);
-        ctx.fill();
-      }
     }
     texture.needsUpdate = true;
   };
@@ -229,7 +285,7 @@ export default function AuraEyezModel({
     hovered.current[i] = value;
   };
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const g = gfx.current;
     if (!g) return;
 
@@ -239,25 +295,57 @@ export default function AuraEyezModel({
       screenMat.current.needsUpdate = true;
     }
 
-    // Scroll-linked rotation — same lerp-toward-target pattern as the siblings.
+    // Scroll target — shared with the siblings' scroll-scrub pattern.
+    const targetY = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(-26, 20, progress));
+    const d = drop.current!;
     if (group.current) {
-      const targetY = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(-26, 20, progress));
-      group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.08);
+      if (d.phase === "waiting") {
+        // Parked above the frame, pre-wound a full turn behind the scroll
+        // target; the drop starts the first time the section scrolls into view.
+        d.rot = targetY - Math.PI * 2;
+        group.current.position.y = d.y;
+        group.current.rotation.y = d.rot;
+        if (progress >= DROP_TRIGGER) d.phase = "falling";
+      } else if (d.phase === "falling") {
+        // One damped spring drives both axes (semi-implicit Euler), so the
+        // fall's bounce and the spin's overshoot share the same momentum.
+        const dt = Math.min(delta, 1 / 30);
+        d.vy += (-SPRING_K * d.y - SPRING_C * d.vy) * dt;
+        d.y += d.vy * dt;
+        d.vrot += (-SPRING_K * (d.rot - targetY) - SPRING_C * d.vrot) * dt;
+        d.rot += d.vrot * dt;
+        group.current.position.y = d.y;
+        group.current.rotation.y = d.rot;
+        // Sub-visible residuals — hand off early; the scroll lerp absorbs them.
+        const settled =
+          Math.abs(d.y) < 0.005 &&
+          Math.abs(d.vy) < 0.05 &&
+          Math.abs(d.rot - targetY) < 0.01 &&
+          Math.abs(d.vrot) < 0.05;
+        if (settled) {
+          d.phase = "done";
+          group.current.position.y = 0;
+          markDropPlayed();
+        }
+      } else {
+        // Scroll-linked rotation — same lerp-toward-target as the siblings.
+        group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.08);
+      }
     }
 
-    // Eyes: ease pupils toward the cursor while inside; back to centre when out.
+    // Eyes: ease the gaze toward the cursor while inside; back to centre when out.
     const p = pointer?.current;
     const tx = p?.inside ? p.x : 0;
     const ty = p?.inside ? p.y : 0;
-    pupil.current.x = THREE.MathUtils.lerp(pupil.current.x, tx, 0.12);
-    pupil.current.y = THREE.MathUtils.lerp(pupil.current.y, ty, 0.12);
+    gaze.current.x = THREE.MathUtils.lerp(gaze.current.x, tx, 0.12);
+    gaze.current.y = THREE.MathUtils.lerp(gaze.current.y, ty, 0.12);
 
     // Occasional blink (triangular open→closed→open).
     const t = state.clock.elapsedTime % BLINK_PERIOD;
     const half = BLINK_DUR / 2;
     const blink = t < half ? t / half : t < BLINK_DUR ? (BLINK_DUR - t) / half : 0;
 
-    draw(g.ctx, g.texture, pupil.current.x, pupil.current.y, blink);
+    draw(g.ctx, g.texture, gaze.current.x, gaze.current.y, blink);
 
     // Knob halos: ~180ms ease toward hovered/rest (independent of the eyes).
     for (let i = 0; i < rings.current.length; i++) {

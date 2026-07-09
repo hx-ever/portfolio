@@ -3,7 +3,7 @@
 import type { ComponentType, RefObject } from "react";
 import ModelCanvas from "./three/ModelCanvas";
 import AuraEyezModel from "./three/AuraEyezModel";
-import WayfarerModel from "./three/WayfarerModel";
+import BuggyModel from "./three/BuggyModel";
 import KeycapModel from "./three/KeycapModel";
 import PulseModel from "./three/PulseModel";
 import EchoModel from "./three/EchoModel";
@@ -16,7 +16,7 @@ type ModelProps = { progress: number; pointer?: RefObject<SectionPointer> };
 
 const MODELS: Record<string, ComponentType<ModelProps>> = {
   lumen: AuraEyezModel,
-  wayfarer: WayfarerModel,
+  wayfarer: BuggyModel,
   keycap: KeycapModel,
   pulse: PulseModel,
   echo: EchoModel,

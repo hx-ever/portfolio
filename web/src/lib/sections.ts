@@ -49,7 +49,7 @@ export const SHOWCASES: ShowcaseSection[] = [
     layout: "model-right",
     gradientFrom: "#140D06",
     gradientTo: "#0A1309",
-    motion: "glasses unfold as section enters · lens HUD fades in, scrubbed by scroll",
+    motion: "buggy drives in from the right and brakes to a stop · one-time per session",
   },
   {
     index: "03",

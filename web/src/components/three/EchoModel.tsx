@@ -75,14 +75,18 @@ const PROP_MAT = new THREE.MeshStandardMaterial({
   opacity: 0.9,
   side: THREE.DoubleSide,
 });
-// spin blur: a genuinely dim translucent disc — not emissive, not bright
+// spin blur: a genuinely dim translucent disc — not emissive, not bright.
+// Only shown while the entrance flight is at speed: its opacity is driven
+// per-frame (fades out with the hover settle, absent at idle and on
+// replay-skipped sessions).
 const BLUR_MAT = new THREE.MeshBasicMaterial({
   color: "#17181A",
   transparent: true,
-  opacity: 0.3,
+  opacity: 0,
   side: THREE.DoubleSide,
   depthWrite: false,
 });
+const BLUR_PEAK = 0.3;
 
 function materialFor(name: string): THREE.Material {
   if (/^SOLID00[1-4]$/.test(name)) return MOTOR_MAT;
@@ -242,6 +246,11 @@ export default function EchoModel({ progress }: { progress: number }) {
       f.y += f.vy * delta;
       f.hoverAmt = Math.min(1, f.hoverAmt + delta / 0.8);
     }
+
+    // blur discs: full while the flight is at speed, fading with the hover
+    // settle, absent at idle (and from frame one on replay-skipped sessions)
+    BLUR_MAT.opacity = BLUR_PEAK * (1 - f.hoverAmt);
+    BLUR_MAT.visible = BLUR_MAT.opacity > 0.01;
 
     if (rig.current) {
       const t = state.clock.elapsedTime;

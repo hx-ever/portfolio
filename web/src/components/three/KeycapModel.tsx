@@ -149,8 +149,18 @@ export default function KeycapModel({ progress }: { progress: number }) {
         const std = mat as THREE.MeshStandardMaterial;
         if (!std.isMeshStandardMaterial || seen.has(std)) continue;
         seen.add(std);
-        std.metalness = 0.05;
-        std.envMapIntensity = 0.1; // subtle room reflections on the plastics
+        // Matte plastic. The CAD export ships metallicFactor=1, semi-gloss
+        // roughness (0.55) and specularColorFactor=2 (double the physical
+        // dielectric F0) on every material — the glossy/plasticky look.
+        // Zero metalness, matte roughness, plastic-range specular.
+        std.metalness = 0;
+        std.roughness = Math.max(std.roughness, 0.78);
+        std.envMapIntensity = 0.1;
+        const body = std as THREE.MeshPhysicalMaterial;
+        if (body.isMeshPhysicalMaterial) {
+          body.specularIntensity = 0.35;
+          body.specularColor.setScalar(1);
+        }
       }
     });
 
@@ -224,11 +234,16 @@ export default function KeycapModel({ progress }: { progress: number }) {
         clone = m.clone();
         clone.userData.capClone = true;
         const phys = clone as THREE.MeshPhysicalMaterial;
-        phys.roughness = 0.5;
-        phys.envMapIntensity = 0.18;
+        // Caps sit a touch smoother than the 0.78-matte case (realistic for
+        // moulded keycap plastic) — but still clearly matte, minimal coat.
+        phys.metalness = 0;
+        phys.roughness = 0.62;
+        phys.envMapIntensity = 0.15;
         if (phys.isMeshPhysicalMaterial) {
-          phys.clearcoat = 0.08;
-          phys.clearcoatRoughness = 0.4;
+          phys.specularIntensity = 0.4;
+          phys.specularColor.setScalar(1);
+          phys.clearcoat = 0.04;
+          phys.clearcoatRoughness = 0.5;
         }
         capClones.set(m, clone);
       }

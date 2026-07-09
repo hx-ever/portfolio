@@ -254,14 +254,24 @@ export default function AuraEyezModel({
           }
           continue;
         }
-        // The CAD export leaves metallicFactor at the glTF default (1.0), and
-        // fully-metallic surfaces render dark without an environment map —
-        // these parts are plastic, so kill the metalness. Keep the room-env
-        // reflection subtle on the plastics; it's the knobs' effect. The body
-        // shell keeps its original imported color.
-        std.metalness = 0.05;
-        std.envMapIntensity = 0.12;
-        if (std.name === CAD_AMBER_MATERIAL) std.color.set(PLATE_COLOR);
+        // Matte plastic. The CAD export ships every material with
+        // metallicFactor at the glTF default (1.0), semi-gloss roughness
+        // (0.55) AND specularColorFactor=2 — double the physical dielectric
+        // reflectance — which is what made the body read glossy/plasticky at
+        // any light level. Zero the metalness, push roughness into the matte
+        // range and normalize the specular to a plastic-like response.
+        std.metalness = 0;
+        std.roughness = Math.max(std.roughness, 0.78);
+        std.envMapIntensity = 0.1;
+        const body = std as THREE.MeshPhysicalMaterial;
+        if (body.isMeshPhysicalMaterial) {
+          body.specularIntensity = 0.35;
+          body.specularColor.setScalar(1);
+        }
+        if (std.name === CAD_AMBER_MATERIAL) {
+          std.color.set(PLATE_COLOR);
+          std.roughness = 0.5; // enamel paint keeps a semi-gloss finish
+        }
       }
     });
 

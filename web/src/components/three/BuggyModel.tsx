@@ -61,24 +61,26 @@ function markVroomPlayed() {
 
 // Part materials by name stem — the console STEP pipeline can't carry the
 // CAD's display colors, so the buggy is dressed here to match its reference
-// render: black knobby tyres, alloy hubs, grey plates, green PCBs, red gears.
+// render: black knobby tyres, plastic hubs, matte plates, green PCBs, red
+// gears. Metalness is reserved for the genuinely metal parts (motor cans,
+// caster housing); the plastic/laser-cut surfaces are matte dielectrics.
 const MATERIALS: [string, THREE.MeshStandardMaterial][] = [
-  ["wheelwithout", new THREE.MeshStandardMaterial({ color: "#B7BCC4", metalness: 0.55, roughness: 0.35 })],
+  ["wheelwithout", new THREE.MeshStandardMaterial({ color: "#B7BCC4", metalness: 0, roughness: 0.62 })],
   ["tyre", new THREE.MeshStandardMaterial({ color: "#17181B", metalness: 0, roughness: 0.95 })],
-  ["motordriverboard", new THREE.MeshStandardMaterial({ color: "#1F7A3D", metalness: 0.1, roughness: 0.55 })],
-  ["stm32mountboard", new THREE.MeshStandardMaterial({ color: "#1F7A3D", metalness: 0.1, roughness: 0.55 })],
+  ["motordriverboard", new THREE.MeshStandardMaterial({ color: "#1F7A3D", metalness: 0.05, roughness: 0.6 })],
+  ["stm32mountboard", new THREE.MeshStandardMaterial({ color: "#1F7A3D", metalness: 0.05, roughness: 0.6 })],
   ["motor", new THREE.MeshStandardMaterial({ color: "#3A3F45", metalness: 0.8, roughness: 0.35 })],
-  ["gear", new THREE.MeshStandardMaterial({ color: "#B23B2E", metalness: 0.15, roughness: 0.5 })],
-  ["encoder", new THREE.MeshStandardMaterial({ color: "#1E1F22", metalness: 0.1, roughness: 0.6 })],
-  ["batteryframe", new THREE.MeshStandardMaterial({ color: "#ACB3BD", metalness: 0.35, roughness: 0.45 })],
-  ["battery", new THREE.MeshStandardMaterial({ color: "#2E3B4E", metalness: 0.2, roughness: 0.55 })],
+  ["gear", new THREE.MeshStandardMaterial({ color: "#B23B2E", metalness: 0, roughness: 0.6 })],
+  ["encoder", new THREE.MeshStandardMaterial({ color: "#1E1F22", metalness: 0.05, roughness: 0.65 })],
+  ["batteryframe", new THREE.MeshStandardMaterial({ color: "#ACB3BD", metalness: 0, roughness: 0.68 })],
+  ["battery", new THREE.MeshStandardMaterial({ color: "#2E3B4E", metalness: 0.05, roughness: 0.6 })],
   ["ballhousing", new THREE.MeshStandardMaterial({ color: "#9AA1AA", metalness: 0.7, roughness: 0.35 })],
   ["ball", new THREE.MeshStandardMaterial({ color: "#26272B", metalness: 0, roughness: 0.85 })],
 ];
 const PLATE_MATERIAL = new THREE.MeshStandardMaterial({
   color: "#AEB5BF",
-  metalness: 0.4,
-  roughness: 0.45,
+  metalness: 0,
+  roughness: 0.72,
 });
 for (const [, m] of MATERIALS) m.envMapIntensity = 0.15;
 PLATE_MATERIAL.envMapIntensity = 0.15;

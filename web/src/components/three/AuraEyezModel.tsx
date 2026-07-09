@@ -489,7 +489,7 @@ export default function AuraEyezModel({
   return (
     <>
       <primitive object={envTex} attach="environment" />
-      <SceneLights accent={ACCENT} accentIntensity={0.6} />
+      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.7} />
       {/* static tilt for depth; scroll rotation lives on the inner group */}
       <group rotation={[-0.09, 0, 0]}>
         <group ref={group}>

@@ -84,6 +84,10 @@
 .stage {
   position: relative;
   height: min(72vh, 660px);
+  /* let the grid track shrink below the canvas' current pixel size —
+     without this the R3F canvas wedges the column open on viewport shrink */
+  min-width: 0;
+  min-height: 0;
 }
 
 .copy {

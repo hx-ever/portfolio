@@ -13,9 +13,11 @@ const MODEL = "/buggy.glb";
 const TARGET_LENGTH = 1.35; // world units the buggy's wheelbase axis fills
 
 // GLB node names (from the STEP conversion). The scene frame is: X
-// longitudinal (nose at -X, castor at +X), Y lateral (axle axis), +Z DOWN —
-// the +90° X wrapper below puts it upright in side profile, nose leading left.
+// longitudinal (sensor plates at -X, BALL CASTER — the vehicle's FRONT — at
+// +X), Y lateral (axle axis), +Z DOWN. The wrappers below stand it upright
+// and yaw it 180° so the caster end leads the leftward drive-in.
 const WHEEL_GROUPS: readonly string[] = ["Wheel", "Wheel001"]; // tyre + hub per side
+const WHEEL_AXLE_GLB_X = -0.128; // axle line in GLB coords (measured)
 
 // --- one-time "vroom" entrance (per session, like the other showcases) ---
 const VROOM_KEY = "hx_buggy_vroom"; // sessionStorage flag
@@ -23,21 +25,22 @@ const VROOM_TRIGGER = 0.15; // section progress at which the drive-in starts
 // Piecewise-physical speed profile (world units/s): a constant-speed entry,
 // a mild coasting deceleration, then a hard braking phase — v0 is derived so
 // the integrated distance exactly covers START_X → 0.
-const T_ENTRY = 0.5; // high-speed entry, constant v0
-const T_COAST = 0.65; // mild constant deceleration (quadratic ease-out on x)
-const T_BRAKE = 0.3; // hard braking, v -> 0
-const COAST_END_FRAC = 0.3; // speed remaining when the brake bites (0.3*v0)
-// Integral of the speed profile in units of v0·s — start distance ÷ this
-// gives the v0 that lands the buggy exactly at rest-x on schedule. The start
-// x itself is frustum-derived per frame while waiting, so the buggy is
-// always fully beyond the canvas' right edge whatever the stage aspect.
-const PROFILE_S =
-  T_ENTRY + ((1 + COAST_END_FRAC) / 2) * T_COAST + (COAST_END_FRAC / 2) * T_BRAKE;
+const T_ENTRY = 0.45; // high-speed entry, constant v0
+const T_BRAKE = 1.0; // single continuous braking arc, v0 -> 0
+// The braking is jerk-limited: deceleration ramps linearly from zero (so the
+// entry hands over with continuous acceleration — one physical event, not
+// two stitched eases) and steepens all the way to the stop, which is when
+// braking-induced weight transfer naturally peaks. v(t) = v0 - ½k·t²,
+// k = 2v0/T², covering exactly (2/3)·v0·T of ground during the brake.
+// Start distance ÷ this profile integral gives v0; the start x itself is
+// frustum-derived per frame while waiting, so the buggy is always fully
+// beyond the canvas' right edge whatever the stage aspect.
+const PROFILE_S = T_ENTRY + (2 / 3) * T_BRAKE;
 // Braking weight transfer: nose-down pitch, released as a small damped rebound.
 const DIP_MAX = THREE.MathUtils.degToRad(3.5);
 const DIP_K = 80; // release spring (ζ≈0.5 — one subtle rebound, quick settle)
 const DIP_C = 9;
-const SPIN_SIGN = 1; // rolling direction for -x travel about the +Y axle
+const SPIN_SIGN = -1; // rolling for -x travel; the 180° yaw flips the axle's +Y
 const AXLE_AXIS = new THREE.Vector3(0, 1, 0); // GLB-frame lateral axis
 
 function vroomAlreadyPlayed() {
@@ -77,17 +80,18 @@ const PLATE_MATERIAL = new THREE.MeshStandardMaterial({
   metalness: 0.4,
   roughness: 0.45,
 });
-for (const [, m] of MATERIALS) m.envMapIntensity = 0.25;
-PLATE_MATERIAL.envMapIntensity = 0.25;
+for (const [, m] of MATERIALS) m.envMapIntensity = 0.15;
+PLATE_MATERIAL.envMapIntensity = 0.15;
 
 /**
  * The Land Rover line-follower buggy — the real SolidWorks assembly
  * (STEP → GLB). One-time entrance per session: it drives in fast from the
- * canvas' right edge with wheels pre-spinning, coasts down, brakes hard with
- * a nose-down weight transfer (whole-chassis approximation — the model has
- * no sprung suspension parts), stops with the wheels (rotation is v/r the
- * whole way, so they cease exactly with the chassis), then the pitch releases
- * with a small rebound. Hands off to the shared scroll-scrub yaw.
+ * canvas' right edge, ball-caster end (the vehicle's front) leading, wheels
+ * pre-spinning, then slows under one continuous jerk-limited braking arc
+ * with a front-down weight transfer (whole-chassis approximation — the model
+ * has no sprung suspension parts). Wheel rotation is v/r the whole way, so
+ * the wheels cease exactly with the chassis; the pitch then releases with a
+ * small damped rebound. Hands off to the shared scroll-scrub yaw.
  */
 export default function BuggyModel({ progress }: { progress: number }) {
   const yaw = useRef<THREE.Group>(null);
@@ -179,8 +183,10 @@ export default function BuggyModel({ progress }: { progress: number }) {
       scale: TARGET_LENGTH / size.x,
       radius, // GLB units; world radius = radius * scale
       pivots,
-      // pitch pivot at the front axle, post-rotation world frame (x = GLB x)
-      axleX: (-0.128 - center.x) * (TARGET_LENGTH / size.x),
+      // pitch pivot on the wheel-axle line. The 180° yaw mirrors GLB x into
+      // world x, so the axle lands at +(center - axle)·scale — behind the
+      // leading caster: braking pitches the caster end down, rear lifts.
+      axleX: (center.x - WHEEL_AXLE_GLB_X) * (TARGET_LENGTH / size.x),
     };
   }, [scene]);
 
@@ -219,20 +225,20 @@ export default function BuggyModel({ progress }: { progress: number }) {
         v.t += dt;
         if (v.t < T_ENTRY) {
           v.speed = v.v0;
-        } else if (v.t < T_ENTRY + T_COAST) {
-          // mild constant deceleration down to the brake-bite speed
-          v.speed = THREE.MathUtils.lerp(v.v0, v.v0 * COAST_END_FRAC, (v.t - T_ENTRY) / T_COAST);
         } else {
-          // hard braking: sharp constant deceleration to zero
-          const p = (v.t - T_ENTRY - T_COAST) / T_BRAKE;
-          v.speed = Math.max(0, v.v0 * COAST_END_FRAC * (1 - p));
-          // weight transfer builds quickly as the brakes bite
-          v.dip = DIP_MAX * THREE.MathUtils.clamp(p / 0.4, 0, 1);
+          // jerk-limited braking: deceleration ramps continuously from zero
+          // and steepens all the way into the stop
+          const tb = Math.min(v.t - T_ENTRY, T_BRAKE);
+          const k = (2 * v.v0) / (T_BRAKE * T_BRAKE);
+          v.speed = Math.max(0, v.v0 - 0.5 * k * tb * tb);
+          // weight transfer tracks the actual deceleration (∝ k·tb), so the
+          // dip eases in smoothly and peaks exactly as motion ceases
+          v.dip = DIP_MAX * THREE.MathUtils.clamp(tb / T_BRAKE, 0, 1);
         }
         v.x = Math.max(0, v.x - v.speed * dt);
         v.theta += (v.speed / rWorld) * dt;
       }
-      if (v.t >= T_ENTRY + T_COAST + T_BRAKE || v.x <= 0) {
+      if (v.t >= T_ENTRY + T_BRAKE || v.x <= 0) {
         v.phase = "settling";
         v.x = 0;
         v.speed = 0;
@@ -272,7 +278,7 @@ export default function BuggyModel({ progress }: { progress: number }) {
   return (
     <>
       <primitive object={envTex} attach="environment" />
-      <SceneLights accent={ACCENT} accentIntensity={0.7} />
+      <SceneLights accent={ACCENT} accentIntensity={0.7} level={0.7} />
       {/* gentle top-down tilt for depth; scroll yaw inside */}
       <group rotation={[0.14, 0, 0]} position={[0, -0.08, 0]}>
         <group ref={yaw}>
@@ -282,10 +288,13 @@ export default function BuggyModel({ progress }: { progress: number }) {
               <group ref={pitch}>
                 <group position={[-layout.axleX, 0, 0]}>
                   <group scale={layout.scale}>
-                    {/* GLB is +Z-down: +90° X puts it upright, nose to -X */}
-                    <group rotation={[Math.PI / 2, 0, 0]}>
-                      <group position={[-layout.center.x, -layout.center.y, -layout.center.z]}>
-                        <primitive object={scene} />
+                    {/* 180° yaw leads with the ball caster (GLB +X → world -X) */}
+                    <group rotation={[0, Math.PI, 0]}>
+                      {/* GLB is +Z-down: +90° X puts it upright */}
+                      <group rotation={[Math.PI / 2, 0, 0]}>
+                        <group position={[-layout.center.x, -layout.center.y, -layout.center.z]}>
+                          <primitive object={scene} />
+                        </group>
                       </group>
                     </group>
                   </group>

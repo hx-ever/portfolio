@@ -336,7 +336,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
   return (
     <>
       <primitive object={envTex} attach="environment" />
-      <SceneLights accent={ACCENT} accentIntensity={0.6} />
+      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.58} />
       {/* static tilt so the key field faces the camera; scroll rotation inside */}
       <group rotation={[0.55, 0, 0]} position={[0, -0.12, 0]}>
         <group ref={group}>

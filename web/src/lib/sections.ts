@@ -81,7 +81,7 @@ export const SHOWCASES: ShowcaseSection[] = [
     layout: "model-left",
     gradientFrom: "#081113",
     gradientTo: "#090D15",
-    motion: "ring orbits camera 360° · stat cards orbit in behind it",
+    motion: "sensor-scan pulse burst on arrival · slow ambient ring while idle · scroll-scrub rotation",
   },
   {
     index: "05",

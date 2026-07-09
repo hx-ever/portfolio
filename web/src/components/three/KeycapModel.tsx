@@ -155,11 +155,18 @@ export default function KeycapModel({ progress }: { progress: number }) {
         // Zero metalness, matte roughness, plastic-range specular.
         std.metalness = 0;
         std.roughness = Math.max(std.roughness, 0.78);
-        std.envMapIntensity = 0.1;
+        std.envMapIntensity = 0.06;
         const body = std as THREE.MeshPhysicalMaterial;
         if (body.isMeshPhysicalMaterial) {
           body.specularIntensity = 0.35;
           body.specularColor.setScalar(1);
+        }
+        // Near-white albedo saturates under any believable lighting — dim
+        // the light plastics ~15%, once (materials are cached across mounts).
+        if (!std.userData.albedoDimmed) {
+          std.userData.albedoDimmed = true;
+          const c = std.color;
+          if (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.55) c.multiplyScalar(0.85);
         }
       }
     });
@@ -351,7 +358,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
   return (
     <>
       <primitive object={envTex} attach="environment" />
-      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.58} />
+      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.58} ambientScale={0.6} />
       {/* static tilt so the key field faces the camera; scroll rotation inside */}
       <group rotation={[0.55, 0, 0]} position={[0, -0.12, 0]}>
         <group ref={group}>

@@ -65,7 +65,7 @@ function markVroomPlayed() {
 // gears. Metalness is reserved for the genuinely metal parts (motor cans,
 // caster housing); the plastic/laser-cut surfaces are matte dielectrics.
 const MATERIALS: [string, THREE.MeshStandardMaterial][] = [
-  ["wheelwithout", new THREE.MeshStandardMaterial({ color: "#B7BCC4", metalness: 0, roughness: 0.62 })],
+  ["wheelwithout", new THREE.MeshStandardMaterial({ color: "#9EA4AD", metalness: 0, roughness: 0.62 })],
   ["tyre", new THREE.MeshStandardMaterial({ color: "#17181B", metalness: 0, roughness: 0.95 })],
   ["motordriverboard", new THREE.MeshStandardMaterial({ color: "#1F7A3D", metalness: 0.05, roughness: 0.6 })],
   ["stm32mountboard", new THREE.MeshStandardMaterial({ color: "#1F7A3D", metalness: 0.05, roughness: 0.6 })],
@@ -78,12 +78,13 @@ const MATERIALS: [string, THREE.MeshStandardMaterial][] = [
   ["ball", new THREE.MeshStandardMaterial({ color: "#26272B", metalness: 0, roughness: 0.85 })],
 ];
 const PLATE_MATERIAL = new THREE.MeshStandardMaterial({
-  color: "#AEB5BF",
+  color: "#969DA8", // light-grey plates ~15% below the old tone — whites at
+  // near-unity albedo saturate to a flat glow under any believable lighting
   metalness: 0,
   roughness: 0.72,
 });
-for (const [, m] of MATERIALS) m.envMapIntensity = 0.15;
-PLATE_MATERIAL.envMapIntensity = 0.15;
+for (const [, m] of MATERIALS) m.envMapIntensity = 0.08;
+PLATE_MATERIAL.envMapIntensity = 0.08;
 
 /**
  * The Land Rover line-follower buggy — the real SolidWorks assembly
@@ -280,7 +281,7 @@ export default function BuggyModel({ progress }: { progress: number }) {
   return (
     <>
       <primitive object={envTex} attach="environment" />
-      <SceneLights accent={ACCENT} accentIntensity={0.7} level={0.7} />
+      <SceneLights accent={ACCENT} accentIntensity={0.7} level={0.7} ambientScale={0.6} />
       {/* gentle top-down tilt for depth; scroll yaw inside */}
       <group rotation={[0.14, 0, 0]} position={[0, -0.08, 0]}>
         <group ref={yaw}>

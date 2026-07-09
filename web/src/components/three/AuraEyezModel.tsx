@@ -262,11 +262,20 @@ export default function AuraEyezModel({
         // range and normalize the specular to a plastic-like response.
         std.metalness = 0;
         std.roughness = Math.max(std.roughness, 0.78);
-        std.envMapIntensity = 0.1;
+        std.envMapIntensity = 0.06;
         const body = std as THREE.MeshPhysicalMaterial;
         if (body.isMeshPhysicalMaterial) {
           body.specularIntensity = 0.35;
           body.specularColor.setScalar(1);
+        }
+        // Near-white albedo (~0.96 linear) saturates under any believable
+        // lighting — real white plastic sits ~0.75-0.85. One-time 15% dim
+        // (guarded: the useGLTF materials are cached across mounts, so an
+        // unguarded multiply would compound).
+        if (!std.userData.albedoDimmed) {
+          std.userData.albedoDimmed = true;
+          const c = std.color;
+          if (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.55) c.multiplyScalar(0.85);
         }
         if (std.name === CAD_AMBER_MATERIAL) {
           std.color.set(PLATE_COLOR);
@@ -499,7 +508,7 @@ export default function AuraEyezModel({
   return (
     <>
       <primitive object={envTex} attach="environment" />
-      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.7} />
+      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.7} ambientScale={0.6} />
       {/* static tilt for depth; scroll rotation lives on the inner group */}
       <group rotation={[-0.09, 0, 0]}>
         <group ref={group}>

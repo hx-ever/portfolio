@@ -4,16 +4,20 @@ export default function SceneLights({
   accent,
   accentIntensity = 1,
   level = 1,
+  ambientScale = 1,
 }: {
   accent: string;
   accentIntensity?: number;
   /** overall exposure scale for this scene's lights (models with bright
    *  materials + an environment map run this below 1 to avoid washing out) */
   level?: number;
+  /** extra scale on the flat ambient only — near-white materials need a
+   *  lower directionless floor or they saturate and lose their form shading */
+  ambientScale?: number;
 }) {
   return (
     <>
-      <ambientLight intensity={0.6 * level} color="#ffffff" />
+      <ambientLight intensity={0.6 * level * ambientScale} color="#ffffff" />
       <directionalLight position={[3, 4, 5]} intensity={0.85 * level} color="#fff7ec" />
       <directionalLight position={[-3, -2, -4]} intensity={0.2 * level} color={accent} />
       <pointLight

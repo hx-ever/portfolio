@@ -14,7 +14,11 @@ const TARGET_WIDTH = 1.75; // world units the frame's footprint is scaled to fil
 // circular1-4 discs) — hidden here and replaced with procedural twisted,
 // tapered 2-blade props (standard for a whoop-class ESP32 build) mounted on
 // the motor tops. Diagonal pairs counter-rotate, like a real quad.
-const PLACEHOLDER_PROPS = /^(tilt[1-4]|circular[1-4])$/;
+// The STEP's placeholder propellers are THREE families of flat geometry per
+// mount (census-verified at all four): the fan_v* bars (45mm rectangles at
+// blade height — the visible offenders), plus the tilt* square sheets and
+// circular* discs parked at the frame's underside.
+const PLACEHOLDER_PROPS = /^(tilt[1-4]|circular[1-4]|fan_v\d+)$/;
 // motor axes in GLB coords (SOLID001-004 measured): (±0.0354, ±0.0354)
 const MOTOR_XY = 0.0354;
 const PROP_Y = 0.0205; // just above the motor tops (motors span y 0..0.019)
@@ -57,8 +61,8 @@ function markFlightPlayed() {
 
 // Materials authored here, matte from the start (brightness lessons applied):
 // no emissive anywhere, metalness only on genuinely metallic parts.
-const FRAME_MAT = new THREE.MeshStandardMaterial({ color: "#3D4147", roughness: 0.8, metalness: 0 });
-const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#5A5F67", roughness: 0.72, metalness: 0 });
+const FRAME_MAT = new THREE.MeshStandardMaterial({ color: "#585E67", roughness: 0.8, metalness: 0 });
+const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#6E747D", roughness: 0.72, metalness: 0 });
 const PCB_MAT = new THREE.MeshStandardMaterial({ color: "#1E4D33", roughness: 0.6, metalness: 0 });
 const MOTOR_MAT = new THREE.MeshStandardMaterial({ color: "#8E9298", roughness: 0.35, metalness: 0.7 });
 const PIN_MAT = new THREE.MeshStandardMaterial({ color: "#C9A227", roughness: 0.4, metalness: 0.8 });
@@ -182,7 +186,13 @@ export default function EchoModel({ progress }: { progress: number }) {
       if (/^support[1-4]$/.test(mesh.name)) mesh.position.y = 0.0035;
       mesh.material = materialFor(mesh.name);
     });
-    for (const m of leftovers) m.removeFromParent();
+    for (const m of leftovers) {
+      // The motor cans nest under the fan-bar nodes in the CAD tree: re-home
+      // any children (attach preserves their world transform) before deleting
+      // the placeholder itself.
+      for (const child of [...m.children]) m.parent?.attach(child);
+      m.removeFromParent();
+    }
     const device = relBox(scene, inv);
     const center = device.getCenter(new THREE.Vector3());
     const size = device.getSize(new THREE.Vector3());
@@ -250,16 +260,19 @@ export default function EchoModel({ progress }: { progress: number }) {
 
   return (
     <>
-      {/* Studio three-point rig — the dark matte frame needs more than the
-          shared section lights. Materials stay matte/non-emissive, so the
-          extra intensity lifts readability without reintroducing glow. */}
-      <ambientLight intensity={0.3} color="#ffffff" />
+      {/* Studio three-point rig + soft non-directional base — the matte frame
+          needs bright, EVEN coverage. Materials stay matte/non-emissive, so
+          the intensity lifts readability without reintroducing glow. */}
+      <ambientLight intensity={0.5} color="#ffffff" />
+      {/* hemisphere: soft omnidirectional fill that reaches every face the
+          directionals miss — evens out the dark patches across the arms */}
+      <hemisphereLight args={["#F4F6F8", "#383C42", 0.65]} />
       {/* key: bright, warm, upper-front-right */}
-      <directionalLight position={[2.5, 3.5, 4]} intensity={1.7} color="#FFF4E8" />
-      {/* fill: soft, cool, opposite side — lifts the shadowed arms */}
-      <directionalLight position={[-3.5, 0.8, 2.5]} intensity={0.55} color="#DCE4F0" />
+      <directionalLight position={[2.5, 3.5, 4]} intensity={2.0} color="#FFF4E8" />
+      {/* fill: soft, cool, front-left — lifts the side the key misses */}
+      <directionalLight position={[-4, 1.5, 3]} intensity={0.9} color="#DCE4F0" />
       {/* rim: behind/above, crimson-tinted — edge separation from the dark bg */}
-      <directionalLight position={[-1, 2.5, -4]} intensity={1.3} color={ACCENT} />
+      <directionalLight position={[-1, 2.5, -4]} intensity={1.4} color={ACCENT} />
       {/* static tilt so the frame's top face reads; scroll rotation inside */}
       <group rotation={[0.45, 0, 0]} position={[0, -0.05, 0]}>
         <group ref={group}>

@@ -97,6 +97,6 @@ export const SHOWCASES: ShowcaseSection[] = [
     layout: "model-right",
     gradientFrom: "#090D15",
     gradientTo: "#140913",
-    motion: "headphones tilt toward viewer · waveform ripple · closes with contact CTA",
+    motion: "flies in from above and wobble-corrects into a perpetual hover · props never stop",
   },
 ];

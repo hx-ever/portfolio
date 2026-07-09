@@ -4,7 +4,6 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
 
 const MODEL = "/arx.glb";
@@ -168,16 +167,22 @@ export default function EchoModel({ progress }: { progress: number }) {
   const layout = useMemo(() => {
     scene.updateWorldMatrix(true, true);
     const inv = new THREE.Matrix4().copy(scene.matrixWorld).invert();
+    const leftovers: THREE.Object3D[] = [];
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.raycast = () => {};
       if (PLACEHOLDER_PROPS.test(mesh.name)) {
-        mesh.visible = false; // flat placeholder cards → replaced below
+        leftovers.push(mesh); // flat placeholder cards → deleted below
         return;
       }
+      // The legs (support1-4) import floating 3mm below the frame plates —
+      // an assembly offset in the STEP. Seat them flush with a 0.5mm embed
+      // so leg and frame read as one manufactured part.
+      if (/^support[1-4]$/.test(mesh.name)) mesh.position.y = 0.0035;
       mesh.material = materialFor(mesh.name);
     });
+    for (const m of leftovers) m.removeFromParent();
     const device = relBox(scene, inv);
     const center = device.getCenter(new THREE.Vector3());
     const size = device.getSize(new THREE.Vector3());
@@ -245,7 +250,16 @@ export default function EchoModel({ progress }: { progress: number }) {
 
   return (
     <>
-      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.7} ambientScale={0.6} />
+      {/* Studio three-point rig — the dark matte frame needs more than the
+          shared section lights. Materials stay matte/non-emissive, so the
+          extra intensity lifts readability without reintroducing glow. */}
+      <ambientLight intensity={0.3} color="#ffffff" />
+      {/* key: bright, warm, upper-front-right */}
+      <directionalLight position={[2.5, 3.5, 4]} intensity={1.7} color="#FFF4E8" />
+      {/* fill: soft, cool, opposite side — lifts the shadowed arms */}
+      <directionalLight position={[-3.5, 0.8, 2.5]} intensity={0.55} color="#DCE4F0" />
+      {/* rim: behind/above, crimson-tinted — edge separation from the dark bg */}
+      <directionalLight position={[-1, 2.5, -4]} intensity={1.3} color={ACCENT} />
       {/* static tilt so the frame's top face reads; scroll rotation inside */}
       <group rotation={[0.45, 0, 0]} position={[0, -0.05, 0]}>
         <group ref={group}>

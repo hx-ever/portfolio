@@ -45,7 +45,7 @@ interface CaseStudyConfig {
   capabilities: Capability[];
 }
 
-// ---- AuraEyez (lumen) ------------------------------------------------------
+// ---- AuraEyez (auraeyez) ------------------------------------------------------
 
 // Snippets are verbatim-trimmed from AuraEyez.ino.
 const AURA_CAPABILITIES: Capability[] = [
@@ -144,7 +144,7 @@ function AuraDiagram({ accent }: { accent: string }) {
   );
 }
 
-// ---- Hxkeys Air (keycap) ---------------------------------------------------
+// ---- Hxkeys Air (hxkeysair) ---------------------------------------------------
 
 // Snippets are verbatim-trimmed from Firmware/code.py in the KMK repo.
 const KEYS_CAPABILITIES: Capability[] = [
@@ -246,7 +246,7 @@ function KeysDiagram({ accent }: { accent: string }) {
   );
 }
 
-// ---- Land Rover (wayfarer) -------------------------------------------------
+// ---- Land Rover (landrover) -------------------------------------------------
 
 // No public repository for this one (university group project), so the cards
 // carry no code peeks — every claim below is from the team's final report.
@@ -356,7 +356,7 @@ function DiagramNode({
 // ---- the registry ----------------------------------------------------------
 
 const CASE_STUDIES: Record<string, CaseStudyConfig> = {
-  lumen: {
+  auraeyez: {
     repo: {
       url: "https://github.com/hx-ever/AuraEyez",
       label: "Full repository on GitHub →",
@@ -376,7 +376,7 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
     Diagram: AuraDiagram,
     capabilities: AURA_CAPABILITIES,
   },
-  wayfarer: {
+  landrover: {
     // university group project — no public repository, so no footer link
     // and no code peeks on the cards
     lede: "An autonomous line-following buggy built by a five-person team I led — Nucleo STM32 control in Mbed C++, dual-loop PID steering, and a custom hybrid analogue/digital sensor board, engineered from chassis to firmware.",
@@ -394,7 +394,7 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
     Diagram: BuggyDiagram,
     capabilities: BUGGY_CAPABILITIES,
   },
-  keycap: {
+  hxkeysair: {
     repo: {
       url: "https://github.com/hx-ever/KMK-macropad",
       label: "Full repository on GitHub →",
@@ -483,7 +483,28 @@ function CaseStudyModal({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      // Focus trap: while the dialog is up, Tab cycles within the panel
+      // instead of escaping into the page hidden behind the backdrop.
+      if (e.key === "Tab" && panelRef.current) {
+        const focusables = panelRef.current.querySelectorAll<HTMLElement>(
+          'button, a[href], summary, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || active === panelRef.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     // <html> is the scroll container — lock it while the overlay is up

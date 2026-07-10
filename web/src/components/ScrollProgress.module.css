@@ -1,0 +1,15 @@
+/* Hairline page-progress line pinned to the viewport's top edge — an
+   optional-feeling detail beneath the floating nav, not a UI element. */
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: var(--z-rail);
+  background: linear-gradient(90deg, #0a84ff, #bf5af2);
+  opacity: 0.75;
+  transform: scaleX(0);
+  transform-origin: left center;
+  pointer-events: none;
+}

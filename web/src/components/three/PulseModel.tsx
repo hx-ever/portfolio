@@ -6,6 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 
 const MODEL = "/corelink.glb";
@@ -112,7 +113,7 @@ export default function PulseModel({ progress }: { progress: number }) {
     null
   );
   if (scan.current == null) {
-    scan.current = { phase: scanPlayed() ? "done" : "waiting", t: 0, idle: 0 };
+    scan.current = { phase: scanPlayed() || prefersReducedMotion() ? "done" : "waiting", t: 0, idle: 0 };
   }
 
   const { scene } = useGLTF(MODEL);

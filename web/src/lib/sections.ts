@@ -37,7 +37,7 @@ export const HERO_ACCENT = "#2997FF";
 export const SHOWCASES: ShowcaseSection[] = [
   {
     index: "01",
-    id: "lumen",
+    id: "auraeyez",
     name: "AuraEyez",
     tag: "PRODUCT — EMBEDDED SYSTEMS",
     description:
@@ -53,7 +53,7 @@ export const SHOWCASES: ShowcaseSection[] = [
   },
   {
     index: "02",
-    id: "wayfarer",
+    id: "landrover",
     name: "Land Rover",
     tag: "TEAM LEAD — ROBOTICS",
     description:
@@ -71,7 +71,7 @@ export const SHOWCASES: ShowcaseSection[] = [
   },
   {
     index: "03",
-    id: "keycap",
+    id: "hxkeysair",
     name: "Hxkeys Air",
     tag: "PRODUCT — INPUT DEVICE",
     description:
@@ -89,7 +89,7 @@ export const SHOWCASES: ShowcaseSection[] = [
   },
   {
     index: "04",
-    id: "pulse",
+    id: "corelink",
     name: "CoreLink",
     tag: "FINAL YEAR PROJECT — EMBEDDED AI",
     description:
@@ -105,7 +105,7 @@ export const SHOWCASES: ShowcaseSection[] = [
   },
   {
     index: "05",
-    id: "echo",
+    id: "arx",
     name: "Arx",
     tag: "BUILD — FPV DRONE",
     description:

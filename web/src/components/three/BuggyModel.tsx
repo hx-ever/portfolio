@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 
 const ACCENT = "#30D158";
@@ -167,7 +168,7 @@ export default function BuggyModel({ progress }: { progress: number }) {
   } | null>(null);
   if (vroom.current == null) {
     vroom.current = {
-      phase: vroomAlreadyPlayed() ? "done" : "waiting",
+      phase: vroomAlreadyPlayed() || prefersReducedMotion() ? "done" : "waiting",
       t: 0,
       x: 0,
       v0: 1,

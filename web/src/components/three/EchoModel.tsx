@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { relBox } from "./relBox";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp } from "./useFitClamp";
 
 const MODEL = "/arx.glb";
@@ -220,7 +221,7 @@ export default function EchoModel({ progress }: { progress: number }) {
     hoverAmt: number;
   } | null>(null);
   if (flight.current == null) {
-    const played = flightPlayed();
+    const played = flightPlayed() || prefersReducedMotion();
     flight.current = played
       ? { phase: "hover", t: 0, x: 0, vx: 0, y: 0, vy: 0, hoverAmt: 1 }
       : {

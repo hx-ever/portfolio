@@ -20,11 +20,11 @@ import styles from "./Showcase.module.css";
 type ModelProps = { progress: number; pointer?: RefObject<SectionPointer> };
 
 const MODELS: Record<string, ComponentType<ModelProps>> = {
-  lumen: AuraEyezModel,
-  wayfarer: BuggyModel,
-  keycap: KeycapModel,
-  pulse: PulseModel,
-  echo: EchoModel,
+  auraeyez: AuraEyezModel,
+  landrover: BuggyModel,
+  hxkeysair: KeycapModel,
+  corelink: PulseModel,
+  arx: EchoModel,
 };
 
 export default function Showcase({ section }: { section: ShowcaseSection }) {
@@ -54,13 +54,13 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
 
       <div className={styles.layout}>
         <div className={styles.stage}>
-          {/* the drone (echo) flies in from above: its canvas bleeds upward so
+          {/* the drone (arx) flies in from above: its canvas bleeds upward so
               the entry happens at the section's top edge, never mid-stage —
               EchoModel compensates the composition for the extra headroom */}
           <ModelCanvas
             cameraPosition={[0, 0, 4]}
             fov={34}
-            className={section.id === "echo" ? styles.bleedTop : undefined}
+            className={section.id === "arx" ? styles.bleedTop : undefined}
           >
             <Model progress={progress} pointer={pointer} />
           </ModelCanvas>
@@ -117,7 +117,7 @@ function CtaLink({
   const [pos, setPos] = useState({ top: 0, left: 0, below: false });
 
   const anchorProps = {
-    href: section.href ?? (section.id === "echo" ? "/contact" : "#"),
+    href: section.href ?? (section.id === "arx" ? "/contact" : "#"),
     className: styles.cta,
     ...(section.href?.startsWith("http")
       ? { target: "_blank", rel: "noopener noreferrer" }

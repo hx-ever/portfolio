@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { EXPERIENCE, type ExperienceEntry } from "@/lib/experience";
 import { HERO_ACCENT } from "@/lib/sections";
 import { useActiveEntry, useFocusDistance, useSpineFill } from "@/lib/useFocusDistance";
@@ -68,10 +69,11 @@ function Row({
 
   const onMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!active) return;
+    setHovered(true);
+    if (prefersReducedMotion()) return; // hover clarity only, no tilt
     const rect = event.currentTarget.getBoundingClientRect();
     const px = (event.clientX - rect.left) / rect.width - 0.5;
     const py = (event.clientY - rect.top) / rect.height - 0.5;
-    setHovered(true);
     setTilt({ rx: -py * 2 * MAX_TILT, ry: px * 2 * MAX_TILT });
   };
 

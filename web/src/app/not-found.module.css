@@ -1,0 +1,69 @@
+.page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 120px 24px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(640px 460px at 70% 30%, rgba(41, 151, 255, 0.10), transparent 66%),
+    radial-gradient(520px 420px at 10% 90%, rgba(191, 90, 242, 0.08), transparent 62%);
+}
+
+.eyebrow {
+  position: relative;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  color: var(--dim);
+}
+
+.headline {
+  position: relative;
+  margin: 18px 0 0;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: clamp(44px, 8vw, 88px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+}
+
+.dot {
+  color: #2997ff;
+}
+
+.support {
+  position: relative;
+  margin: 20px 0 0;
+  font-size: clamp(15px, 1.6vw, 17px);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.home {
+  position: relative;
+  display: inline-block;
+  margin-top: 36px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2997ff;
+  border-bottom: 1.5px solid rgba(41, 151, 255, 0.45);
+  padding-bottom: 3px;
+  transition: border-color 0.2s ease;
+}
+
+.home:hover {
+  border-bottom-color: #2997ff;
+}

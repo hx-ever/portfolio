@@ -57,6 +57,19 @@ button {
   cursor: pointer;
 }
 
+/* Route transition: template.tsx remounts this wrapper on every navigation,
+   fading the new page up from the dark background — a quick fade-through-
+   dark rather than a hard cut. */
+.route-fade {
+  animation: route-fade 340ms ease;
+}
+
+@keyframes route-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-snap-type: none;

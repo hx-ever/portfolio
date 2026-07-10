@@ -2,6 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useRef, useState } from "react";
+import styles from "./ModelCanvas.module.css";
 
 interface ModelCanvasProps {
   children: React.ReactNode;
@@ -11,12 +12,28 @@ interface ModelCanvasProps {
 }
 
 /**
+ * Mounted as the Suspense FALLBACK inside the Canvas: it exists exactly
+ * while the model's GLB is still loading, so its mount/unmount drives the
+ * DOM loading indicator outside the WebGL context.
+ */
+function LoadSignal({ onChange }: { onChange: (loading: boolean) => void }) {
+  useEffect(() => {
+    onChange(true);
+    return () => onChange(false);
+  }, [onChange]);
+  return null;
+}
+
+/**
  * Lazily mounts an R3F Canvas once it nears the viewport (so off-screen
  * sections stay idle), and — separately — gates the RENDER LOOP by
  * visibility: once mounted, a canvas that scrolls out of view flips to
  * frameloop="never" (no rendering, no useFrame work) and resumes as it
  * re-approaches. Without this every mounted canvas renders forever; with
  * six scenes that was the site's largest steady main-thread/GPU drain.
+ *
+ * While the section's GLB is still fetching/parsing, a soft pulsing glow
+ * marks the stage as loading instead of leaving a dead-empty gap.
  */
 export default function ModelCanvas({
   children,
@@ -27,6 +44,7 @@ export default function ModelCanvas({
   const ref = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -56,16 +74,29 @@ export default function ModelCanvas({
   }, []);
 
   return (
-    <div ref={ref} className={className} style={{ width: "100%", height: "100%" }}>
+    <div
+      ref={ref}
+      className={className}
+      style={{ width: "100%", height: "100%", position: "relative" }}
+    >
       {mounted && (
-        <Canvas
-          dpr={[1, 2]}
-          gl={{ antialias: true, alpha: true }}
-          camera={{ position: cameraPosition, fov }}
-          frameloop={active ? "always" : "never"}
-        >
-          <Suspense fallback={null}>{children}</Suspense>
-        </Canvas>
+        <>
+          <div
+            className={styles.loading}
+            data-visible={loading}
+            aria-hidden="true"
+          />
+          <Canvas
+            dpr={[1, 2]}
+            gl={{ antialias: true, alpha: true }}
+            camera={{ position: cameraPosition, fov }}
+            frameloop={active ? "always" : "never"}
+          >
+            <Suspense fallback={<LoadSignal onChange={setLoading} />}>
+              {children}
+            </Suspense>
+          </Canvas>
+        </>
       )}
     </div>
   );

@@ -112,7 +112,7 @@ export default function Nav() {
           aria-hidden="true"
         />
         <Link
-          href="/#lumen"
+          href="/#auraeyez"
           onMouseEnter={onLinkEnter}
           className={onHome && pastHero ? styles.active : undefined}
         >

@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 
 const ACCENT = "#5AC8FA";
@@ -125,7 +126,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
 
   const asm = useRef<{ phase: "waiting" | "running" | "done"; t: number } | null>(null);
   if (asm.current == null) {
-    asm.current = { phase: assembled() ? "done" : "waiting", t: 0 };
+    asm.current = { phase: assembled() || prefersReducedMotion() ? "done" : "waiting", t: 0 };
   }
 
   const { scene } = useGLTF(MODEL);

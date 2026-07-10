@@ -8,6 +8,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import SceneLights from "./SceneLights";
 import { GRAPHITE_DEEP } from "./materials";
 import { relBox } from "./relBox";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
@@ -182,7 +183,7 @@ export default function AuraEyezModel({
   // Power-on entrance state; skipped entirely when already played this session.
   const power = useRef<{ phase: "waiting" | "running" | "done"; t: number } | null>(null);
   if (power.current == null) {
-    power.current = { phase: powerAlreadyPlayed() ? "done" : "waiting", t: 0 };
+    power.current = { phase: powerAlreadyPlayed() || prefersReducedMotion() ? "done" : "waiting", t: 0 };
   }
   // The section's DOM glow element is driven via a CSS variable during the
   // ambient-bloom step; resolved lazily from the canvas' ancestors.

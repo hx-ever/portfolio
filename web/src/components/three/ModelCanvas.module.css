@@ -1,0 +1,49 @@
+/* Loading state shown while a section's GLB is still fetching/parsing when
+   the stage is already on screen — a soft breathing glow in the stage's
+   centre, in the site's ambient language rather than a spinner. */
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.loading[data-visible="true"] {
+  opacity: 1;
+}
+
+.loading::after {
+  content: "";
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.10),
+    rgba(255, 255, 255, 0.03) 55%,
+    transparent 72%
+  );
+  animation: model-loading-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes model-loading-pulse {
+  0%,
+  100% {
+    transform: scale(0.82);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading::after {
+    animation: none;
+    opacity: 0.7;
+  }
+}

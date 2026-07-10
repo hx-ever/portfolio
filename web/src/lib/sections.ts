@@ -9,6 +9,17 @@ export interface ShowcaseSection {
   cta: string;
   /** case-study link target; an http(s) URL opens in a new tab */
   href?: string;
+  /** hover/focus preview panel on the case-study link (glass-pill treatment,
+      same interaction language as the Contact dock tooltips). Only sections
+      with a real exported asset carry one. */
+  preview?: {
+    src: string;
+    alt: string;
+    caption: string;
+    /** intrinsic pixel size of the asset (aspect source for layout) */
+    width: number;
+    height: number;
+  };
   accent: string;
   glow: string; // rgba glow color used behind the model
   layout: Layout;
@@ -60,6 +71,14 @@ export const SHOWCASES: ShowcaseSection[] = [
       "A custom 10-key macropad running KMK firmware on a Seeed Studio XIAO RP2040 — PCB, 3D-printed enclosure, and firmware designed and built as one system.",
     cta: "View case study",
     href: "https://github.com/hx-ever/KMK-macropad",
+    preview: {
+      src: "/hxkeysair-pcb.svg",
+      alt: "Hxkeys Air PCB schematic preview",
+      caption: "Custom PCB, KiCad",
+      // exported from hxkeysair.kicad_pcb via kicad-cli (76.3 x 96.4 mm board)
+      width: 200,
+      height: 253,
+    },
     accent: "#5AC8FA",
     glow: "90,200,250",
     layout: "model-center",

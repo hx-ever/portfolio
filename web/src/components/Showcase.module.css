@@ -163,6 +163,89 @@
   border-bottom-color: var(--accent);
 }
 
+/* ============ case-study hover preview (glass tooltip language) ============ */
+
+.previewWrap {
+  position: relative;
+  display: inline-block;
+  margin-top: 28px;
+}
+
+.previewWrap .cta {
+  margin-top: 0; /* the wrapper carries the CTA's outer spacing */
+}
+
+/* Same glass material + 200ms fade-and-slide as the Contact dock tooltip
+   (rgba(40,40,44,.55) frost, 16px blur, hairline border), shaped as a card
+   rather than a pill. position:fixed — placed from the link's rect by JS on
+   each show, clamped to the viewport — so the section's overflow:hidden can
+   never clip it; `translate` carries the show/hide slide on top. */
+.previewPanel {
+  position: fixed;
+  width: 220px;
+  padding: 10px 10px 9px;
+  border-radius: 16px;
+  background: rgba(40, 40, 44, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: var(--z-overlay);
+  opacity: 0;
+  translate: 0 6px;
+  visibility: hidden;
+  transition:
+    opacity 200ms ease,
+    translate 200ms ease,
+    visibility 0s linear 200ms; /* leave the AX tree only after the fade */
+}
+
+.previewPanel[data-visible="true"] {
+  opacity: 1;
+  translate: 0 0;
+  visibility: visible;
+  transition:
+    opacity 200ms ease,
+    translate 200ms ease;
+}
+
+/* flipped below the link when there's no room above (fixed nav): the hidden
+   rest position mirrors, so it still slides toward the link on entry */
+.previewPanel[data-placement="below"] {
+  translate: 0 -6px;
+}
+
+.previewPanel[data-placement="below"][data-visible="true"] {
+  translate: 0 0;
+}
+
+.previewImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: rgba(14, 14, 16, 0.55); /* dark well behind the copper traces */
+}
+
+.previewCaption {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Reduced motion: no slide — the panel simply fades (the global reduced-
+   motion rule already collapses the durations to near-instant). */
+@media (prefers-reduced-motion: reduce) {
+  .previewPanel,
+  .previewPanel[data-placement="below"] {
+    translate: 0 0;
+  }
+}
+
 @media (max-width: 860px) {
   .layout,
   .section[data-layout="model-right"] .layout,

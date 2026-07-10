@@ -185,17 +185,22 @@
 }
 
 .viewerInner {
+  /* plain block, not grid: an auto grid track would make the img's
+     percentage height cyclic, snapping it back to its attribute aspect
+     and overflowing the square frame. The img fills this box and
+     object-fit letterboxes the artwork; the frame stays fully covered. */
   width: 100%;
   height: 100%;
-  display: grid;
-  place-items: center;
   padding: 4%;
   will-change: transform;
 }
 
 .viewerInner img {
+  /* fill the square frame, letterboxing whatever the export's aspect —
+     the layout view includes dimension annotations, so it isn't 1:1 */
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
   filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.5));

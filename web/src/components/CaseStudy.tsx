@@ -9,9 +9,11 @@ import styles from "./CaseStudy.module.css";
 
 const REPO_URL = "https://github.com/hx-ever/AuraEyez";
 
-// Both sides rendered from the real fab Gerbers (pcb-stackup composite of
-// copper + mask + silkscreen + drills, clipped by Edge_Cuts). SVG, so the
-// zoom stays crisp down to individual traces.
+// Both sides exported from the real KiCad board file (kicad-cli, editor
+// theme): the routing view — red front copper, blue back copper, silkscreen
+// and dimensions — rather than a fab render, so the trace work is legible.
+// The bottom side is mirrored, as if the board were flipped over. SVG, so
+// the zoom stays crisp down to individual traces.
 const SIDES = [
   { id: "top", label: "Top", src: "/auraeyez-pcb-top.svg" },
   { id: "bottom", label: "Bottom", src: "/auraeyez-pcb-bottom.svg" },
@@ -314,11 +316,14 @@ function PcbViewer() {
         <div ref={innerRef} className={styles.viewerInner}>
           <Image
             src={active.src}
-            alt={`AuraEyez PCB, ${active.label.toLowerCase()} side — rendered from the fabrication Gerbers`}
+            alt={`AuraEyez PCB layout, ${active.label.toLowerCase()} side — routing view exported from the KiCad board`}
             width={740}
-            height={740}
+            height={855}
             draggable={false}
             priority
+            // inline so next/image's own sizing styles can't override the
+            // letterboxed fill of the square frame
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
         </div>
       </div>

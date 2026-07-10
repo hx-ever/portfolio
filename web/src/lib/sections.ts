@@ -59,6 +59,9 @@ export const SHOWCASES: ShowcaseSection[] = [
     description:
       "An autonomous line-following buggy I led a five-person team to build — STM32 control, dual-loop PID steering, and a hybrid analogue/digital sensor array, engineered from chassis to firmware.",
     cta: "View case study",
+    // in-site case study (sensor-board PCB viewer + control-loop firmware
+    // view); no public repo for this group project
+    caseStudy: true,
     accent: "#30D158",
     glow: "48,209,88",
     layout: "model-right",

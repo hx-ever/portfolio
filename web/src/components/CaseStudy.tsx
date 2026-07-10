@@ -25,11 +25,13 @@ import styles from "./CaseStudy.module.css";
 interface Capability {
   label: string;
   desc: string;
-  snippet: string;
+  /** short verbatim code peek — omitted when the project has no public source */
+  snippet?: string;
 }
 
 interface CaseStudyConfig {
-  repoUrl: string;
+  /** secondary footer link — omitted when there's no public repository */
+  repo?: { url: string; label: string };
   lede: string;
   pcb: {
     sides: { id: string; label: string; src: string }[];
@@ -244,6 +246,81 @@ function KeysDiagram({ accent }: { accent: string }) {
   );
 }
 
+// ---- Land Rover (wayfarer) -------------------------------------------------
+
+// No public repository for this one (university group project), so the cards
+// carry no code peeks — every claim below is from the team's final report.
+const BUGGY_CAPABILITIES: Capability[] = [
+  {
+    label: "Hybrid sensor array",
+    desc: "Two centre analogue TCRT5000s resolve the line continuously to ±17 mm; four digital flanks with trimmer-set thresholds flag hard escapes at ±27 and ±52 mm.",
+  },
+  {
+    label: "Dual-loop control",
+    desc: "An outer position PID turns displacement into left/right speed demands; an inner PI loop per wheel holds that speed against disturbances using encoder feedback.",
+  },
+  {
+    label: "Noise-hardened line sensing",
+    desc: "Dynamic averaging steadies the displacement signal, and infrared sensors tucked behind the front wheel shrug off ambient light — the buggy runs even in the dark.",
+  },
+  {
+    label: "Bluetooth tuning & race control",
+    desc: "An HM10 link streams live variables and retunes PID gains on the fly; the race-day 180° turnaround is triggered over the same link.",
+  },
+];
+
+/**
+ * The buggy's nested control loops, in the same diagram language: the sensor
+ * board feeds an outer position PID (the accent — the steering brain), whose
+ * differential speed demands are held by per-wheel PI loops closed on the
+ * encoders; the buggy's own motion closes the outermost loop by shifting the
+ * line under the array.
+ */
+function BuggyDiagram({ accent }: { accent: string }) {
+  return (
+    <svg
+      viewBox="0 0 720 330"
+      className={styles.diagram}
+      role="img"
+      aria-label="Control topology: the hybrid sensor array measures line displacement, an outer position PID converts it into differential wheel-speed demands, two inner PI loops hold each wheel to its demand using encoder feedback, and the buggy's motion shifts the line under the array, closing the outer loop."
+    >
+      <defs>
+        <marker id="cs-arrow3" viewBox="0 0 8 8" refX={7} refY={4} markerWidth={7} markerHeight={7} orient="auto-start-reverse">
+          <path d="M0,0.8 L7.2,4 L0,7.2 Z" fill="rgba(255,255,255,0.38)" />
+        </marker>
+      </defs>
+
+      <rect x={12} y={34} width={696} height={284} rx={20} fill="none" stroke="rgba(255,255,255,0.10)" strokeDasharray="5 7" />
+      <text x={30} y={22} className={styles.diagramNote}>
+        Nucleo STM32F401RE · Mbed C++
+      </text>
+
+      {/* forward path: sensors -> position PID -> wheel PIs -> motors */}
+      <path d="M 157 130 L 221 130" fill="none" stroke="rgba(255,255,255,0.28)" markerEnd="url(#cs-arrow3)" />
+      <text x={189} y={116} textAnchor="middle" className={styles.diagramNote}>±17 mm</text>
+      <path d="M 347 130 L 411 130" fill="none" stroke="rgba(255,255,255,0.28)" markerEnd="url(#cs-arrow3)" />
+      <text x={379} y={116} textAnchor="middle" className={styles.diagramNote}>speed demands</text>
+      <path d="M 537 130 L 576 130" fill="none" stroke="rgba(255,255,255,0.28)" markerEnd="url(#cs-arrow3)" />
+      <text x={557} y={116} textAnchor="middle" className={styles.diagramNote}>PWM</text>
+
+      {/* inner loop: motors -> encoders -> wheel PIs */}
+      <path d="M 630 152 C 620 200, 580 240, 539 252" fill="none" stroke="rgba(255,255,255,0.18)" markerEnd="url(#cs-arrow3)" />
+      <path d="M 413 250 C 450 236, 462 200, 470 154" fill="none" stroke="rgba(255,255,255,0.28)" markerEnd="url(#cs-arrow3)" />
+      <text x={432} y={210} textAnchor="middle" className={styles.diagramNote}>measured speed</text>
+
+      {/* outer loop: the buggy moves, the line shifts under the array */}
+      <path d="M 640 156 C 640 300, 130 300, 96 156" fill="none" stroke="rgba(255,255,255,0.14)" strokeDasharray="4 6" markerEnd="url(#cs-arrow3)" />
+      <text x={368} y={310} textAnchor="middle" className={styles.diagramNote}>the buggy moves · the line shifts under the array</text>
+
+      <DiagramNode x={95} y={130} label="SENSOR ARRAY" />
+      <DiagramNode x={285} y={130} label="POSITION PID" accent={accent} />
+      <DiagramNode x={475} y={130} label="WHEEL PI ×2" />
+      <DiagramNode x={640} y={130} label="MOTORS" />
+      <DiagramNode x={475} y={258} label="ENCODERS" />
+    </svg>
+  );
+}
+
 // ---- shared diagram node ---------------------------------------------------
 
 function DiagramNode({
@@ -280,7 +357,10 @@ function DiagramNode({
 
 const CASE_STUDIES: Record<string, CaseStudyConfig> = {
   lumen: {
-    repoUrl: "https://github.com/hx-ever/AuraEyez",
+    repo: {
+      url: "https://github.com/hx-ever/AuraEyez",
+      label: "Full repository on GitHub →",
+    },
     lede: "An ESP32 desk assistant with animated RoboEyes, motion-triggered wake, and live temperature & humidity — enclosure, PCB, and firmware built as one system.",
     pcb: {
       sides: [
@@ -296,8 +376,29 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
     Diagram: AuraDiagram,
     capabilities: AURA_CAPABILITIES,
   },
+  wayfarer: {
+    // university group project — no public repository, so no footer link
+    // and no code peeks on the cards
+    lede: "An autonomous line-following buggy built by a five-person team I led — Nucleo STM32 control in Mbed C++, dual-loop PID steering, and a custom hybrid analogue/digital sensor board, engineered from chassis to firmware.",
+    pcb: {
+      sides: [
+        { id: "top", label: "Top", src: "/buggy-pcb-top.svg" },
+        { id: "bottom", label: "Bottom", src: "/buggy-pcb-bottom.svg" },
+      ],
+      caption: "Sensor board — 2-layer, Altium Designer · 125 × 75 mm",
+      width: 740,
+      height: 443,
+    },
+    firmwareNote:
+      "Two nested loops in Mbed C++ on a Nucleo STM32F401RE: an outer position PID reads the line, and two inner PI loops hold each wheel to the speed it demands.",
+    Diagram: BuggyDiagram,
+    capabilities: BUGGY_CAPABILITIES,
+  },
   keycap: {
-    repoUrl: "https://github.com/hx-ever/KMK-macropad",
+    repo: {
+      url: "https://github.com/hx-ever/KMK-macropad",
+      label: "Full repository on GitHub →",
+    },
     lede: "A 10-key macropad with a rotary encoder, running KMK on a Seeed XIAO RP2040 — snap-tap gaming macros, a second launcher layer, and per-layer encoder control.",
     pcb: {
       sides: [
@@ -436,27 +537,31 @@ function CaseStudyModal({
               <article key={cap.label} className={styles.card}>
                 <h4 className={styles.cardLabel}>{cap.label}</h4>
                 <p className={styles.cardDesc}>{cap.desc}</p>
-                <details className={styles.peek}>
-                  <summary>Peek at the code</summary>
-                  <pre>
-                    <code>{cap.snippet}</code>
-                  </pre>
-                </details>
+                {cap.snippet && (
+                  <details className={styles.peek}>
+                    <summary>Peek at the code</summary>
+                    <pre>
+                      <code>{cap.snippet}</code>
+                    </pre>
+                  </details>
+                )}
               </article>
             ))}
           </div>
         </section>
 
-        <footer className={styles.footer}>
-          <a
-            href={study.repoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.repoLink}
-          >
-            Full repository on GitHub →
-          </a>
-        </footer>
+        {study.repo && (
+          <footer className={styles.footer}>
+            <a
+              href={study.repo.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.repoLink}
+            >
+              {study.repo.label}
+            </a>
+          </footer>
+        )}
       </div>
     </div>
   );

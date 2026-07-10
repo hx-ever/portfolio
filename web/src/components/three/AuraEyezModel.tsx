@@ -6,6 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
+import { GRAPHITE, GRAPHITE_DEEP } from "./materials";
 import { relBox } from "./relBox";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
@@ -17,14 +18,16 @@ const TARGET_WIDTH = 1.55; // world units the 80mm device face is scaled to fill
 const KNOB_MESHES: readonly string[] = ["Body1008", "Body1009"]; // left (-x) and right (+x) knob caps
 const GLASS_MESH = "Body5002"; // the OLED cover glass — the visible display area
 const CAD_AMBER_MATERIAL = "Paint - Enamel Glossy (Yellow)"; // shared by knob caps + backplate
-const OLED_FRAME_MATERIAL = "Plastic - Glossy (Black)"; // screen bezel — kept as imported
+const OLED_FRAME_MATERIAL = "Plastic - Glossy (Black)"; // screen bezel — amber accent edge
 const PIR_LENS_MATERIAL = "Glass - Medium Color"; // PIR dome between the knobs
+const PIR_RING_MATERIAL = "PEKK - Polyetherketoneketone Reinforced With Carbon Fib_66a7dc3"; // PIR mount ring
+const BODY_MATERIAL = "ABS (White)"; // enclosure shell
 
-// Device palette. The body shell keeps its ORIGINAL imported color (the CAD's
-// near-white ABS); only the knobs and the distinct backplate mesh are themed —
-// vivid saturated amber-golds that echo the section's accent.
-const PLATE_COLOR = "#F5A50F"; // backplate: saturated amber enamel
-const KNOB_COLOR = "#FFAD1F"; // knobs: vivid metallic gold
+// Device palette — Dyson-inspired CMF: graphite engineered body, with the
+// saturated amber concentrated only at the interaction/technology points
+// (knobs, PIR ring, OLED frame edge). The white eyes stay the focal glow.
+const KNOB_COLOR = "#FFB627"; // knobs: saturated jewel-amber
+const ACCENT_EDGE = "#F5A623"; // PIR ring + OLED frame edge
 
 // --- OLED screen (canvas texture) geometry, in canvas pixels ---
 // Eye look & behaviour follow the FluxGarage RoboEyes library (default mood +
@@ -214,8 +217,8 @@ export default function AuraEyezModel({
     // light body) while the plate joins the warm-neutral body scheme.
     const knobMat = new THREE.MeshStandardMaterial({
       color: KNOB_COLOR,
-      metalness: 0.9,
-      roughness: 0.25, // tactile premium metal — tighter highlight
+      metalness: 0.45, // jewel-like machined metal, not chrome and not plastic
+      roughness: 0.3,
       envMapIntensity: 0.5,
     });
     injectSweep(knobMat);
@@ -234,8 +237,22 @@ export default function AuraEyezModel({
         if (!std.isMeshStandardMaterial || seen.has(std)) continue;
         seen.add(std);
         injectSweep(std); // everything takes part in the power-on sweep
-        // OLED bezel: original glossy-black as imported, no overrides.
-        if (std.name === OLED_FRAME_MATERIAL) continue;
+        // OLED frame edge: amber accent — the screen is a technology point.
+        if (std.name === OLED_FRAME_MATERIAL) {
+          std.color.set(ACCENT_EDGE);
+          std.metalness = 0.3;
+          std.roughness = 0.4;
+          std.envMapIntensity = 0.3;
+          continue;
+        }
+        // PIR mount ring: amber accent framing the frosted lens.
+        if (std.name === PIR_RING_MATERIAL) {
+          std.color.set(ACCENT_EDGE);
+          std.metalness = 0.2;
+          std.roughness = 0.5;
+          std.envMapIntensity = 0.12;
+          continue;
+        }
         // PIR lens: frosted glass — transmissive with a faint frost tint so
         // it reads as a distinct component rather than a dark dot.
         if (std.name === PIR_LENS_MATERIAL) {
@@ -277,9 +294,15 @@ export default function AuraEyezModel({
           const c = std.color;
           if (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.55) c.multiplyScalar(0.85);
         }
-        if (std.name === CAD_AMBER_MATERIAL) {
-          std.color.set(PLATE_COLOR);
-          std.roughness = 0.5; // enamel paint keeps a semi-gloss finish
+        if (std.name === BODY_MATERIAL) {
+          // graphite engineered shell — the shared dark base of the family
+          std.color.set(GRAPHITE);
+          std.roughness = 0.72;
+          std.metalness = 0.15;
+        } else if (std.name === CAD_AMBER_MATERIAL) {
+          std.color.set(GRAPHITE_DEEP); // backplate joins the dark body
+          std.roughness = 0.6;
+          std.metalness = 0.15;
         }
       }
     });

@@ -18,3 +18,16 @@ export const ink = {
   roughness: 0.5,
   metalness: 0,
 } as const;
+
+/**
+ * Dyson-inspired engineered base shared by all five showcase models: dark
+ * graphite/iron, matte with a whisper of brushed metal — machined, not
+ * molded. Accents live only at each model's interaction points.
+ */
+export const GRAPHITE = "#434347";
+export const GRAPHITE_DEEP = "#3A3A3D";
+export const graphite = {
+  color: GRAPHITE,
+  roughness: 0.72,
+  metalness: 0.15,
+} as const;

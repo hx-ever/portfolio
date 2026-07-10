@@ -61,14 +61,24 @@ function markFlightPlayed() {
 
 // Materials authored here, matte from the start (brightness lessons applied):
 // no emissive anywhere, metalness only on genuinely metallic parts.
-const FRAME_MAT = new THREE.MeshStandardMaterial({ color: "#585E67", roughness: 0.8, metalness: 0 });
-const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#6E747D", roughness: 0.72, metalness: 0 });
+// Dyson-inspired CMF: graphite engineered frame (top of the graphite range —
+// the studio rig is bright); crimson accents live only at the prop tips and
+// motor-mount rings. Sits at the same family base tone as the other models.
+const FRAME_MAT = new THREE.MeshStandardMaterial({ color: "#47484D", roughness: 0.78, metalness: 0.15 });
+const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#505157", roughness: 0.72, metalness: 0.15 });
 const PCB_MAT = new THREE.MeshStandardMaterial({ color: "#1E4D33", roughness: 0.6, metalness: 0 });
 const MOTOR_MAT = new THREE.MeshStandardMaterial({ color: "#8E9298", roughness: 0.35, metalness: 0.7 });
 const PIN_MAT = new THREE.MeshStandardMaterial({ color: "#C9A227", roughness: 0.4, metalness: 0.8 });
 // props: slightly glossier dark plastic, distinct from the matte frame
+const TIP_ACCENT = "#FF375F"; // saturated crimson — prop tips + motor rings
+const RING_MAT = new THREE.MeshStandardMaterial({
+  color: TIP_ACCENT,
+  roughness: 0.4,
+  metalness: 0.3,
+});
 const PROP_MAT = new THREE.MeshStandardMaterial({
-  color: "#1A1B1E",
+  color: "#FFFFFF", // multiplied by per-vertex colors: dark blade, crimson tip
+  vertexColors: true,
   roughness: 0.35,
   metalness: 0,
   transparent: true,
@@ -108,15 +118,23 @@ function buildBladeGeometry(): THREE.BufferGeometry {
   const TIP_R = 0.017;
   const MAX_CHORD = 0.0062;
   const pos: number[] = [];
+  const col: number[] = [];
+  const dark = new THREE.Color("#1A1B1E");
+  const tip = new THREE.Color(TIP_ACCENT);
+  const mixed = new THREE.Color();
   for (let i = 0; i <= SPAN; i++) {
     const t = i / SPAN;
     const r = THREE.MathUtils.lerp(HUB_R, TIP_R, t);
     const chord =
       MAX_CHORD * (0.45 + 0.55 * Math.sin(Math.PI * (0.18 + 0.82 * t))) * (1 - 0.3 * t * t);
     const twist = 0.62 - 0.44 * t; // ~36° root pitch → ~10° at the tip
+    // Dyson CMF accent: the outer ~quarter of each blade blends to crimson
+    const tipMix = THREE.MathUtils.smoothstep(t, 0.72, 0.95);
+    mixed.copy(dark).lerp(tip, tipMix);
     for (let j = 0; j <= CHORD; j++) {
       const c = (j / CHORD - 0.5) * chord;
       pos.push(r, c * Math.sin(twist), c * Math.cos(twist));
+      col.push(mixed.r, mixed.g, mixed.b);
     }
   }
   const idx: number[] = [];
@@ -129,6 +147,7 @@ function buildBladeGeometry(): THREE.BufferGeometry {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
@@ -305,6 +324,11 @@ export default function EchoModel({ progress }: { progress: number }) {
                         <meshStandardMaterial color="#26272B" roughness={0.4} metalness={0} />
                       </mesh>
                     </group>
+                    {/* crimson motor-mount ring — the accent at the tech point */}
+                    <mesh position={[0, -0.002, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                      <torusGeometry args={[0.0036, 0.0009, 12, 32]} />
+                      <primitive object={RING_MAT} attach="material" />
+                    </mesh>
                     {/* spin-blur disc: dim, translucent, non-emissive */}
                     <mesh rotation={[-Math.PI / 2, 0, 0]}>
                       <circleGeometry args={[0.0172, 40]} />

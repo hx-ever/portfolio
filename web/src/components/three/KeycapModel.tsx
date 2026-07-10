@@ -6,6 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
+import { graphite } from "./materials";
 import { relBox } from "./relBox";
 
 const ACCENT = "#5AC8FA";
@@ -41,6 +42,14 @@ const SWITCH_NODES: readonly string[] = [
   "MX_PCB10",
 ];
 const MCU_NODE = "Arduino_Pro_Micro1";
+
+// Dyson-inspired CMF: graphite engineered enclosure; the section's saturated
+// sky-blue lives ONLY on the keycaps — the surfaces the user's fingers touch.
+// Switches beneath stay dark neutral so the interaction point reads alone.
+const CAP_ACCENT = "#3EBFFF";
+const CASE_MESHES = /^(Structure|Upper_Plate|Lower_Plate|Base)$/;
+const CASE_MAT = new THREE.MeshStandardMaterial({ ...graphite, roughness: 0.75 });
+const SWITCH_MAT = new THREE.MeshStandardMaterial({ color: "#33353A", metalness: 0.1, roughness: 0.6 });
 
 // --- one-time exploded-assembly entrance (per session) ---
 const ASSEMBLE_KEY = "hx_keys_assembled"; // sessionStorage flag
@@ -144,6 +153,10 @@ export default function KeycapModel({ progress }: { progress: number }) {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.raycast = () => {};
+      if (CASE_MESHES.test(mesh.name)) {
+        mesh.material = CASE_MAT; // graphite enclosure — the family base tone
+        return;
+      }
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const mat of mats) {
         const std = mat as THREE.MeshStandardMaterial;
@@ -226,6 +239,13 @@ export default function KeycapModel({ progress }: { progress: number }) {
     const swUnits = SWITCH_NODES.map((n, i) =>
       makeUnit(n, SWITCH_LIFT + hash01(i + 7) * 0.007, 0, hash01(i + 11) * 0.06)
     ).filter((u): u is Unit => u != null);
+    // Switches go dark neutral so the blue caps carry the accent alone.
+    for (const u of swUnits) {
+      u.node.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) mesh.material = SWITCH_MAT;
+      });
+    }
 
     const mcu = makeUnit(MCU_NODE, MCU_LIFT, MCU_SIDE, 0.04);
     const moving = [...capUnits, ...swUnits, ...(mcu ? [mcu] : [])];
@@ -243,6 +263,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
         const phys = clone as THREE.MeshPhysicalMaterial;
         // Caps sit a touch smoother than the 0.78-matte case (realistic for
         // moulded keycap plastic) — but still clearly matte, minimal coat.
+        phys.color.set(CAP_ACCENT); // the saturated interaction-point accent
         phys.metalness = 0;
         phys.roughness = 0.62;
         phys.envMapIntensity = 0.15;

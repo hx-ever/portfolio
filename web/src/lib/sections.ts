@@ -74,15 +74,9 @@ export const SHOWCASES: ShowcaseSection[] = [
     description:
       "A custom 10-key macropad running KMK firmware on a Seeed Studio XIAO RP2040 — PCB, 3D-printed enclosure, and firmware designed and built as one system.",
     cta: "View case study",
-    href: "https://github.com/hx-ever/KMK-macropad",
-    preview: {
-      src: "/hxkeysair-pcb.svg",
-      alt: "Hxkeys Air PCB schematic preview",
-      caption: "Custom PCB, KiCad",
-      // exported from hxkeysair.kicad_pcb via kicad-cli (76.3 x 96.4 mm board)
-      width: 200,
-      height: 253,
-    },
+    // in-site case study (PCB viewer + firmware) — the GitHub repo link
+    // lives inside it as the secondary footer link
+    caseStudy: true,
     accent: "#5AC8FA",
     glow: "90,200,250",
     layout: "model-center",

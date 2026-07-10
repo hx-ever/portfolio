@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
+import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 
 const ACCENT = "#5AC8FA";
 const MODEL = "/hxkeysair.glb";
@@ -281,9 +282,29 @@ export default function KeycapModel({ progress }: { progress: number }) {
       });
     }
 
+    // Worst-case on-screen extents for the shared fit clamp: the measured
+    // box is expanded to the exploded-entrance envelope (keycap lift + max
+    // jitter along GLB +Z, MCU side park along +X) and swept across the
+    // scroll-scrub yaw range. The tilt group's -0.12 y offset is folded in.
+    const scale = TARGET_LONG / size.y;
+    const explodedSize = size.clone();
+    explodedSize.z += KEYCAP_LIFT + 0.012;
+    explodedSize.x += MCU_SIDE;
+    const fitHalf = worstCaseHalfExtents(
+      explodedSize.multiplyScalar(scale),
+      (yaw) => [
+        new THREE.Euler(0.55, 0, 0),
+        new THREE.Euler(0, yaw, 0),
+        new THREE.Euler(-Math.PI / 2, 0, 0),
+      ],
+      [-24, 0, 18]
+    );
+    fitHalf.h += 0.12;
+
     return {
       center,
-      scale: TARGET_LONG / size.y,
+      scale,
+      fitHalf,
       capUnits,
       capXY,
       moving,
@@ -293,6 +314,8 @@ export default function KeycapModel({ progress }: { progress: number }) {
       planeSize: [size.x * 1.3, size.y * 1.15] as [number, number],
     };
   }, [scene]);
+
+  const fitGroup = useFitClamp(layout.fitHalf.w, layout.fitHalf.h);
 
   const onPlaneMove = (e: ThreeEvent<PointerEvent>) => {
     const p = e.object.worldToLocal(e.point.clone());
@@ -377,6 +400,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
       {/* static tilt so the key field faces the camera; scroll rotation inside */}
       <group rotation={[0.55, 0, 0]} position={[0, -0.12, 0]}>
         <group ref={group}>
+          <group ref={fitGroup}>
           <group scale={layout.scale}>
             {/* GLB is Z-up: rotate the board flat, world up = board up */}
             <group rotation={[-Math.PI / 2, 0, 0]}>
@@ -395,6 +419,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
                 <meshBasicMaterial transparent opacity={0} depthWrite={false} />
               </mesh>
             </group>
+          </group>
           </group>
         </group>
       </group>

@@ -6,6 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
+import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 
 const MODEL = "/corelink.glb";
 const ACCENT = "#2FA093"; // section's new deep-teal theme (family: #24403E)
@@ -129,8 +130,18 @@ export default function PulseModel({ progress }: { progress: number }) {
     const center = device.getCenter(new THREE.Vector3());
     const size = device.getSize(new THREE.Vector3());
     const scale = TARGET_WIDTH / size.x;
-    return { center, scale, baseY: (device.min.y - center.y) * scale };
+    // Worst-case on-screen extents across the scroll-scrub yaw range for the
+    // shared fit clamp; the tilt group's -0.05 y offset is folded in.
+    const fitHalf = worstCaseHalfExtents(
+      size.clone().multiplyScalar(scale),
+      (yaw) => [new THREE.Euler(0.52, 0, 0), new THREE.Euler(0, yaw, 0)],
+      [-22, 0, 18]
+    );
+    fitHalf.h += 0.05;
+    return { center, scale, fitHalf, baseY: (device.min.y - center.y) * scale };
   }, [scene]);
+
+  const fitGroup = useFitClamp(layout.fitHalf.w, layout.fitHalf.h);
 
   // Drive one ring mesh for phase p ∈ [0,1] at the given opacity; hidden
   // outside that range.
@@ -198,6 +209,9 @@ export default function PulseModel({ progress }: { progress: number }) {
       {/* static tilt so the hub's top face reads; scroll rotation inside */}
       <group rotation={[0.52, 0, 0]} position={[0, -0.05, 0]}>
         <group ref={group}>
+          {/* fit clamp wraps the hub AND its rings (the rings' own radius
+              clamp then only ever over-protects) */}
+          <group ref={fitGroup}>
           <group scale={layout.scale}>
             <group position={[-layout.center.x, -layout.center.y, -layout.center.z]}>
               <primitive object={scene} />
@@ -225,6 +239,7 @@ export default function PulseModel({ progress }: { progress: number }) {
               />
             </mesh>
           ))}
+          </group>
         </group>
       </group>
     </>

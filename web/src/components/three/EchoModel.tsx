@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { relBox } from "./relBox";
+import { useFitClamp } from "./useFitClamp";
 
 const MODEL = "/arx.glb";
 const ACCENT = "#FF375F";
@@ -202,8 +203,10 @@ const PROPS: { x: number; z: number; dir: 1 | -1 }[] = [
 export default function EchoModel({ progress }: { progress: number }) {
   const group = useRef<THREE.Group>(null); // scroll yaw
   const rig = useRef<THREE.Group>(null); // flight position + attitude
-  const fitGroup = useRef<THREE.Group>(null); // live fit-to-frustum clamp
-  const fit = useRef(1);
+  // live fit-to-frustum clamp (shared site-wide discipline): shrink the
+  // model — not the flight path — whenever the stage aspect leaves less room
+  // than the drone's worst-case projected extents.
+  const fitGroup = useFitClamp(FIT_HALF_W, FIT_HALF_H);
   const comp = useRef<THREE.Group>(null); // canvas top-bleed compensation
   const propRefs = useRef<(THREE.Group | null)[]>([null, null, null, null]);
 
@@ -329,19 +332,6 @@ export default function EchoModel({ progress }: { progress: number }) {
       const s = Math.max(0.5, (h - BLEED_PX) / h);
       comp.current.scale.setScalar(s);
       comp.current.position.y = -(2.44 * (BLEED_PX / 2)) / h;
-    }
-
-    // Fit-to-frustum clamp (m_7 standard: never clipped by the canvas):
-    // shrink the model — not the flight path — whenever the stage aspect
-    // leaves less room than the drone's worst-case projected extents.
-    if (fitGroup.current) {
-      const s = Math.min(
-        1,
-        (state.viewport.width / 2 - 0.06) / FIT_HALF_W,
-        (state.viewport.height / 2 - 0.06) / FIT_HALF_H,
-      );
-      fit.current = THREE.MathUtils.lerp(fit.current, Math.max(0.45, s), 0.15);
-      fitGroup.current.scale.setScalar(fit.current);
     }
 
     if (rig.current) {

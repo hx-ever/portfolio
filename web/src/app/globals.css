@@ -4,6 +4,16 @@
   --muted: #a1a1a6;
   --dim: #6e6e73;
   --hairline: rgba(255, 255, 255, 0.08);
+
+  /* Site-wide stacking scale. Every cross-component z-index MUST come from
+     this ladder (component-internal stacking may use small local values,
+     which stay trapped in their own stacking context). Nothing outranks
+     the nav. */
+  --z-content: 1; /* in-section content above ambient/decorative layers */
+  --z-model: 2; /* 3D model layers that may pass over section content */
+  --z-overlay: 3; /* section-local floating cues (scroll hint, tooltips) */
+  --z-rail: 90; /* fixed section dot rail */
+  --z-nav: 100; /* fixed liquid-glass nav — always on top */
 }
 
 * {

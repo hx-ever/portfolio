@@ -8,6 +8,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import SceneLights from "./SceneLights";
 import { GRAPHITE_DEEP } from "./materials";
 import { relBox } from "./relBox";
+import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
 const MODEL = "/auraeyez.glb";
@@ -335,14 +336,30 @@ export default function AuraEyezModel({
       };
     });
 
+    const scale = TARGET_WIDTH / size.x;
+    // Worst-case on-screen extents across the scroll-scrub yaw range, for
+    // the shared fit-to-frustum clamp (chain mirrors the JSX group nesting).
+    const fitHalf = worstCaseHalfExtents(
+      size.clone().multiplyScalar(scale),
+      (yaw) => [
+        new THREE.Euler(-0.09, 0, 0),
+        new THREE.Euler(0, yaw, 0),
+        new THREE.Euler(-Math.PI / 2, 0, 0),
+      ],
+      [-26, 0, 20]
+    );
+
     return {
       center,
-      scale: TARGET_WIDTH / size.x,
+      scale,
+      fitHalf,
       // eye plane hovers a hair's breadth in front of the cover glass
       eye: { pos: post(gCenter.x, gBox.min.y - 0.0004, gCenter.z), w: gSize.x, h: gSize.z },
       knobs,
     };
   }, [scene]);
+
+  const fitGroup = useFitClamp(layout.fitHalf.w, layout.fitHalf.h);
 
   // Soft annular glow sprite for the knob halos — transparent under the knob,
   // peaking just past its edge, fading out. Reads as light, not as a solid ring.
@@ -541,6 +558,7 @@ export default function AuraEyezModel({
       {/* static tilt for depth; scroll rotation lives on the inner group */}
       <group rotation={[-0.09, 0, 0]}>
         <group ref={group}>
+          <group ref={fitGroup}>
           <group scale={layout.scale}>
             {/* the CAD assembly, re-centred and rotated face-to-camera */}
             <group rotation={[-Math.PI / 2, 0, 0]}>
@@ -580,6 +598,7 @@ export default function AuraEyezModel({
                 />
               </mesh>
             ))}
+          </group>
           </group>
         </group>
       </group>

@@ -45,6 +45,9 @@ interface LabelPos {
   y: number;
   dx: number;
   dy: number;
+  /** anchor the text's right edge instead, so it grows leftward — used when
+      the default leftward-growing box would overflow the map's right edge */
+  flip: boolean;
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -225,7 +228,11 @@ export default function WorldMap() {
       setLabels(
         LOCATIONS.map((l) => {
           const p = project(l.lon, l.lat);
-          return { label: l.label, x: p.x, y: p.y, dx: l.dx, dy: l.dy };
+          // ~8px per character at 10px mono + 0.18em tracking; flip labels
+          // that would run past the map's right edge (they'd be clipped at
+          // narrow viewports since the sites are all in east Asia)
+          const flip = p.x + l.dx + l.label.length * 8 + 8 > W;
+          return { label: l.label, x: p.x, y: p.y, dx: l.dx, dy: l.dy, flip };
         })
       );
       needsFrame = true;
@@ -337,6 +344,7 @@ export default function WorldMap() {
             style={{
               left: l.x + l.dx,
               top: l.y + l.dy,
+              transform: l.flip ? "translate(-100%, -50%)" : undefined,
             }}
             aria-hidden="true"
           >

@@ -66,14 +66,23 @@
   padding-right: 28px;
 }
 
+/* Stacked layouts (model-center, and every layout under 860px) size the
+   stage DYNAMICALLY: the copy row gets its natural height and the stage
+   absorbs whatever remains, so the copy/CTA can never be pushed past the
+   section's overflow:hidden bottom edge at any viewport size. */
 .section[data-layout="model-center"] .layout {
   grid-template-columns: 1fr;
-  align-content: center;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
   gap: 8px;
+  padding-bottom: clamp(24px, 4vh, 48px);
 }
 
 .section[data-layout="model-center"] .stage {
-  height: min(52vh, 460px);
+  height: 100%;
+  max-height: 460px;
+  width: 100%;
+  align-self: center;
 }
 
 .section[data-layout="model-center"] .copy {
@@ -156,17 +165,27 @@
 
 @media (max-width: 860px) {
   .layout,
-  .section[data-layout="model-right"] .layout {
+  .section[data-layout="model-right"] .layout,
+  .section[data-layout="model-center"] .layout {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-content: stretch;
     padding-top: 96px;
+    padding-bottom: clamp(20px, 3.5vh, 40px);
     gap: 0;
   }
   .section[data-layout="model-right"] .stage,
   .section[data-layout="model-right"] .copy {
     order: initial;
   }
-  .stage {
-    height: 38vh;
+  /* stage fills whatever the copy row leaves — never a fixed vh that can
+     push the copy out of the 100vh section on short screens */
+  .stage,
+  .section[data-layout="model-center"] .stage {
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+    align-self: stretch;
   }
   .copy,
   .section[data-layout="model-right"] .copy {

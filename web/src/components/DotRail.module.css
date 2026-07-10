@@ -3,7 +3,7 @@
   right: clamp(16px, 3vw, 40px);
   top: 50%;
   transform: translateY(-50%);
-  z-index: 90;
+  z-index: var(--z-rail);
   display: flex;
   flex-direction: column;
   align-items: center;

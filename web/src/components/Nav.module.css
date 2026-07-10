@@ -3,7 +3,7 @@
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 100;
+  z-index: var(--z-nav);
   width: min(1200px, calc(100vw - 32px));
   height: 60px;
   display: flex;
@@ -140,6 +140,21 @@
    place while opacity and scale still ease. */
 .pill.snap {
   transition-property: opacity, scale;
+}
+
+/* Very narrow screens: tighten the link row so the last link ("Contact")
+   is never clipped by the nav pill's overflow:hidden. */
+@media (max-width: 400px) {
+  .nav {
+    padding: 0 12px;
+  }
+  .links {
+    gap: 2px;
+    font-size: 13px;
+  }
+  .links a {
+    padding: 8px 9px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

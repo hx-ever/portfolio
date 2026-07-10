@@ -226,6 +226,11 @@ export default function HeroCharacter() {
         phase.current = "idle";
         markIntroPlayed(); // never replay the walk-in this session
       }
+    } else {
+      // Idle: keep tracking the resting spot — targetX depends on the live
+      // viewport, so a resize (especially across the 860px mobile/desktop
+      // breakpoint) would otherwise strand the character off-canvas.
+      g.position.x = THREE.MathUtils.lerp(g.position.x, targetX, 0.1);
     }
 
     // Idle/settle: ease arms toward the relaxed A-pose (with a subtle sway),

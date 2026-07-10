@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
+import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 
 const ACCENT = "#30D158";
 const MODEL = "/buggy.glb";
@@ -248,9 +249,26 @@ export default function BuggyModel({ progress }: { progress: number }) {
       pivots.push(pivot);
     }
 
+    // Worst-case on-screen extents across the scroll-scrub yaw range for the
+    // shared fit clamp (chain mirrors the JSX nesting; the tilt group's
+    // -0.08 y offset is folded into the half-height).
+    const scale = TARGET_LENGTH / size.x;
+    const fitHalf = worstCaseHalfExtents(
+      size.clone().multiplyScalar(scale),
+      (yaw) => [
+        new THREE.Euler(0.14, 0, 0),
+        new THREE.Euler(0, yaw, 0),
+        new THREE.Euler(0, Math.PI, 0),
+        new THREE.Euler(Math.PI / 2, 0, 0),
+      ],
+      [-24, 0, 14]
+    );
+    fitHalf.h += 0.08;
+
     return {
       center,
-      scale: TARGET_LENGTH / size.x,
+      scale,
+      fitHalf,
       radius, // GLB units; world radius = radius * scale
       pivots,
       // pitch pivot on the wheel-axle line. The 180° yaw mirrors GLB x into
@@ -259,6 +277,8 @@ export default function BuggyModel({ progress }: { progress: number }) {
       axleX: (center.x - WHEEL_AXLE_GLB_X) * (TARGET_LENGTH / size.x),
     };
   }, [scene]);
+
+  const fitGroup = useFitClamp(layout.fitHalf.w, layout.fitHalf.h);
 
   useFrame((state, delta) => {
     const v = vroom.current!;
@@ -353,6 +373,8 @@ export default function BuggyModel({ progress }: { progress: number }) {
       <group rotation={[0.14, 0, 0]} position={[0, -0.08, 0]}>
         <group ref={yaw}>
           <group ref={drive}>
+            {/* fit clamp scales the vehicle, never the drive-in path */}
+            <group ref={fitGroup}>
             {/* braking pitch, pivoted at the front axle so the rear lifts */}
             <group position={[layout.axleX, 0, 0]}>
               <group ref={pitch}>
@@ -390,6 +412,7 @@ export default function BuggyModel({ progress }: { progress: number }) {
                 />
               </mesh>
             ))}
+            </group>
           </group>
         </group>
       </group>

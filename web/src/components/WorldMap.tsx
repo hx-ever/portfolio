@@ -31,12 +31,21 @@ const LOCATIONS = [
 
 const STEPS = 24; // intensity quantization for the sprite atlas
 const SPRITE = 8; // sprite box size in css px
+const HALF = SPRITE / 2;
+// Beyond this distance the Gaussian is < 1/(2·STEPS) — it quantizes to
+// sprite index 0 (invisible) — so treating it as exactly zero is lossless
+// and lets far dots skip the falloff math entirely.
+const CUTOFF = 200;
+// Punch-out radius: covers the largest dot (1.6px) but stays clear of the
+// nearest neighbour's resting pixels (3.5px spacing - 1.05px radius = 2.45px).
+const PUNCH_R = 2;
 
 interface Dot {
   x: number;
   y: number;
   locG: number; // 0..1 membership in a highlighted location cluster
   cur: number; // eased intensity
+  idx: number; // sprite index this frame (transient, set during draw)
 }
 
 interface LabelPos {
@@ -103,6 +112,9 @@ export default function WorldMap() {
     let dots: Dot[] = [];
     let locPoints: { x: number; y: number; r: number }[] = [];
     let sprites: HTMLCanvasElement[][] = [];
+    let base: HTMLCanvasElement | null = null; // every dot at rest, prerendered
+    let punch: HTMLCanvasElement | null = null; // destination-out hole for redrawn dots
+    const actives: Dot[] = []; // per-frame redraw list (reused buffer)
     let W = 0;
     let H = 0;
     const cursor = { x: -1e6, y: -1e6 };
@@ -132,6 +144,16 @@ export default function WorldMap() {
           return c;
         })
       );
+      // opaque disc used with destination-out to erase a dot's resting
+      // pixels from the blitted base before its brighter sprite is drawn
+      punch = document.createElement("canvas");
+      punch.width = punch.height = Math.ceil(SPRITE * dpr);
+      const pctx = punch.getContext("2d")!;
+      pctx.scale(dpr, dpr);
+      pctx.fillStyle = "#000";
+      pctx.beginPath();
+      pctx.arc(SPRITE / 2, SPRITE / 2, PUNCH_R, 0, Math.PI * 2);
+      pctx.fill();
     };
 
     const build = () => {
@@ -199,7 +221,7 @@ export default function WorldMap() {
       for (let y = SPACING / 2; y < H; y += SPACING) {
         for (let x = SPACING / 2; x < W; x += SPACING) {
           if (!landAt(x, y)) continue;
-          dots.push({ x, y, locG: locWeight(x, y), cur: 0 });
+          dots.push({ x, y, locG: locWeight(x, y), cur: 0, idx: 0 });
         }
       }
 
@@ -221,8 +243,20 @@ export default function WorldMap() {
         for (const [ox, oy] of offsets) {
           const x = p.x + ox * SPACING;
           const y = p.y + oy * SPACING;
-          dots.push({ x, y, locG: locWeight(x, y), cur: 0 });
+          dots.push({ x, y, locG: locWeight(x, y), cur: 0, idx: 0 });
         }
+      }
+
+      // Prerender every dot at rest into the base layer: per-frame work then
+      // reduces to one blit plus only the dots that currently differ from
+      // rest (cluster pulse + cursor glow) instead of ~10k drawImage calls.
+      base = document.createElement("canvas");
+      base.width = W * dpr;
+      base.height = H * dpr;
+      const bctx = base.getContext("2d")!;
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      for (const dot of dots) {
+        bctx.drawImage(sprites[dot.locG > 0.12 ? 1 : 0][0], dot.x - HALF, dot.y - HALF, SPRITE, SPRITE);
       }
 
       setLabels(
@@ -241,10 +275,49 @@ export default function WorldMap() {
     const draw = (now: number) => {
       frame = 0;
       ctx.clearRect(0, 0, W, H);
+      if (base) ctx.drawImage(base, 0, 0, W, H);
 
       const pulse = reduced ? 0.5 : 0.5 + 0.5 * Math.sin((now / PULSE_MS) * Math.PI * 2);
       const ease = reduced ? 1 : 0.16;
       let settled = true;
+
+      // Pass 1 — state only: dots at rest (no cluster membership, no eased
+      // residual, outside the cursor's cutoff box) are covered by the base
+      // blit and skipped entirely; the rest ease toward their target and are
+      // queued for redraw. This reduces per-frame draw calls from every land
+      // dot (~10k) to just the animated ones.
+      actives.length = 0;
+      for (const dot of dots) {
+        const dx = dot.x - cursor.x;
+        const dy = dot.y - cursor.y;
+        // Gaussian falloff of the cursor glow, with a hard cutoff box where
+        // its value is already indistinguishable from zero.
+        let hoverG = 0;
+        if (dx < CUTOFF && dx > -CUTOFF && dy < CUTOFF && dy > -CUTOFF) {
+          hoverG = Math.exp(-(dx * dx + dy * dy) * GAUSS_K);
+          if (hoverG < 0.004) hoverG = 0;
+        }
+        if (dot.locG === 0 && dot.cur === 0 && hoverG === 0) continue; // at rest
+
+        const target = Math.min(1, dot.locG * (0.5 + 0.3 * pulse) + hoverG);
+        dot.cur += (target - dot.cur) * ease;
+        if (Math.abs(target - dot.cur) > 0.004) settled = false;
+        else dot.cur = target;
+
+        dot.idx = Math.round(dot.cur * STEPS);
+        if (dot.idx > 0) actives.push(dot); // idx 0 renders identically to base
+      }
+
+      // Pass 2 — erase the resting pixels under every dot about to be
+      // redrawn (all punches before any sprite, so a punch can never shave
+      // an already-drawn neighbour).
+      if (punch) {
+        ctx.globalCompositeOperation = "destination-out";
+        for (const dot of actives) {
+          ctx.drawImage(punch, dot.x - HALF, dot.y - HALF, SPRITE, SPRITE);
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
 
       // Tick lines from each highlighted cluster toward its label.
       ctx.strokeStyle = "rgba(160, 170, 190, 0.35)";
@@ -258,24 +331,9 @@ export default function WorldMap() {
         ctx.stroke();
       }
 
-      const half = SPRITE / 2;
-      for (const dot of dots) {
-        // Gaussian falloff of the cursor glow: continuous, no radius cutoff,
-        // approaching the baseline asymptotically so no edge is visible.
-        const dx = dot.x - cursor.x;
-        const dy = dot.y - cursor.y;
-        let hoverG = Math.exp(-(dx * dx + dy * dy) * GAUSS_K);
-        if (hoverG < 0.004) hoverG = 0;
-
-        const base = dot.locG * (0.5 + 0.3 * pulse);
-        const target = Math.min(1, base + hoverG);
-        dot.cur += (target - dot.cur) * ease;
-        if (Math.abs(target - dot.cur) > 0.004) settled = false;
-        else dot.cur = target;
-
-        const idx = Math.round(dot.cur * STEPS);
-        const palette = dot.locG > 0.12 ? 1 : 0;
-        ctx.drawImage(sprites[palette][idx], dot.x - half, dot.y - half, SPRITE, SPRITE);
+      // Pass 3 — the animated dots at their current intensity.
+      for (const dot of actives) {
+        ctx.drawImage(sprites[dot.locG > 0.12 ? 1 : 0][dot.idx], dot.x - HALF, dot.y - HALF, SPRITE, SPRITE);
       }
 
       // Keep animating while visible: the pulse is continuous, and hover

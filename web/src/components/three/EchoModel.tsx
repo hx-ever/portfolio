@@ -310,12 +310,15 @@ export default function EchoModel({ progress }: { progress: number }) {
         markFlightPlayed();
       }
     } else if (f.phase === "hover") {
-      // springs keep decaying any residual while the hover idle fades in
-      f.vx += (-XK * f.x - XC * f.vx) * delta;
-      f.x += f.vx * delta;
-      f.vy += (-YK * f.y - YC * f.vy) * delta;
-      f.y += f.vy * delta;
-      f.hoverAmt = Math.min(1, f.hoverAmt + delta / 0.8);
+      // springs keep decaying any residual while the hover idle fades in.
+      // delta is clamped: resuming from a paused frameloop hands the first
+      // frame a multi-second delta, which would blow up the Euler springs.
+      const dt = Math.min(delta, 0.1);
+      f.vx += (-XK * f.x - XC * f.vx) * dt;
+      f.x += f.vx * dt;
+      f.vy += (-YK * f.y - YC * f.vy) * dt;
+      f.y += f.vy * dt;
+      f.hoverAmt = Math.min(1, f.hoverAmt + dt / 0.8);
     }
 
     // blur discs: full while the flight is at speed, fading with the hover
@@ -447,4 +450,6 @@ export default function EchoModel({ progress }: { progress: number }) {
   );
 }
 
-useGLTF.preload(MODEL);
+// No module-level useGLTF.preload here: the five showcase GLBs are warmed
+// in page order by ModelPrefetcher during idle time after first paint,
+// instead of six parallel fetches competing with the initial load.

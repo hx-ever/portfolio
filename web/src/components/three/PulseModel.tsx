@@ -178,7 +178,9 @@ export default function PulseModel({ progress }: { progress: number }) {
         s.t = 0;
       }
     } else if (s.phase === "running") {
-      s.t += delta;
+      // clamp: a resumed frameloop's first delta can span seconds — it must
+      // not fast-forward (skip) the scan-burst timeline
+      s.t += Math.min(delta, 0.1);
       RING_STARTS.forEach((start, i) => {
         const p = (s.t - start) / RING_DUR;
         setRing(i, p, maxR, (1 - p) * 0.5);
@@ -192,7 +194,7 @@ export default function PulseModel({ progress }: { progress: number }) {
       // idle: one quiet ring on a slow loop, indicators breathing with it.
       // Sine envelope: the ring fades IN as it clears the hub's footprint
       // (a linear fade dies before it ever becomes visible), then out.
-      s.idle += delta;
+      s.idle += Math.min(delta, 0.1);
       const ip = (s.idle % IDLE_PERIOD) / IDLE_DUR;
       setRing(0, ip, maxR, 0.34 * Math.sin(Math.PI * Math.min(ip, 1)));
       setRing(1, 0, maxR, 0);
@@ -246,4 +248,6 @@ export default function PulseModel({ progress }: { progress: number }) {
   );
 }
 
-useGLTF.preload(MODEL);
+// No module-level useGLTF.preload here: the five showcase GLBs are warmed
+// in page order by ModelPrefetcher during idle time after first paint,
+// instead of six parallel fetches competing with the initial load.

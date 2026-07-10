@@ -497,7 +497,9 @@ export default function AuraEyezModel({
         pw.t = 0;
       }
     } else if (pw.phase === "running") {
-      pw.t += delta;
+      // clamp: a resumed frameloop's first delta can span seconds — it must
+      // not fast-forward (skip) the power-on timeline
+      pw.t += Math.min(delta, 0.1);
       const t = pw.t;
       // light sweep front, world-x
       sweepUniform.value =
@@ -606,4 +608,6 @@ export default function AuraEyezModel({
   );
 }
 
-useGLTF.preload(MODEL);
+// No module-level useGLTF.preload here: the five showcase GLBs are warmed
+// in page order by ModelPrefetcher during idle time after first paint,
+// instead of six parallel fetches competing with the initial load.

@@ -8,7 +8,10 @@ import KeycapModel from "./three/KeycapModel";
 import PulseModel from "./three/PulseModel";
 import EchoModel from "./three/EchoModel";
 import { useSectionProgress } from "@/lib/useSectionProgress";
-import { useSectionPointer, type SectionPointer } from "@/lib/useSectionPointer";
+import {
+  useSectionPointer,
+  type SectionPointer,
+} from "@/lib/useSectionPointer";
 import type { ShowcaseSection } from "@/lib/sections";
 import styles from "./Showcase.module.css";
 
@@ -49,7 +52,14 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
 
       <div className={styles.layout}>
         <div className={styles.stage}>
-          <ModelCanvas cameraPosition={[0, 0, 4]} fov={34}>
+          {/* the drone (echo) flies in from above: its canvas bleeds upward so
+              the entry happens at the section's top edge, never mid-stage —
+              EchoModel compensates the composition for the extra headroom */}
+          <ModelCanvas
+            cameraPosition={[0, 0, 4]}
+            fov={34}
+            className={section.id === "echo" ? styles.bleedTop : undefined}
+          >
             <Model progress={progress} pointer={pointer} />
           </ModelCanvas>
         </div>
@@ -62,7 +72,8 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
           }}
         >
           <span className={styles.tag}>
-            <span style={{ color: section.accent }}>{section.index}</span> · {section.tag}
+            <span style={{ color: section.accent }}>{section.index}</span> ·{" "}
+            {section.tag}
           </span>
           <h2 className={styles.title}>{section.name}</h2>
           <p className={styles.description}>{section.description}</p>

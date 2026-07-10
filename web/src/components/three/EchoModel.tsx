@@ -14,6 +14,11 @@ const TARGET_WIDTH = 1.6; // world units the frame's footprint is scaled to fill
 // fit-clamp that guarantees the model never touches the canvas edge.
 const FIT_HALF_W = 1.02;
 const FIT_HALF_H = 0.88;
+// The echo canvas bleeds this many px above its stage (see .bleedTop in
+// Showcase.module.css) so the flight-in entry line sits at the section's top
+// edge; the comp group below rescales/shifts the scene to keep the on-screen
+// composition identical to the unbled stage.
+const BLEED_PX = 160;
 
 // The STEP's propellers are flat placeholder cards (tilt1-4 squares +
 // circular1-4 discs) — hidden here and replaced with procedural twisted,
@@ -199,6 +204,7 @@ export default function EchoModel({ progress }: { progress: number }) {
   const rig = useRef<THREE.Group>(null); // flight position + attitude
   const fitGroup = useRef<THREE.Group>(null); // live fit-to-frustum clamp
   const fit = useRef(1);
+  const comp = useRef<THREE.Group>(null); // canvas top-bleed compensation
   const propRefs = useRef<(THREE.Group | null)[]>([null, null, null, null]);
 
   const flight = useRef<{
@@ -314,6 +320,17 @@ export default function EchoModel({ progress }: { progress: number }) {
     BLUR_MAT.opacity = BLUR_PEAK * (1 - f.hoverAmt);
     BLUR_MAT.visible = BLUR_MAT.opacity > 0.01;
 
+    // Bleed compensation: the canvas is BLEED_PX taller than the stage (all
+    // extra at the top), so scale/shift the scene to render exactly as it
+    // would in the unbled stage — the headroom exists purely to contain the
+    // flight-in path.
+    if (comp.current) {
+      const h = state.size.height;
+      const s = Math.max(0.5, (h - BLEED_PX) / h);
+      comp.current.scale.setScalar(s);
+      comp.current.position.y = -(2.44 * (BLEED_PX / 2)) / h;
+    }
+
     // Fit-to-frustum clamp (m_7 standard: never clipped by the canvas):
     // shrink the model — not the flight path — whenever the stage aspect
     // leaves less room than the drone's worst-case projected extents.
@@ -374,60 +391,62 @@ export default function EchoModel({ progress }: { progress: number }) {
         color={ACCENT}
       />
       {/* static tilt so the frame's top face reads; scroll rotation inside */}
-      <group rotation={[0.45, 0, 0]} position={[0, -0.05, 0]}>
-        <group ref={group}>
-          <group ref={rig}>
-            <group ref={fitGroup}>
-              <group scale={layout.scale}>
-                <group
-                  position={[
-                    -layout.center.x,
-                    -layout.center.y,
-                    -layout.center.z,
-                  ]}
-                >
-                  <primitive object={scene} />
-                  {/* procedural props on the motor tops (GLB coords) */}
-                  {PROPS.map((p, i) => (
-                    <group key={i} position={[p.x, PROP_Y, p.z]}>
-                      <group
-                        ref={(g) => {
-                          propRefs.current[i] = g;
-                        }}
-                      >
-                        <mesh geometry={bladeGeo} material={PROP_MAT} />
+      <group ref={comp}>
+        <group rotation={[0.45, 0, 0]} position={[0, -0.05, 0]}>
+          <group ref={group}>
+            <group ref={rig}>
+              <group ref={fitGroup}>
+                <group scale={layout.scale}>
+                  <group
+                    position={[
+                      -layout.center.x,
+                      -layout.center.y,
+                      -layout.center.z,
+                    ]}
+                  >
+                    <primitive object={scene} />
+                    {/* procedural props on the motor tops (GLB coords) */}
+                    {PROPS.map((p, i) => (
+                      <group key={i} position={[p.x, PROP_Y, p.z]}>
+                        <group
+                          ref={(g) => {
+                            propRefs.current[i] = g;
+                          }}
+                        >
+                          <mesh geometry={bladeGeo} material={PROP_MAT} />
+                          <mesh
+                            geometry={bladeGeo}
+                            material={PROP_MAT}
+                            rotation={[0, Math.PI, 0]}
+                          />
+                          {/* hub */}
+                          <mesh>
+                            <cylinderGeometry
+                              args={[0.0028, 0.0028, 0.004, 16]}
+                            />
+                            <meshStandardMaterial
+                              color="#26272B"
+                              roughness={0.4}
+                              metalness={0}
+                            />
+                          </mesh>
+                        </group>
+                        {/* crimson motor-mount ring — the accent at the tech point */}
                         <mesh
-                          geometry={bladeGeo}
-                          material={PROP_MAT}
-                          rotation={[0, Math.PI, 0]}
-                        />
-                        {/* hub */}
-                        <mesh>
-                          <cylinderGeometry
-                            args={[0.0028, 0.0028, 0.004, 16]}
-                          />
-                          <meshStandardMaterial
-                            color="#26272B"
-                            roughness={0.4}
-                            metalness={0}
-                          />
+                          position={[0, -0.002, 0]}
+                          rotation={[Math.PI / 2, 0, 0]}
+                        >
+                          <torusGeometry args={[0.0036, 0.0009, 12, 32]} />
+                          <primitive object={RING_MAT} attach="material" />
+                        </mesh>
+                        {/* spin-blur disc: dim, translucent, non-emissive */}
+                        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                          <circleGeometry args={[0.0172, 40]} />
+                          <primitive object={BLUR_MAT} attach="material" />
                         </mesh>
                       </group>
-                      {/* crimson motor-mount ring — the accent at the tech point */}
-                      <mesh
-                        position={[0, -0.002, 0]}
-                        rotation={[Math.PI / 2, 0, 0]}
-                      >
-                        <torusGeometry args={[0.0036, 0.0009, 12, 32]} />
-                        <primitive object={RING_MAT} attach="material" />
-                      </mesh>
-                      {/* spin-blur disc: dim, translucent, non-emissive */}
-                      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                        <circleGeometry args={[0.0172, 40]} />
-                        <primitive object={BLUR_MAT} attach="material" />
-                      </mesh>
-                    </group>
-                  ))}
+                    ))}
+                  </group>
                 </group>
               </group>
             </group>

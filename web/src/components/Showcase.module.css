@@ -90,6 +90,19 @@
   min-height: 0;
 }
 
+/* Canvas that bleeds 160px above its stage (Arx flight-in headroom): the
+   drone's off-screen entry line moves to the section's top edge instead of
+   slicing mid-stage. Keep in sync with BLEED_PX in EchoModel.tsx. */
+.bleedTop {
+  position: absolute !important;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: -160px;
+  width: auto !important;
+  height: auto !important;
+}
+
 .copy {
   position: relative;
   padding-left: 28px;

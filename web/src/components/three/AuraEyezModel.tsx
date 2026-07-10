@@ -296,9 +296,9 @@ export default function AuraEyezModel({
           if (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.55) c.multiplyScalar(0.85);
         }
         if (std.name === BODY_MATERIAL) {
-          // light neutral-grey shell: the dark screen window + white eyes
-          // read with maximum contrast against it
-          std.color.set("#CDCDD1");
+          // light neutral-grey shell, dimmed 15% from #CDCDD1 (same
+          // undertone) — the dark screen window keeps the eyes' contrast
+          std.color.set("#AEAEB2");
           std.roughness = 0.72;
           std.metalness = 0.1;
         } else if (std.name === CAD_AMBER_MATERIAL) {

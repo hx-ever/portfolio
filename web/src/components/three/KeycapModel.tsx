@@ -6,7 +6,6 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
-import { graphite } from "./materials";
 import { relBox } from "./relBox";
 
 const ACCENT = "#5AC8FA";
@@ -43,12 +42,13 @@ const SWITCH_NODES: readonly string[] = [
 ];
 const MCU_NODE = "Arduino_Pro_Micro1";
 
-// Dyson-inspired CMF: graphite engineered enclosure; the section's saturated
+// Dyson-inspired CMF: deep-navy enclosure; the section's saturated
 // sky-blue lives ONLY on the keycaps — the surfaces the user's fingers touch.
 // Switches beneath stay dark neutral so the interaction point reads alone.
-const CAP_ACCENT = "#259BE3"; // deeper, more grounded take on the section blue
+const CAP_ACCENT = "#2188C8"; // one further subtle step down from #259BE3
 const CASE_MESHES = /^(Structure|Upper_Plate|Lower_Plate|Base)$/;
-const CASE_MAT = new THREE.MeshStandardMaterial({ ...graphite, roughness: 0.75 });
+// enclosure: deep rich navy, matte per the established treatment
+const CASE_MAT = new THREE.MeshStandardMaterial({ color: "#1E2C4E", roughness: 0.75, metalness: 0.1 });
 
 // --- one-time exploded-assembly entrance (per session) ---
 const ASSEMBLE_KEY = "hx_keys_assembled"; // sessionStorage flag
@@ -153,7 +153,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
       if (!mesh.isMesh) return;
       mesh.raycast = () => {};
       if (CASE_MESHES.test(mesh.name)) {
-        mesh.material = CASE_MAT; // graphite enclosure — the family base tone
+        mesh.material = CASE_MAT; // deep-navy enclosure
         return;
       }
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];

@@ -8,7 +8,7 @@ import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
 
 const MODEL = "/corelink.glb";
-const ACCENT = "#0A84FF";
+const ACCENT = "#2FA093"; // section's new deep-teal theme (family: #24403E)
 const TARGET_WIDTH = 1.5; // world units the hub's footprint is scaled to fill
 
 // --- one-time "sensor scan" entrance (per session) ---
@@ -25,8 +25,8 @@ const DONE_T = 1.45;
 const IDLE_PERIOD = 5;
 const IDLE_DUR = 1.8;
 
-const LED_DIM = 0.15; // dormant indicator emissive
-const LED_ON = 2.1; // steady "active" emissive
+const LED_DIM = 0.1; // dormant indicator emissive
+const LED_ON = 1.3; // steady "active" emissive — dimmed per the exposure discipline
 
 function scanPlayed() {
   try {
@@ -56,13 +56,14 @@ const matte = (color: string, roughness = 0.75) =>
 // Light neutral-grey enclosure with clearly darker controls; the accent
 // (section blue) lives only at the technology points — the driven indicator
 // domes/slivers and the scan-pulse rings, which already share ACCENT.
-const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#CDCDD1", roughness: 0.75, metalness: 0.1 });
-const CAP_MAT = new THREE.MeshStandardMaterial({ color: "#D2D2D6", roughness: 0.7, metalness: 0.1 });
+// light tints derived from the teal theme, keeping the light-body direction
+const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#C4CFCB", roughness: 0.75, metalness: 0.1 });
+const CAP_MAT = new THREE.MeshStandardMaterial({ color: "#CBD6D2", roughness: 0.7, metalness: 0.1 });
 const PCB_MAT = matte("#1F7A3D", 0.6);
 const INLAY_MAT = matte("#2E3136", 0.65);
 const MODULE_MAT = matte("#56585E", 0.68);
-// knobs read as clearly distinct dark controls against the light enclosure
-const KNOB_MAT = new THREE.MeshStandardMaterial({ color: "#2F3135", roughness: 0.55, metalness: 0.2 });
+// knobs carry the deep theme anchor — distinct controls on the light body
+const KNOB_MAT = new THREE.MeshStandardMaterial({ color: "#24403E", roughness: 0.55, metalness: 0.2 });
 // knob-top domes + their tiny indicator slivers: emissive driven at runtime
 const DOME_MAT = new THREE.MeshStandardMaterial({
   color: "#3D4248",
@@ -185,9 +186,9 @@ export default function PulseModel({ progress }: { progress: number }) {
       setRing(0, ip, maxR, 0.34 * Math.sin(Math.PI * Math.min(ip, 1)));
       setRing(1, 0, maxR, 0);
       setRing(2, 0, maxR, 0);
-      led = LED_ON + (ip < 1 ? 0.4 * Math.sin(Math.PI * ip) : 0);
+      led = LED_ON + (ip < 1 ? 0.25 * Math.sin(Math.PI * ip) : 0);
     }
-    DOME_MAT.emissiveIntensity = led * 0.45; // domes glow softer than slivers
+    DOME_MAT.emissiveIntensity = led * 0.3; // domes glow softer than slivers
     LED_MAT.emissiveIntensity = led;
   });
 

@@ -10,7 +10,7 @@ import { relBox } from "./relBox";
 
 const ACCENT = "#30D158";
 const MODEL = "/buggy.glb";
-const TARGET_LENGTH = 1.35; // world units the buggy's wheelbase axis fills
+const TARGET_LENGTH = 1.55; // world units the buggy's wheelbase axis fills (+15%)
 
 // GLB node names (from the STEP conversion). The scene frame is: X
 // longitudinal (sensor plates at -X, BALL CASTER — the vehicle's FRONT — at

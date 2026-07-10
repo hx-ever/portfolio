@@ -6,7 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
-import { GRAPHITE, GRAPHITE_DEEP } from "./materials";
+import { GRAPHITE_DEEP } from "./materials";
 import { relBox } from "./relBox";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
@@ -237,12 +237,13 @@ export default function AuraEyezModel({
         if (!std.isMeshStandardMaterial || seen.has(std)) continue;
         seen.add(std);
         injectSweep(std); // everything takes part in the power-on sweep
-        // OLED frame edge: amber accent — the screen is a technology point.
+        // OLED frame: near-black bezel — a dark window on the light body, so
+        // the white eyes and their glow carry maximum contrast.
         if (std.name === OLED_FRAME_MATERIAL) {
-          std.color.set(ACCENT_EDGE);
-          std.metalness = 0.3;
-          std.roughness = 0.4;
-          std.envMapIntensity = 0.3;
+          std.color.set("#1E1E20");
+          std.metalness = 0.2;
+          std.roughness = 0.5;
+          std.envMapIntensity = 0.15;
           continue;
         }
         // PIR mount ring: amber accent framing the frosted lens.
@@ -295,12 +296,13 @@ export default function AuraEyezModel({
           if (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.55) c.multiplyScalar(0.85);
         }
         if (std.name === BODY_MATERIAL) {
-          // graphite engineered shell — the shared dark base of the family
-          std.color.set(GRAPHITE);
+          // light neutral-grey shell: the dark screen window + white eyes
+          // read with maximum contrast against it
+          std.color.set("#CDCDD1");
           std.roughness = 0.72;
-          std.metalness = 0.15;
+          std.metalness = 0.1;
         } else if (std.name === CAD_AMBER_MATERIAL) {
-          std.color.set(GRAPHITE_DEEP); // backplate joins the dark body
+          std.color.set(GRAPHITE_DEEP); // backplate stays dark, grounding
           std.roughness = 0.6;
           std.metalness = 0.15;
         }
@@ -394,6 +396,10 @@ export default function AuraEyezModel({
     lit: number
   ) => {
     ctx.clearRect(0, 0, TEX_W, TEX_H);
+    // dark display panel — pairs with the near-black bezel so the white
+    // eyes and their glow pop against the light body
+    ctx.fillStyle = "#1A1A1C";
+    ctx.fillRect(0, 0, TEX_W, TEX_H);
 
     if (lit > 0) {
       ctx.fillStyle = `rgba(255,255,255,${lit.toFixed(3)})`;

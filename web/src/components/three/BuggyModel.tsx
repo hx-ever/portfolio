@@ -6,7 +6,6 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
-import { graphite } from "./materials";
 import { relBox } from "./relBox";
 
 const ACCENT = "#30D158";
@@ -69,19 +68,75 @@ function markVroomPlayed() {
 const MATERIALS: [string, THREE.MeshStandardMaterial][] = [
   ["wheelwithout", new THREE.MeshStandardMaterial({ color: "#37383C", metalness: 0.1, roughness: 0.62 })],
   ["tyre", new THREE.MeshStandardMaterial({ color: "#17181B", metalness: 0, roughness: 0.95 })],
-  ["motordriverboard", new THREE.MeshStandardMaterial({ color: "#26C351", metalness: 0.1, roughness: 0.5 })],
-  ["stm32mountboard", new THREE.MeshStandardMaterial({ color: "#26C351", metalness: 0.1, roughness: 0.5 })],
   ["motor", new THREE.MeshStandardMaterial({ color: "#3A3F45", metalness: 0.8, roughness: 0.35 })],
   ["gear", new THREE.MeshStandardMaterial({ color: "#3E4046", metalness: 0.1, roughness: 0.6 })],
   ["encoder", new THREE.MeshStandardMaterial({ color: "#1E1F22", metalness: 0.05, roughness: 0.65 })],
-  ["batteryframe", new THREE.MeshStandardMaterial({ ...graphite })],
+  ["batteryframe", new THREE.MeshStandardMaterial({ color: "#333B36", metalness: 0.15, roughness: 0.72 })],
   ["battery", new THREE.MeshStandardMaterial({ color: "#2E3B4E", metalness: 0.05, roughness: 0.6 })],
   ["ballhousing", new THREE.MeshStandardMaterial({ color: "#9AA1AA", metalness: 0.7, roughness: 0.35 })],
   ["ball", new THREE.MeshStandardMaterial({ color: "#26272B", metalness: 0, roughness: 0.85 })],
 ];
-const PLATE_MATERIAL = new THREE.MeshStandardMaterial({ ...graphite });
+// Chassis: dark with a subtle cool-green undertone — coordinated with the
+// section's green accent, premium rather than flat black.
+const PLATE_MATERIAL = new THREE.MeshStandardMaterial({
+  color: "#333B36",
+  metalness: 0.15,
+  roughness: 0.72,
+});
+
+// PCB palette matched per-component to the reference renders: green
+// substrate, bright-green terminal blocks, blue electrolytic sleeve, silver
+// fuse + clips, brass terminal screws, matte-black ICs, black connector
+// housings and light pin-header strips.
+const PCB_GREEN = new THREE.MeshStandardMaterial({ color: "#237A3C", metalness: 0.05, roughness: 0.55 });
+const TERMINAL_GREEN = new THREE.MeshStandardMaterial({ color: "#52D96A", metalness: 0, roughness: 0.5 });
+const CAP_BLUE = new THREE.MeshStandardMaterial({ color: "#2A36A0", metalness: 0.1, roughness: 0.4 });
+const SILVER = new THREE.MeshStandardMaterial({ color: "#B9BEC4", metalness: 0.85, roughness: 0.3 });
+const GOLD = new THREE.MeshStandardMaterial({ color: "#C9A227", metalness: 0.85, roughness: 0.35 });
+const IC_BLACK = new THREE.MeshStandardMaterial({ color: "#141518", metalness: 0.05, roughness: 0.55 });
+const CONNECTOR_BLACK = new THREE.MeshStandardMaterial({ color: "#1B1C1F", metalness: 0.05, roughness: 0.5 });
+const HEADER_LIGHT = new THREE.MeshStandardMaterial({ color: "#C7CBD1", metalness: 0.3, roughness: 0.45 });
+const PCB_PALETTE = [PCB_GREEN, TERMINAL_GREEN, CAP_BLUE, SILVER, GOLD, IC_BLACK, CONNECTOR_BLACK, HEADER_LIGHT];
+
+// Motor driver board: distinct parts identified from the measured sub-mesh
+// census (positions/sizes) matched against the reference photo.
+const DRIVER_EXPLICIT: Record<string, THREE.Material> = {
+  motordriverboard: PCB_GREEN, // substrate
+  motordriverboard001: TERMINAL_GREEN, // edge terminal block
+  motordriverboard002: TERMINAL_GREEN,
+  motordriverboard003: TERMINAL_GREEN,
+  motordriverboard004: TERMINAL_GREEN,
+  motordriverboard005: CAP_BLUE, // electrolytic — blue sleeve
+  motordriverboard048: SILVER, // fuse clips + glass body
+  motordriverboard049: SILVER,
+  motordriverboard050: SILVER,
+  motordriverboard051: SILVER,
+  motordriverboard052: CONNECTOR_BLACK, // large black package
+};
+// STM32 mount board: substrate + big black connector + two light header
+// strips with silver pin rows (six sub-meshes, measured).
+const STM_EXPLICIT: Record<string, THREE.Material> = {
+  stm32mountboard: PCB_GREEN,
+  stm32mountboard001: CONNECTOR_BLACK,
+  stm32mountboard002: HEADER_LIGHT,
+  stm32mountboard003: SILVER,
+  stm32mountboard004: HEADER_LIGHT,
+  stm32mountboard005: SILVER,
+};
+
+/** Size-rule fallback for the driver board's dozens of small parts. */
+function driverPartMaterial(n: string, sizeMM: THREE.Vector3): THREE.Material {
+  const explicit = DRIVER_EXPLICIT[n];
+  if (explicit) return explicit;
+  const h = sizeMM.z;
+  const big = Math.max(sizeMM.x, sizeMM.y);
+  if (big >= 2 && big <= 3 && h <= 3.5) return GOLD; // terminal screws
+  if (h >= 6 && big <= 2.5) return SILVER; // component legs / wire posts
+  return IC_BLACK; // SOICs, SMDs, everything else
+}
 for (const [, m] of MATERIALS) m.envMapIntensity = 0.08;
 PLATE_MATERIAL.envMapIntensity = 0.08;
+for (const m of PCB_PALETTE) m.envMapIntensity = 0.08;
 
 /**
  * The Land Rover line-follower buggy — the real SolidWorks assembly
@@ -136,12 +191,27 @@ export default function BuggyModel({ progress }: { progress: number }) {
     scene.updateWorldMatrix(true, true);
     const inv = new THREE.Matrix4().copy(scene.matrixWorld).invert();
 
-    // Dress the assembly (materials by part-name stem) + disable raycasting.
+    // Dress the assembly + disable raycasting. The two PCBs get reference-
+    // accurate per-component colors; everything else by part-name stem.
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.raycast = () => {};
       const n = mesh.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (n.startsWith("motordriverboard")) {
+        const s = relBox(mesh, inv).getSize(new THREE.Vector3()).multiplyScalar(1000);
+        mesh.material = driverPartMaterial(n, s);
+        return;
+      }
+      if (n.startsWith("stm32mountboard")) {
+        mesh.material = STM_EXPLICIT[n] ?? IC_BLACK;
+        return;
+      }
+      // interboard pin connectors + their plates: black housings
+      if (n.startsWith("connector") || n.startsWith("connplate")) {
+        mesh.material = CONNECTOR_BLACK;
+        return;
+      }
       const hit = MATERIALS.find(([stem]) => n.startsWith(stem));
       mesh.material = hit ? hit[1] : PLATE_MATERIAL;
     });

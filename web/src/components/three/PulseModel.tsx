@@ -5,7 +5,6 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import SceneLights from "./SceneLights";
-import { graphite } from "./materials";
 import { relBox } from "./relBox";
 
 const MODEL = "/corelink.glb";
@@ -54,15 +53,16 @@ const easeOutQuad = (p: number) => 1 - (1 - p) * (1 - p);
 const matte = (color: string, roughness = 0.75) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
 
-// Dyson-inspired CMF: graphite engineered body; the accent (section blue)
-// lives only at the technology points — the driven indicator domes/slivers
-// and the scan-pulse rings, which already share ACCENT.
-const BODY_MAT = new THREE.MeshStandardMaterial({ ...graphite, roughness: 0.75 });
-const CAP_MAT = new THREE.MeshStandardMaterial({ color: "#4A4A4E", roughness: 0.7, metalness: 0.15 });
+// Light neutral-grey enclosure with clearly darker controls; the accent
+// (section blue) lives only at the technology points — the driven indicator
+// domes/slivers and the scan-pulse rings, which already share ACCENT.
+const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#CDCDD1", roughness: 0.75, metalness: 0.1 });
+const CAP_MAT = new THREE.MeshStandardMaterial({ color: "#D2D2D6", roughness: 0.7, metalness: 0.1 });
 const PCB_MAT = matte("#1F7A3D", 0.6);
 const INLAY_MAT = matte("#2E3136", 0.65);
 const MODULE_MAT = matte("#56585E", 0.68);
-const KNOB_MAT = new THREE.MeshStandardMaterial({ color: "#3E4045", roughness: 0.6, metalness: 0.15 });
+// knobs read as clearly distinct dark controls against the light enclosure
+const KNOB_MAT = new THREE.MeshStandardMaterial({ color: "#2F3135", roughness: 0.55, metalness: 0.2 });
 // knob-top domes + their tiny indicator slivers: emissive driven at runtime
 const DOME_MAT = new THREE.MeshStandardMaterial({
   color: "#3D4248",
@@ -193,8 +193,7 @@ export default function PulseModel({ progress }: { progress: number }) {
 
   return (
     <>
-      {/* graphite body needs a touch more base light than the old pale shell */}
-      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.85} ambientScale={0.7} />
+      <SceneLights accent={ACCENT} accentIntensity={0.6} level={0.75} ambientScale={0.65} />
       {/* static tilt so the hub's top face reads; scroll rotation inside */}
       <group rotation={[0.52, 0, 0]} position={[0, -0.05, 0]}>
         <group ref={group}>

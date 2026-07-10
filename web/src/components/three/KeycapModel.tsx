@@ -46,10 +46,9 @@ const MCU_NODE = "Arduino_Pro_Micro1";
 // Dyson-inspired CMF: graphite engineered enclosure; the section's saturated
 // sky-blue lives ONLY on the keycaps — the surfaces the user's fingers touch.
 // Switches beneath stay dark neutral so the interaction point reads alone.
-const CAP_ACCENT = "#3EBFFF";
+const CAP_ACCENT = "#259BE3"; // deeper, more grounded take on the section blue
 const CASE_MESHES = /^(Structure|Upper_Plate|Lower_Plate|Base)$/;
 const CASE_MAT = new THREE.MeshStandardMaterial({ ...graphite, roughness: 0.75 });
-const SWITCH_MAT = new THREE.MeshStandardMaterial({ color: "#33353A", metalness: 0.1, roughness: 0.6 });
 
 // --- one-time exploded-assembly entrance (per session) ---
 const ASSEMBLE_KEY = "hx_keys_assembled"; // sessionStorage flag
@@ -236,16 +235,11 @@ export default function KeycapModel({ progress }: { progress: number }) {
       capXY.push({ x: c.x - center.x, y: c.y - center.y });
     });
 
+    // Switches keep their original imported materials (white housings, amber
+    // stems), per the reverted treatment — only the caps carry the accent.
     const swUnits = SWITCH_NODES.map((n, i) =>
       makeUnit(n, SWITCH_LIFT + hash01(i + 7) * 0.007, 0, hash01(i + 11) * 0.06)
     ).filter((u): u is Unit => u != null);
-    // Switches go dark neutral so the blue caps carry the accent alone.
-    for (const u of swUnits) {
-      u.node.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) mesh.material = SWITCH_MAT;
-      });
-    }
 
     const mcu = makeUnit(MCU_NODE, MCU_LIFT, MCU_SIDE, 0.04);
     const moving = [...capUnits, ...swUnits, ...(mcu ? [mcu] : [])];

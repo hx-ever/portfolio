@@ -8,7 +8,12 @@ import { relBox } from "./relBox";
 
 const MODEL = "/arx.glb";
 const ACCENT = "#FF375F";
-const TARGET_WIDTH = 1.75; // world units the frame's footprint is scaled to fill
+const TARGET_WIDTH = 1.6; // world units the frame's footprint is scaled to fill
+// Worst-case half-extents of the assembled drone as presented (diagonal
+// footprint under scroll yaw + tilt + hover jitter), used by the live
+// fit-clamp that guarantees the model never touches the canvas edge.
+const FIT_HALF_W = 1.02;
+const FIT_HALF_H = 0.88;
 
 // The STEP's propellers are flat placeholder cards (tilt1-4 squares +
 // circular1-4 discs) — hidden here and replaced with procedural twisted,
@@ -64,11 +69,31 @@ function markFlightPlayed() {
 // Dyson-inspired CMF: graphite engineered frame (top of the graphite range —
 // the studio rig is bright); crimson accents live only at the prop tips and
 // motor-mount rings. Sits at the same family base tone as the other models.
-const FRAME_MAT = new THREE.MeshStandardMaterial({ color: "#47484D", roughness: 0.78, metalness: 0.15 });
-const BODY_MAT = new THREE.MeshStandardMaterial({ color: "#505157", roughness: 0.72, metalness: 0.15 });
-const PCB_MAT = new THREE.MeshStandardMaterial({ color: "#1E4D33", roughness: 0.6, metalness: 0 });
-const MOTOR_MAT = new THREE.MeshStandardMaterial({ color: "#8E9298", roughness: 0.35, metalness: 0.7 });
-const PIN_MAT = new THREE.MeshStandardMaterial({ color: "#C9A227", roughness: 0.4, metalness: 0.8 });
+const FRAME_MAT = new THREE.MeshStandardMaterial({
+  color: "#47484D",
+  roughness: 0.78,
+  metalness: 0.15,
+});
+const BODY_MAT = new THREE.MeshStandardMaterial({
+  color: "#505157",
+  roughness: 0.72,
+  metalness: 0.15,
+});
+const PCB_MAT = new THREE.MeshStandardMaterial({
+  color: "#1E4D33",
+  roughness: 0.6,
+  metalness: 0,
+});
+const MOTOR_MAT = new THREE.MeshStandardMaterial({
+  color: "#8E9298",
+  roughness: 0.35,
+  metalness: 0.7,
+});
+const PIN_MAT = new THREE.MeshStandardMaterial({
+  color: "#C9A227",
+  roughness: 0.4,
+  metalness: 0.8,
+});
 // props: slightly glossier dark plastic, distinct from the matte frame
 const TIP_ACCENT = "#FF375F"; // saturated crimson — prop tips + motor rings
 const RING_MAT = new THREE.MeshStandardMaterial({
@@ -126,7 +151,9 @@ function buildBladeGeometry(): THREE.BufferGeometry {
     const t = i / SPAN;
     const r = THREE.MathUtils.lerp(HUB_R, TIP_R, t);
     const chord =
-      MAX_CHORD * (0.45 + 0.55 * Math.sin(Math.PI * (0.18 + 0.82 * t))) * (1 - 0.3 * t * t);
+      MAX_CHORD *
+      (0.45 + 0.55 * Math.sin(Math.PI * (0.18 + 0.82 * t))) *
+      (1 - 0.3 * t * t);
     const twist = 0.62 - 0.44 * t; // ~36° root pitch → ~10° at the tip
     // Dyson CMF accent: the outer ~quarter of each blade blends to crimson
     const tipMix = THREE.MathUtils.smoothstep(t, 0.72, 0.95);
@@ -170,6 +197,8 @@ const PROPS: { x: number; z: number; dir: 1 | -1 }[] = [
 export default function EchoModel({ progress }: { progress: number }) {
   const group = useRef<THREE.Group>(null); // scroll yaw
   const rig = useRef<THREE.Group>(null); // flight position + attitude
+  const fitGroup = useRef<THREE.Group>(null); // live fit-to-frustum clamp
+  const fit = useRef(1);
   const propRefs = useRef<(THREE.Group | null)[]>([null, null, null, null]);
 
   const flight = useRef<{
@@ -185,7 +214,15 @@ export default function EchoModel({ progress }: { progress: number }) {
     const played = flightPlayed();
     flight.current = played
       ? { phase: "hover", t: 0, x: 0, vx: 0, y: 0, vy: 0, hoverAmt: 1 }
-      : { phase: "waiting", t: 0, x: START_X, vx: 0, y: START_Y, vy: START_VY, hoverAmt: 0 };
+      : {
+          phase: "waiting",
+          t: 0,
+          x: START_X,
+          vx: 0,
+          y: START_Y,
+          vy: START_VY,
+          hoverAmt: 0,
+        };
   }
 
   const { scene } = useGLTF(MODEL);
@@ -225,8 +262,14 @@ export default function EchoModel({ progress }: { progress: number }) {
   useFrame((state, delta) => {
     // Scroll-linked rotation — same lerp-toward-target pattern as the siblings.
     if (group.current) {
-      const targetY = THREE.MathUtils.degToRad(THREE.MathUtils.lerp(-20, 16, progress));
-      group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.08);
+      const targetY = THREE.MathUtils.degToRad(
+        THREE.MathUtils.lerp(-20, 16, progress),
+      );
+      group.current.rotation.y = THREE.MathUtils.lerp(
+        group.current.rotation.y,
+        targetY,
+        0.08,
+      );
     }
 
     // Props never stop — fast spin in every phase, diagonal pairs opposed.
@@ -271,6 +314,19 @@ export default function EchoModel({ progress }: { progress: number }) {
     BLUR_MAT.opacity = BLUR_PEAK * (1 - f.hoverAmt);
     BLUR_MAT.visible = BLUR_MAT.opacity > 0.01;
 
+    // Fit-to-frustum clamp (m_7 standard: never clipped by the canvas):
+    // shrink the model — not the flight path — whenever the stage aspect
+    // leaves less room than the drone's worst-case projected extents.
+    if (fitGroup.current) {
+      const s = Math.min(
+        1,
+        (state.viewport.width / 2 - 0.06) / FIT_HALF_W,
+        (state.viewport.height / 2 - 0.06) / FIT_HALF_H,
+      );
+      fit.current = THREE.MathUtils.lerp(fit.current, Math.max(0.45, s), 0.15);
+      fitGroup.current.scale.setScalar(fit.current);
+    }
+
     if (rig.current) {
       const t = state.clock.elapsedTime;
       const h = f.hoverAmt;
@@ -279,8 +335,12 @@ export default function EchoModel({ progress }: { progress: number }) {
       const bobX = h * Math.sin(t * 0.9) * 0.01;
       rig.current.position.set(f.x + bobX, f.y + bobY, 0);
       // bank/pitch from velocity: leans into the approach, levels as it slows
-      const bank = THREE.MathUtils.clamp(-f.vx * 0.1, -0.18, 0.18) + h * Math.sin(t * 1.7) * 0.008;
-      const pitch = THREE.MathUtils.clamp(f.vy * 0.05, -0.14, 0.14) + h * Math.sin(t * 2.3) * 0.006;
+      const bank =
+        THREE.MathUtils.clamp(-f.vx * 0.1, -0.18, 0.18) +
+        h * Math.sin(t * 1.7) * 0.008;
+      const pitch =
+        THREE.MathUtils.clamp(f.vy * 0.05, -0.14, 0.14) +
+        h * Math.sin(t * 2.3) * 0.006;
       rig.current.rotation.z = bank;
       rig.current.rotation.x = pitch;
     }
@@ -296,46 +356,79 @@ export default function EchoModel({ progress }: { progress: number }) {
           directionals miss — evens out the dark patches across the arms */}
       <hemisphereLight args={["#F4F6F8", "#383C42", 0.65]} />
       {/* key: bright, warm, upper-front-right */}
-      <directionalLight position={[2.5, 3.5, 4]} intensity={2.0} color="#FFF4E8" />
+      <directionalLight
+        position={[2.5, 3.5, 4]}
+        intensity={2.0}
+        color="#FFF4E8"
+      />
       {/* fill: soft, cool, front-left — lifts the side the key misses */}
-      <directionalLight position={[-4, 1.5, 3]} intensity={0.9} color="#DCE4F0" />
+      <directionalLight
+        position={[-4, 1.5, 3]}
+        intensity={0.9}
+        color="#DCE4F0"
+      />
       {/* rim: behind/above, crimson-tinted — edge separation from the dark bg */}
-      <directionalLight position={[-1, 2.5, -4]} intensity={1.4} color={ACCENT} />
+      <directionalLight
+        position={[-1, 2.5, -4]}
+        intensity={1.4}
+        color={ACCENT}
+      />
       {/* static tilt so the frame's top face reads; scroll rotation inside */}
       <group rotation={[0.45, 0, 0]} position={[0, -0.05, 0]}>
         <group ref={group}>
           <group ref={rig}>
-            <group scale={layout.scale}>
-              <group position={[-layout.center.x, -layout.center.y, -layout.center.z]}>
-                <primitive object={scene} />
-                {/* procedural props on the motor tops (GLB coords) */}
-                {PROPS.map((p, i) => (
-                  <group key={i} position={[p.x, PROP_Y, p.z]}>
-                    <group
-                      ref={(g) => {
-                        propRefs.current[i] = g;
-                      }}
-                    >
-                      <mesh geometry={bladeGeo} material={PROP_MAT} />
-                      <mesh geometry={bladeGeo} material={PROP_MAT} rotation={[0, Math.PI, 0]} />
-                      {/* hub */}
-                      <mesh>
-                        <cylinderGeometry args={[0.0028, 0.0028, 0.004, 16]} />
-                        <meshStandardMaterial color="#26272B" roughness={0.4} metalness={0} />
+            <group ref={fitGroup}>
+              <group scale={layout.scale}>
+                <group
+                  position={[
+                    -layout.center.x,
+                    -layout.center.y,
+                    -layout.center.z,
+                  ]}
+                >
+                  <primitive object={scene} />
+                  {/* procedural props on the motor tops (GLB coords) */}
+                  {PROPS.map((p, i) => (
+                    <group key={i} position={[p.x, PROP_Y, p.z]}>
+                      <group
+                        ref={(g) => {
+                          propRefs.current[i] = g;
+                        }}
+                      >
+                        <mesh geometry={bladeGeo} material={PROP_MAT} />
+                        <mesh
+                          geometry={bladeGeo}
+                          material={PROP_MAT}
+                          rotation={[0, Math.PI, 0]}
+                        />
+                        {/* hub */}
+                        <mesh>
+                          <cylinderGeometry
+                            args={[0.0028, 0.0028, 0.004, 16]}
+                          />
+                          <meshStandardMaterial
+                            color="#26272B"
+                            roughness={0.4}
+                            metalness={0}
+                          />
+                        </mesh>
+                      </group>
+                      {/* crimson motor-mount ring — the accent at the tech point */}
+                      <mesh
+                        position={[0, -0.002, 0]}
+                        rotation={[Math.PI / 2, 0, 0]}
+                      >
+                        <torusGeometry args={[0.0036, 0.0009, 12, 32]} />
+                        <primitive object={RING_MAT} attach="material" />
+                      </mesh>
+                      {/* spin-blur disc: dim, translucent, non-emissive */}
+                      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                        <circleGeometry args={[0.0172, 40]} />
+                        <primitive object={BLUR_MAT} attach="material" />
                       </mesh>
                     </group>
-                    {/* crimson motor-mount ring — the accent at the tech point */}
-                    <mesh position={[0, -0.002, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                      <torusGeometry args={[0.0036, 0.0009, 12, 32]} />
-                      <primitive object={RING_MAT} attach="material" />
-                    </mesh>
-                    {/* spin-blur disc: dim, translucent, non-emissive */}
-                    <mesh rotation={[-Math.PI / 2, 0, 0]}>
-                      <circleGeometry args={[0.0172, 40]} />
-                      <primitive object={BLUR_MAT} attach="material" />
-                    </mesh>
-                  </group>
-                ))}
+                  ))}
+                </group>
               </group>
             </group>
           </group>

@@ -1,0 +1,345 @@
+/* In-site case study overlay — the site's glass language at full-screen
+   scale: dim-blurred backdrop, one frosted panel, 200ms fade with a slight
+   scale/rise (the overlay counterpart of the tooltip fade-and-slide). */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vh, 32px) clamp(12px, 3vw, 32px);
+  background: rgba(6, 6, 7, 0.62);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.overlay[data-shown="true"] {
+  opacity: 1;
+}
+
+.panel {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(24px, 4vw, 44px);
+  border-radius: 24px;
+  background: rgba(24, 24, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 32px 90px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  outline: none;
+  transform: scale(0.96) translateY(10px);
+  transition: transform 200ms ease;
+}
+
+.overlay[data-shown="true"] .panel {
+  transform: scale(1) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .overlay[data-shown="true"] .panel {
+    transform: none; /* fade only */
+  }
+}
+
+.close {
+  position: sticky;
+  top: 0;
+  float: right;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: -6px -6px 0 0;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.close:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.header {
+  margin-bottom: clamp(24px, 4vh, 36px);
+}
+
+.eyebrow {
+  display: inline-block;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  border: 1px solid #3e3e44;
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+
+.title {
+  margin: 18px 0 0;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 800;
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+}
+
+.lede {
+  margin: 14px 0 0;
+  max-width: 56ch;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.block {
+  margin-top: clamp(28px, 4.5vh, 40px);
+}
+
+.blockTitle {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.blockNote {
+  margin: 6px 0 14px;
+  font-size: 14px;
+  color: var(--dim);
+}
+
+/* ============ PCB viewer ============ */
+
+.viewerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.sideToggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sideToggle button {
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.sideToggle button[data-active="true"] {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px 17px; /* border compensation keeps the pill size stable */
+}
+
+.viewerHint {
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+}
+
+.viewerFrame {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  max-height: 52vh;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 16px;
+  background: rgba(10, 10, 12, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  cursor: grab;
+  touch-action: none; /* single-finger drag pans instead of scrolling */
+}
+
+.viewerFrame:active {
+  cursor: grabbing;
+}
+
+.viewerInner {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 4%;
+  will-change: transform;
+}
+
+.viewerInner img {
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.5));
+}
+
+.viewerCaption {
+  margin: 12px 0 0;
+  text-align: center;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+/* ============ firmware diagram ============ */
+
+.diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 4px;
+}
+
+.diagramLabel {
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  fill: var(--fg);
+}
+
+.diagramNote {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  fill: var(--dim);
+}
+
+/* ============ capability cards ============ */
+
+.cards {
+  margin-top: clamp(16px, 3vh, 24px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.cardLabel {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.cardLabel::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 2px;
+}
+
+.cardDesc {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.peek {
+  margin-top: 10px;
+}
+
+.peek summary {
+  display: inline-block;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  transition: color 0.2s ease;
+}
+
+.peek summary::-webkit-details-marker {
+  display: none;
+}
+
+.peek summary::before {
+  content: "▸ ";
+}
+
+.peek[open] summary::before {
+  content: "▾ ";
+}
+
+.peek summary:hover {
+  color: var(--accent);
+}
+
+.peek pre {
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  overflow-x: auto;
+  background: rgba(10, 10, 12, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #c9ccd1;
+}
+
+/* ============ footer ============ */
+
+.footer {
+  margin-top: clamp(28px, 4.5vh, 40px);
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+
+.repoLink {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color 0.2s ease;
+}
+
+.repoLink:hover {
+  color: var(--accent);
+}

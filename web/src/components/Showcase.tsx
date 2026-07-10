@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ComponentType, type RefObject } from "react";
 import Image from "next/image";
+import CaseStudyCta from "./CaseStudy";
 import ModelCanvas from "./three/ModelCanvas";
 import AuraEyezModel from "./three/AuraEyezModel";
 import BuggyModel from "./three/BuggyModel";
@@ -81,7 +82,11 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
           </span>
           <h2 className={styles.title}>{section.name}</h2>
           <p className={styles.description}>{section.description}</p>
-          <CtaLink section={section} revealed={reveal >= 1} />
+          {section.caseStudy ? (
+            <CaseStudyCta section={section} />
+          ) : (
+            <CtaLink section={section} revealed={reveal >= 1} />
+          )}
         </div>
       </div>
     </section>

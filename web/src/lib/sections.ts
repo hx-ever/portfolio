@@ -20,6 +20,9 @@ export interface ShowcaseSection {
     width: number;
     height: number;
   };
+  /** the case-study link opens the in-site case study overlay instead of
+      navigating (currently only AuraEyez has one built) */
+  caseStudy?: boolean;
   accent: string;
   glow: string; // rgba glow color used behind the model
   layout: Layout;
@@ -40,6 +43,7 @@ export const SHOWCASES: ShowcaseSection[] = [
     description:
       "An ESP32-powered smart assistant with animated RoboEyes on an OLED display, motion-triggered wake behavior, and a two-knob control interface — enclosure, PCB, and firmware built as one system.",
     cta: "View case study",
+    caseStudy: true,
     accent: "#F0B24A",
     glow: "240,178,74",
     layout: "model-left",

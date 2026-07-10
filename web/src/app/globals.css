@@ -13,7 +13,8 @@
   --z-model: 2; /* 3D model layers that may pass over section content */
   --z-overlay: 3; /* section-local floating cues (scroll hint, tooltips) */
   --z-rail: 90; /* fixed section dot rail */
-  --z-nav: 100; /* fixed liquid-glass nav — always on top */
+  --z-nav: 100; /* fixed liquid-glass nav — always on top of page chrome */
+  --z-modal: 110; /* full-screen overlays (case studies) — above the nav */
 }
 
 * {

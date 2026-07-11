@@ -32,17 +32,20 @@ interface Capability {
 interface CaseStudyConfig {
   /** secondary footer link — omitted when there's no public repository */
   repo?: { url: string; label: string };
-  lede: string;
-  pcb: {
+  // The lede is the section's `description` (single source of truth in
+  // sections.ts), so it isn't repeated here. The rest is optional: a minimal
+  // study (CoreLink, Arx) carries only a repo link, with no PCB export or
+  // firmware breakdown available yet.
+  pcb?: {
     sides: { id: string; label: string; src: string }[];
     caption: string;
     /** intrinsic pixel size matching the export's aspect */
     width: number;
     height: number;
   };
-  firmwareNote: string;
-  Diagram: ComponentType<{ accent: string }>;
-  capabilities: Capability[];
+  firmwareNote?: string;
+  Diagram?: ComponentType<{ accent: string }>;
+  capabilities?: Capability[];
 }
 
 // ---- AuraEyez (auraeyez) ------------------------------------------------------
@@ -361,7 +364,6 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
       url: "https://github.com/hx-ever/AuraEyez",
       label: "Full repository on GitHub →",
     },
-    lede: "An ESP32 desk assistant with animated RoboEyes, motion-triggered wake, and live temperature & humidity — enclosure, PCB, and firmware built as one system.",
     pcb: {
       sides: [
         { id: "top", label: "Top", src: "/auraeyez-pcb-top.svg" },
@@ -379,7 +381,6 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
   landrover: {
     // university group project — no public repository, so no footer link
     // and no code peeks on the cards
-    lede: "An autonomous line-following buggy built by a five-person team I led — Nucleo STM32 control in Mbed C++, dual-loop PID steering, and a custom hybrid analogue/digital sensor board, engineered from chassis to firmware.",
     pcb: {
       sides: [
         { id: "top", label: "Top", src: "/buggy-pcb-top.svg" },
@@ -399,7 +400,6 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
       url: "https://github.com/hx-ever/KMK-macropad",
       label: "Full repository on GitHub →",
     },
-    lede: "A 10-key macropad with a rotary encoder, running KMK on a Seeed XIAO RP2040 — snap-tap gaming macros, a second launcher layer, and per-layer encoder control.",
     pcb: {
       sides: [
         { id: "top", label: "Top", src: "/hxkeysair-pcb-top.svg" },
@@ -413,6 +413,20 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
       "One keymap, two personalities: a 4×3 diode matrix feeds KMK's scan loop, and a single toggle key flips every binding.",
     Diagram: KeysDiagram,
     capabilities: KEYS_CAPABILITIES,
+  },
+  // Minimal studies — the description (from sections.ts) plus a repo link.
+  // No PCB export or firmware breakdown built for these yet.
+  corelink: {
+    repo: {
+      url: "https://github.com/hx-ever/IndividualProject",
+      label: "Full repository on GitHub →",
+    },
+  },
+  arx: {
+    repo: {
+      url: "https://github.com/hx-ever/ESP32-Drone",
+      label: "Full repository on GitHub →",
+    },
   },
 };
 
@@ -542,34 +556,39 @@ function CaseStudyModal({
             <span style={{ color: section.accent }}>{section.index}</span> · {section.tag}
           </span>
           <h2 className={styles.title}>{section.name}</h2>
-          <p className={styles.lede}>{study.lede}</p>
+          {/* the section's technical description, relocated here from the card */}
+          <p className={styles.lede}>{section.description}</p>
         </header>
 
-        <section className={styles.block} aria-label="PCB viewer">
-          <PcbViewer name={section.name} pcb={study.pcb} />
-        </section>
+        {study.pcb && (
+          <section className={styles.block} aria-label="PCB viewer">
+            <PcbViewer name={section.name} pcb={study.pcb} />
+          </section>
+        )}
 
-        <section className={styles.block} aria-label="Firmware architecture">
-          <h3 className={styles.blockTitle}>Firmware</h3>
-          <p className={styles.blockNote}>{study.firmwareNote}</p>
-          <study.Diagram accent={section.accent} />
-          <div className={styles.cards}>
-            {study.capabilities.map((cap) => (
-              <article key={cap.label} className={styles.card}>
-                <h4 className={styles.cardLabel}>{cap.label}</h4>
-                <p className={styles.cardDesc}>{cap.desc}</p>
-                {cap.snippet && (
-                  <details className={styles.peek}>
-                    <summary>Peek at the code</summary>
-                    <pre>
-                      <code>{cap.snippet}</code>
-                    </pre>
-                  </details>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
+        {study.Diagram && study.capabilities && (
+          <section className={styles.block} aria-label="Firmware architecture">
+            <h3 className={styles.blockTitle}>Firmware</h3>
+            {study.firmwareNote && <p className={styles.blockNote}>{study.firmwareNote}</p>}
+            <study.Diagram accent={section.accent} />
+            <div className={styles.cards}>
+              {study.capabilities.map((cap) => (
+                <article key={cap.label} className={styles.card}>
+                  <h4 className={styles.cardLabel}>{cap.label}</h4>
+                  <p className={styles.cardDesc}>{cap.desc}</p>
+                  {cap.snippet && (
+                    <details className={styles.peek}>
+                      <summary>Peek at the code</summary>
+                      <pre>
+                        <code>{cap.snippet}</code>
+                      </pre>
+                    </details>
+                  )}
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
         {study.repo && (
           <footer className={styles.footer}>
@@ -601,7 +620,7 @@ function PcbViewer({
   pcb,
 }: {
   name: string;
-  pcb: CaseStudyConfig["pcb"];
+  pcb: NonNullable<CaseStudyConfig["pcb"]>;
 }) {
   const [side, setSide] = useState(pcb.sides[0].id);
   const frameRef = useRef<HTMLDivElement | null>(null);

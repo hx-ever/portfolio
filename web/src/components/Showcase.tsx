@@ -81,7 +81,9 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
             {section.tag}
           </span>
           <h2 className={styles.title}>{section.name}</h2>
-          <p className={styles.description}>{section.description}</p>
+          {/* pain-point pitch — the technical description moved to the case
+              study; same styling, content swap only */}
+          <p className={styles.description}>{section.pitch}</p>
           {section.caseStudy ? (
             <CaseStudyCta section={section} />
           ) : (

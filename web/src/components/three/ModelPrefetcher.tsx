@@ -11,6 +11,8 @@ const MODELS = [
   "/buggy.glb",
   "/hxkeysair.glb",
   "/corelink.glb",
+  "/airmodule.glb", // CoreLink's companion submodules load with their section
+  "/lightmodule.glb",
   "/arx.glb",
 ];
 

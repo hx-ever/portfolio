@@ -22,8 +22,9 @@ export function useSectionProgress<T extends HTMLElement>() {
       frame = 0;
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight;
+      // a zero denominator (collapsed rect before first layout) yields 0/0
       const raw = (vh - rect.top) / (vh + rect.height);
-      setProgress(Math.min(1, Math.max(0, raw)));
+      setProgress(Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0);
     };
 
     const onScroll = () => {

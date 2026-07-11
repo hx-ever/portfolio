@@ -15,6 +15,13 @@
   --z-rail: 90; /* fixed section dot rail */
   --z-nav: 100; /* fixed liquid-glass nav — always on top of page chrome */
   --z-modal: 110; /* full-screen overlays (case studies) — above the nav */
+
+  /* Motion tokens — the site's full easing vocabulary. New animations pick
+     from these three (plus plain `ease` for simple fades) rather than
+     minting new curves. Durations cluster on a ~170/220/340/500ms scale. */
+  --ease-spring: cubic-bezier(0.3, 1.35, 0.5, 1); /* hover response: fast out, slight overshoot */
+  --ease-glide: cubic-bezier(0.22, 1, 0.36, 1); /* slides/draws: snappy start, gentle settle */
+  --ease-settle: cubic-bezier(0.4, 0, 0.2, 1); /* graceful retract/dismiss */
 }
 
 * {
@@ -27,6 +34,8 @@ html {
   height: 100%;
   color-scheme: dark;
   scroll-snap-type: y proximity;
+  /* anchor navigation (nav "Designs", dot rail) glides instead of jumping */
+  scroll-behavior: smooth;
 }
 
 html,
@@ -73,6 +82,7 @@ button {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-snap-type: none;
+    scroll-behavior: auto;
   }
   * {
     animation-duration: 0.01ms !important;

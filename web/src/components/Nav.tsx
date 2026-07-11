@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { hasHover, prefersReducedMotion } from "@/lib/reducedMotion";
 import styles from "./Nav.module.css";
 
 const REST_DISPLACE = 3;
@@ -18,12 +19,14 @@ export default function Nav() {
   const linksRef = useRef<HTMLDivElement | null>(null);
   const displaceRef = useRef<SVGFEDisplacementMapElement | null>(null);
   const reducedMotion = useRef(false);
+  const hoverCapable = useRef(true);
 
   // Hover pill: a single element that slides/morphs between links.
   const [pill, setPill] = useState({ x: 0, w: 0, visible: false, snap: false });
 
   useEffect(() => {
-    reducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    reducedMotion.current = prefersReducedMotion();
+    hoverCapable.current = hasHover();
     const onScroll = () => {
       setScrolled(window.scrollY > 40);
       setPastHero(window.scrollY > window.innerHeight * 0.6);
@@ -46,6 +49,8 @@ export default function Nav() {
   };
 
   const onLinkEnter = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    // touch: taps navigate; a glass pill with no mouseleave would stick
+    if (!hoverCapable.current) return;
     const el = event.currentTarget;
     setPill((p) => ({
       x: el.offsetLeft,

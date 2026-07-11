@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { prefersReducedMotion } from "@/lib/reducedMotion";
+import { useEffect, useRef, useState } from "react";
+import { hasHover, prefersReducedMotion } from "@/lib/reducedMotion";
 import { EXPERIENCE, type ExperienceEntry } from "@/lib/experience";
 import { HERO_ACCENT } from "@/lib/sections";
 import { useActiveEntry, useFocusDistance, useSpineFill } from "@/lib/useFocusDistance";
@@ -64,22 +64,28 @@ function Row({
   const { ref, t } = useFocusDistance<HTMLDivElement>();
   const focus = 1 - t;
 
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
   const [hovered, setHovered] = useState(false);
 
+  // Tilt bypasses React entirely: mousemove writes --rx/--ry straight onto
+  // the card, and the rendered transform reads them via var(). A cursor
+  // stream never re-renders anything; the card's 220ms spring transition
+  // still supplies the eased feel.
   const onMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!active) return;
-    setHovered(true);
+    if (!active || !hasHover()) return; // no tilt/clarity path on touch
+    if (!hovered) setHovered(true);
     if (prefersReducedMotion()) return; // hover clarity only, no tilt
-    const rect = event.currentTarget.getBoundingClientRect();
+    const el = event.currentTarget;
+    const rect = el.getBoundingClientRect();
     const px = (event.clientX - rect.left) / rect.width - 0.5;
     const py = (event.clientY - rect.top) / rect.height - 0.5;
-    setTilt({ rx: -py * 2 * MAX_TILT, ry: px * 2 * MAX_TILT });
+    el.style.setProperty("--rx", `${(-py * 2 * MAX_TILT).toFixed(2)}deg`);
+    el.style.setProperty("--ry", `${(px * 2 * MAX_TILT).toFixed(2)}deg`);
   };
 
-  const onMouseLeave = () => {
+  const onMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
     setHovered(false);
-    setTilt({ rx: 0, ry: 0 });
+    event.currentTarget.style.setProperty("--rx", "0deg");
+    event.currentTarget.style.setProperty("--ry", "0deg");
   };
 
   // Everything hover-driven is gated on `active` at render time, so a
@@ -87,16 +93,27 @@ function Row({
   // cursor parked on it) loses tilt and clarity immediately even though
   // no mouse event fires; mouseleave still resets the stale state.
   const clear = hovered && active; // hover clarity outranks scroll blur
-  const rx = active ? tilt.rx : 0;
-  const ry = active ? tilt.ry : 0;
+
+  // The imperative tilt vars must also reset when the card leaves the
+  // plateau under a parked cursor (no mouse event fires in that case).
+  useEffect(() => {
+    if (!active && ref.current) {
+      ref.current.style.setProperty("--rx", "0deg");
+      ref.current.style.setProperty("--ry", "0deg");
+    }
+  }, [active, ref]);
 
   const scale = (1 + Math.pow(focus, 3) * 0.03) * (clear ? HOVER_SCALE : 1);
+  // Blur quantized to 0.5px steps: visually identical to the continuous
+  // value, but the expensive re-rasterization happens ~14 times per card
+  // transit instead of on every scroll frame.
+  const blur = Math.round(t * 7 * 2) / 2;
 
   const cardStyle = {
     gridRow: row,
-    filter: clear ? "none" : `blur(${(t * 7).toFixed(2)}px)`,
+    filter: clear || blur === 0 ? "none" : `blur(${blur}px)`,
     opacity: clear ? 1 : 0.22 + focus * 0.78,
-    transform: `perspective(700px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) scale(${scale.toFixed(3)})`,
+    transform: `perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(${scale.toFixed(3)})`,
     "--focus": focus,
   } as React.CSSProperties;
 

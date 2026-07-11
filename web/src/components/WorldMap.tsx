@@ -374,9 +374,17 @@ export default function WorldMap() {
     });
 
     build();
+    // Debounced rebuild: build() rasterizes the landmass mask and re-samples
+    // ~10k dot sites — far too heavy to run on every intermediate tick of a
+    // window drag. Rebuild once the resize settles; the canvas keeps its
+    // last frame (scaled by CSS) in the meantime, so nothing flashes.
+    let resizeTimer = 0;
     const ro = new ResizeObserver(() => {
-      build();
-      start();
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        build();
+        start();
+      }, 180);
     });
     ro.observe(wrap);
     io.observe(canvas);
@@ -385,6 +393,7 @@ export default function WorldMap() {
     return () => {
       ro.disconnect();
       io.disconnect();
+      window.clearTimeout(resizeTimer);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
       if (frame) cancelAnimationFrame(frame);

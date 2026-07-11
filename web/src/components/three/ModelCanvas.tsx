@@ -91,6 +91,10 @@ export default function ModelCanvas({
             gl={{ antialias: true, alpha: true }}
             camera={{ position: cameraPosition, fov }}
             frameloop={active ? "always" : "never"}
+            // a model that finishes loading mid-view fades up instead of
+            // popping into existence; cached models resolve before the first
+            // paint, so loading never flips true and there's no fade at all
+            style={{ opacity: loading ? 0 : 1, transition: "opacity 400ms ease" }}
           >
             <Suspense fallback={<LoadSignal onChange={setLoading} />}>
               {children}

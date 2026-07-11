@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { hasHover, prefersReducedMotion } from "@/lib/reducedMotion";
 import { HERO_ACCENT } from "@/lib/sections";
 import styles from "./Contact.module.css";
 
@@ -36,13 +37,21 @@ export default function Contact() {
   const iconRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const reducedMotion = useRef(false);
+  const hoverCapable = useRef(true);
+  // latest cursor sample + pending rAF: mousemove only records, the frame
+  // callback does the style work — one update per painted frame, batched to
+  // the browser's cadence on every platform
+  const cursor = useRef({ x: 0, y: 0 });
+  const moveFrame = useRef(0);
 
   // Which icon the tooltip names (label + visibility). Position is written
   // imperatively so it shares the icons' exact transition timing.
   const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
-    reducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    reducedMotion.current = prefersReducedMotion();
+    hoverCapable.current = hasHover();
+    return () => cancelAnimationFrame(moveFrame.current);
   }, []);
 
   const iconCenter = (i: number) => {
@@ -85,16 +94,19 @@ export default function Contact() {
     }
   };
 
-  const onDockMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+  // The frame step: all magnification/tooltip style writes happen here, at
+  // most once per painted frame, from the latest recorded cursor position.
+  const applyDockCursor = () => {
+    moveFrame.current = 0;
     const dock = dockRef.current;
     if (!dock) return;
     const rect = dock.getBoundingClientRect();
-    const cursorX = event.clientX - rect.left;
+    const cursorX = cursor.current.x - rect.left;
 
     // Ambient light follows the cursor across the glass.
     if (!reducedMotion.current) {
       dock.style.setProperty("--lx", `${cursorX.toFixed(0)}px`);
-      dock.style.setProperty("--ly", `${(event.clientY - rect.top).toFixed(0)}px`);
+      dock.style.setProperty("--ly", `${(cursor.current.y - rect.top).toFixed(0)}px`);
     }
 
     let nearest = -1;
@@ -112,7 +124,8 @@ export default function Contact() {
       const g = influence(dx);
       el.style.transform = `translateY(${(-MAX_LIFT * g).toFixed(1)}px) scale(${(1 + MAX_SCALE * g).toFixed(3)})`;
       el.style.filter = `brightness(${(1 + 0.28 * g).toFixed(3)})`;
-      el.style.boxShadow = `0 ${(6 + 10 * g).toFixed(0)}px ${(14 + 20 * g).toFixed(0)}px rgba(41, 151, 255, ${(0.5 * g).toFixed(3)})`;
+      // glow: opacity of a pre-rendered ::after shadow — compositor-only
+      el.style.setProperty("--glow", g.toFixed(3));
     });
 
     if (nearest >= 0) {
@@ -121,12 +134,23 @@ export default function Contact() {
     if (nearest !== activeIndex) setActiveIndex(nearest);
   };
 
+  const onDockMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    // touch devices get plain tappable icons — no magnification to un-stick
+    if (!hoverCapable.current) return;
+    cursor.current = { x: event.clientX, y: event.clientY };
+    if (!moveFrame.current) {
+      moveFrame.current = requestAnimationFrame(applyDockCursor);
+    }
+  };
+
   const onDockMouseLeave = () => {
+    cancelAnimationFrame(moveFrame.current);
+    moveFrame.current = 0;
     iconRefs.current.forEach((el) => {
       if (!el) return;
       el.style.transform = "";
       el.style.filter = "";
-      el.style.boxShadow = "";
+      el.style.removeProperty("--glow");
     });
     setActiveIndex(-1);
   };

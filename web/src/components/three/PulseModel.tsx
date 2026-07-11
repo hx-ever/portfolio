@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
@@ -12,9 +13,9 @@ import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 const MODEL = "/corelink.glb";
 const AIR_MODEL = "/airmodule.glb";
 const LIGHT_MODEL = "/lightmodule.glb";
-const ACCENT = "#7B4DFF"; // the section's vibrant electric-violet theme
-const ACCENT_RGB = "123, 77, 255";
-const ENERGY = "#B49CFF"; // link pulses/arcs: lifted violet-white, reads over the ambient glow
+const ACCENT = "#7A2FFF"; // the section's electric-violet theme — full saturation
+const ACCENT_RGB = "122, 47, 255";
+const ENERGY = "#AC85FF"; // link pulses/arcs: lifted violet-white, reads over the ambient glow
 const TARGET_WIDTH = 1.5; // world units the hub's footprint is scaled to fill
 
 // The GLB lies on its back: the interface face (knobs, domes, screen inlay)
@@ -30,8 +31,9 @@ const TILT_X = 0.08; // slight downward presentation tilt (upright device)
 // footprint with the lid (violet cap, finger-notch tab) facing up — the
 // resting pose from the product reference. They flank the hub smaller and
 // slightly behind, turned a touch inward, and simply ride the shared scroll
-// yaw. Their recolor is baked in the GLB: graphite shell, near-black inner,
-// the section's violet concentrated on the lid.
+// yaw. Their palette is re-themed at runtime (see the traversal below):
+// legible graphite shell, dark inner, the section's electric violet
+// concentrated on the lid.
 const FLAT = -Math.PI / 2;
 const MOD_SCALE = 6.0; // vs the hub's ~13.5 — clearly subordinate
 const MOD_X = 0.95; // flanking offset from the hub's centre
@@ -48,12 +50,20 @@ const LINK_KEY = "hx_corelink_link"; // sessionStorage flag (new choreography)
 const LINK_TRIGGER = 0.15; // section progress at which the sequence starts
 const BOOT_S = 0.55; // hub screen count-up (step 2)
 const LED_RAMP = [0.15, 0.55] as const; // dome indicators warm on with the boot
-const P1 = [0.55, 0.9] as const; // hub -> airmodule pulse travel window
-const P2 = [0.95, 1.3] as const; // hub -> lightmodule pulse travel window
+// Each pulse's travel along its arc is a damped spring — the same integrator
+// family as the site's other entrance physics (keycap assembly, buggy
+// suspension, drone hover): released from rest it genuinely accelerates,
+// then decelerates into arrival. ζ≈1 (critical) so it lands without
+// overshooting past the lid. Arrival at ~98.5% settle takes ≈0.65s, so the
+// second release leaves a clear ~0.3s beat after the first pulse lands.
+const PULSE_RELEASE = [0.55, 1.5] as const; // hub -> air, then hub -> light
+const PULSE_K = 90; // same stiffness as the keycap-assembly spring
+const PULSE_C = 19; // ζ≈1 — decisive arrival, no overshoot
+const PULSE_ARRIVED = 0.985; // settle fraction that counts as "landed"
 const ACK_FLASH = 0.55; // acknowledgment glow peak opacity
-const ACK_DECAY = 0.35; // seconds for the flash to die toward ambient
-const LINES_FADE = [1.35, 1.75] as const; // arcs dissolve once both are linked
-const DONE_T = 1.8;
+const ACK_TAU = 0.16; // exponential flash decay constant (light dying, not a linear ramp)
+const LINES_FADE = [2.3, 2.75] as const; // arcs dissolve once both are linked
+const DONE_T = 2.85;
 const TUBE_SEGS = 32; // arc tube segments; drawRange animates in these units
 const TUBE_IDX_PER_SEG = 8 * 6; // radialSegments * 2 triangles * 3 indices
 // --- idle: one quiet ring on a slow loop, LED breathing in sync ---
@@ -96,24 +106,35 @@ const easeOutQuad = (p: number) => 1 - (1 - p) * (1 - p);
 const easeOutCubic = (p: number) => 1 - Math.pow(1 - p, 3);
 const easeInOut = (p: number) => p * p * (3 - 2 * p);
 
-// Dyson-style redesign: dark engineered graphite body, the vibrant violet
-// concentrated at the technology points — indicator domes/slivers, the
-// screen readout and its bezel, the link pulses and rings. Matte discipline
-// throughout: roughness 0.55-0.8, near-zero metalness, zero emissive except
-// the genuinely light-emitting indicator elements.
+// Dyson-style redesign: dark-but-legible engineered graphite body, the
+// electric violet concentrated at the technology points — the knobs,
+// indicator domes/slivers, the screen readout and its bezel, the link pulses
+// and rings. The graphite sits high enough above black that form shading
+// reads against the section's violet glow (an env map below provides the
+// coverage punctual lights alone can't give camera-facing surfaces).
+// Env exposure lives on scene.environmentIntensity (ENV_LEVEL below) — in
+// this three version material.envMapIntensity no longer applies to a
+// scene.environment map, so per-material env tweaks would be silently inert.
 const matte = (color: string, roughness = 0.75) =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.05 });
 
-const BODY_MAT = matte("#383C42", 0.72); // graphite shell
-const CAP_MAT = matte("#26292E", 0.68); // darker front fascia
+const BODY_MAT = matte("#42474F", 0.68); // graphite shell — visible form, not a silhouette
+const CAP_MAT = matte("#31353C", 0.64); // darker front fascia, still legible
 const PCB_MAT = matte("#234230", 0.6); // interior board, barely visible
 const INLAY_MAT = matte("#101215", 0.5); // near-black screen window
-const MODULE_MAT = matte("#3A3E45", 0.68);
-const KNOB_MAT = matte("#17191D", 0.55); // deep charcoal controls
+const MODULE_MAT = matte("#40454D", 0.66);
+// knobs: the accent made physical — jewel-violet machined discs, the same
+// treatment as AuraEyez's amber knobs (they catch the env map and read as
+// polished metal rather than flat matte plastic)
+const KNOB_MAT = new THREE.MeshStandardMaterial({
+  color: "#7C34FF",
+  metalness: 0.45,
+  roughness: 0.3,
+});
 // knob-top domes + their tiny indicator slivers: emissive driven at runtime
 const DOME_MAT = new THREE.MeshStandardMaterial({
-  color: "#2B2E35",
-  roughness: 0.45,
+  color: "#322B44",
+  roughness: 0.4,
   metalness: 0,
   emissive: ACCENT,
   emissiveIntensity: LED_DIM,
@@ -125,6 +146,13 @@ const LED_MAT = new THREE.MeshStandardMaterial({
   emissive: ACCENT,
   emissiveIntensity: LED_DIM,
 });
+
+// Submodule recolor — the GLBs bake a near-black shell (#2E333B body,
+// #1B1E20 inner) that vanishes against the section background, so the real
+// palette is applied at runtime: legible graphite matching the hub, with the
+// lid carrying the full-saturation accent as the brightest surface.
+const MOD_BODY_COLOR = "#41464E";
+const MOD_INNER_COLOR = "#282B31";
 const MAT_BY_NAME: Record<string, THREE.MeshStandardMaterial> = {
   body: BODY_MAT,
   cap: CAP_MAT,
@@ -173,6 +201,11 @@ export default function PulseModel({ progress }: { progress: number }) {
   });
   const ackFlash = useRef([0, 0]); // per-submodule acknowledgment flash level
   const ackFired = useRef([false, false]); // each submodule acknowledges once
+  // per-pulse spring state along its arc: s 0 (at hub) -> 1 (at the lid)
+  const pulses = useRef([
+    { s: 0, v: 0 },
+    { s: 0, v: 0 },
+  ]);
 
   // display state: off until the hub boots, counts to rest, then drifts.
   // `drawnKey` gates canvas redraws to actual value changes.
@@ -252,8 +285,13 @@ export default function PulseModel({ progress }: { progress: number }) {
     fitHalf.w = Math.max(fitHalf.w, modReach);
     fitHalf.h += 0.05; // tilt-group y offset
 
-    // link-pulse arcs: hub's lower face out to each lid's centre
-    const hubAnchor = new THREE.Vector3(0, -0.22, 0.14);
+    // link-pulse arcs: hub's lower face out to each lid's centre. The anchor
+    // is measured, not guessed: upright, the GLB's y-thickness faces the
+    // camera as world z, so starting just proud of that surface keeps the
+    // tube from being born inside the enclosure and popping out through the
+    // fascia like a clipping error.
+    const hubHalfDepth = (size.y / 2) * scale;
+    const hubAnchor = new THREE.Vector3(0, baseY * 0.45, hubHalfDepth + 0.02);
     const lidY = modY + modSize.z / 2 + 0.02;
     const arcs = [-1, 1].map((side) => {
       const end = new THREE.Vector3(side * MOD_X * 0.96, lidY, MOD_Z + 0.06);
@@ -276,17 +314,52 @@ export default function PulseModel({ progress }: { progress: number }) {
     };
   }, [scene, airScene]);
 
-  // Submodule scenes: hover raycasts off (no cursor interaction by design).
+  // Submodule scenes: hover raycasts off (no cursor interaction by design),
+  // and the baked near-black palette re-themed to the legible graphite + the
+  // saturated accent lid (idempotent on the cached scenes).
   useMemo(() => {
     for (const s of [airScene, lightScene]) {
       s.traverse((o) => {
         const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) mesh.raycast = () => {};
+        if (!mesh.isMesh) return;
+        mesh.raycast = () => {};
+        const std = mesh.material as THREE.MeshStandardMaterial;
+        if (!std?.isMeshStandardMaterial) return;
+        if (std.name === "module_body") {
+          std.color.set(MOD_BODY_COLOR);
+          std.roughness = 0.68;
+        } else if (std.name === "module_inner") {
+          std.color.set(MOD_INNER_COLOR);
+        } else if (std.name === "module_lid") {
+          std.color.set(ACCENT);
+          std.roughness = 0.48;
+          std.metalness = 0.2;
+          // a whisper of self-glow keeps the lid's violet saturated instead
+          // of washing toward lavender under the white key light — it is the
+          // brightest element in the hierarchy, and reads as pigment + light
+          std.emissive.set(ACCENT);
+          std.emissiveIntensity = 0.18;
+        }
       });
     }
   }, [airScene, lightScene]);
 
   const fitGroup = useFitClamp(layout.fitHalf.w, layout.fitHalf.h);
+
+  // Procedural room environment (no assets), scoped to this Canvas — same
+  // approach as AuraEyez: punctual lights alone leave the camera-facing dark
+  // graphite (and the jewel knobs) unlit; the env map gives every surface
+  // coverage so form shading survives against the section's violet glow.
+  // Exposure is calibrated live: environmentIntensity 1 washes the graphite
+  // to silver, 0 collapses it back to the old silhouette — the dark-but-
+  // legible target sits in between.
+  const gl = useThree((s) => s.gl);
+  const envTex = useMemo(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const tex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    return tex;
+  }, [gl]);
 
   // ---- lazily-built link/glow scenography (mutable, render-persistent):
   // two sampled arc lines, plus a shared radial halo texture for the
@@ -313,6 +386,12 @@ export default function PulseModel({ progress }: { progress: number }) {
       const line = new THREE.Mesh(geo, mat);
       line.geometry.setDrawRange(0, 0);
       line.raycast = () => {};
+      // Transparent objects sort by object origin, and a tube spanning the
+      // whole scene has a meaningless single sort point — pin the draw order
+      // explicitly instead (floor glows < screen < arcs < dot). Depth-testing
+      // stays on, so the arc still passes correctly behind/in front of the
+      // opaque models per actual 3D depth as the scene rotates.
+      line.renderOrder = 3;
       lines.push(line);
       lineMats.push(mat);
     }
@@ -378,14 +457,16 @@ export default function PulseModel({ progress }: { progress: number }) {
       ctx.fillText("T E M P", TEX_W * 0.25, 76);
       ctx.fillText("H U M I D I T Y", TEX_W * 0.75, 76);
 
-      ctx.fillStyle = "#8F66FF"; // the accent, lifted a step for legibility
-      ctx.shadowColor = `rgba(${ACCENT_RGB}, 0.6)`;
-      ctx.shadowBlur = 16;
+      // the accent, lifted a step for legibility: #A05CFF on the near-black
+      // panel is ~5.4:1 contrast — comfortably readable at full saturation
+      ctx.fillStyle = "#A05CFF";
+      ctx.shadowColor = `rgba(${ACCENT_RGB}, 0.7)`;
+      ctx.shadowBlur = 18;
       ctx.font = `600 84px ${font}`;
       ctx.fillText(temp.toFixed(1), TEX_W * 0.25 - 22, 182);
       ctx.fillText(`${Math.round(hum)}`, TEX_W * 0.75 - 26, 182);
       ctx.shadowBlur = 0;
-      ctx.fillStyle = "#6F61A6";
+      ctx.fillStyle = "#7B5BC9";
       ctx.font = `500 34px ${font}`;
       ctx.fillText("°C", TEX_W * 0.25 + 82, 156);
       ctx.fillText("%", TEX_W * 0.75 + 74, 156);
@@ -395,6 +476,10 @@ export default function PulseModel({ progress }: { progress: number }) {
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.1); // resume-safe (paused frameloop)
+
+    // Env exposure (see the envTex note): 1 washes the graphite to silver,
+    // 0 collapses it to a silhouette — 0.38 is the dark-but-legible target.
+    state.scene.environmentIntensity = 0.38;
 
     // Scroll-linked rotation — same lerp-toward-target pattern as the siblings.
     if (group.current) {
@@ -429,44 +514,57 @@ export default function PulseModel({ progress }: { progress: number }) {
       l.t = 0;
     }
     if (l.phase === "running") {
-      l.t += dt;
+      // Fixed sub-steps keep the pulse springs identical on every framerate —
+      // the same integration discipline as the keycap-assembly entrance.
+      let remaining = dt;
+      while (remaining > 0) {
+        const h = Math.min(remaining, 1 / 120);
+        remaining -= h;
+        l.t += h;
+        pulses.current.forEach((sp, i) => {
+          if (l.t <= PULSE_RELEASE[i] || ackFired.current[i]) return;
+          sp.v += (PULSE_K * (1 - sp.s) - PULSE_C * sp.v) * h;
+          sp.s += sp.v * h;
+        });
+      }
       // step 2: the hub wakes — indicators warm on with the screen boot
       led =
         LED_DIM +
         (LED_ON - LED_DIM) *
           THREE.MathUtils.clamp((l.t - LED_RAMP[0]) / (LED_RAMP[1] - LED_RAMP[0]), 0, 1);
 
-      // steps 3+4: a pulse travels to each submodule; arrival flashes it
-      const windows = [P1, P2] as const;
+      // steps 3+4: each pulse springs from the hub to its submodule —
+      // accelerating out, decelerating into the lid — and arrival flashes it
       let dotPlaced = false;
-      windows.forEach((w, i) => {
-        const p = (l.t - w[0]) / (w[1] - w[0]);
+      pulses.current.forEach((sp, i) => {
         const line = fx.current?.lines[i];
         const mat = fx.current?.lineMats[i];
-        if (!line || !mat) return;
-        if (p > 0 && p < 1) {
-          const eased = easeInOut(p);
-          line.geometry.setDrawRange(0, Math.ceil(eased * TUBE_SEGS) * TUBE_IDX_PER_SEG);
+        if (!line || !mat || l.t <= PULSE_RELEASE[i]) return;
+        if (ackFired.current[i]) return; // landed — full arc stays until the fade
+        const p = THREE.MathUtils.clamp(sp.s, 0, 1);
+        if (sp.s >= PULSE_ARRIVED) {
+          line.geometry.setDrawRange(0, TUBE_SEGS * TUBE_IDX_PER_SEG);
+          ackFired.current[i] = true; // acknowledge exactly once
+          ackFlash.current[i] = 1;
+        } else {
+          line.geometry.setDrawRange(0, Math.ceil(p * TUBE_SEGS) * TUBE_IDX_PER_SEG);
           mat.opacity = 0.85;
           if (dot.current && !dotPlaced) {
             dotPlaced = true;
             dot.current.visible = true;
-            dot.current.position.copy(layout.arcs[i].getPoint(eased));
+            dot.current.position.copy(layout.arcs[i].getPoint(p));
             dot.current.scale.setScalar(1 + 0.25 * Math.sin(t * 14));
-          }
-        } else if (p >= 1) {
-          line.geometry.setDrawRange(0, TUBE_SEGS * TUBE_IDX_PER_SEG);
-          if (!ackFired.current[i]) {
-            ackFired.current[i] = true; // acknowledge exactly once
-            ackFlash.current[i] = 1;
           }
         }
       });
       if (!dotPlaced && dot.current) dot.current.visible = false;
 
-      // step 5: both linked — the arcs dissolve
+      // step 5: both linked — the arcs dissolve (eased, not a linear cut)
       const fade =
-        1 - THREE.MathUtils.clamp((l.t - LINES_FADE[0]) / (LINES_FADE[1] - LINES_FADE[0]), 0, 1);
+        1 -
+        easeInOut(
+          THREE.MathUtils.clamp((l.t - LINES_FADE[0]) / (LINES_FADE[1] - LINES_FADE[0]), 0, 1)
+        );
       if (l.t >= LINES_FADE[0] && fx.current) {
         for (const m of fx.current.lineMats) m.opacity = 0.85 * fade;
       }
@@ -499,7 +597,8 @@ export default function PulseModel({ progress }: { progress: number }) {
     halos.current.forEach((h, i) => {
       if (!h) return;
       const m = h.material as THREE.MeshBasicMaterial;
-      ackFlash.current[i] = Math.max(0, ackFlash.current[i] - dt / ACK_DECAY);
+      // exponential decay — a flash of light dying away, not a linear ramp
+      ackFlash.current[i] *= Math.exp(-dt / ACK_TAU);
       const settled = l.phase === "done" || ackFired.current[i];
       const ambient = settled ? AMBIENT_BASE + AMBIENT_AMP * Math.sin(t * 0.8 + i * 2.4) : 0;
       m.opacity = Math.min(0.7, ambient + ackFlash.current[i] * ACK_FLASH);
@@ -541,7 +640,8 @@ export default function PulseModel({ progress }: { progress: number }) {
 
   return (
     <>
-      <SceneLights accent={ACCENT} accentIntensity={0.7} level={0.85} ambientScale={0.65} />
+      <primitive object={envTex} attach="environment" />
+      <SceneLights accent={ACCENT} accentIntensity={0.75} level={0.95} ambientScale={0.7} />
       {/* slight downward tilt; scroll rotation inside */}
       <group rotation={[TILT_X, 0, 0]} position={[0, -0.05, 0]}>
         <group ref={group}>
@@ -553,7 +653,7 @@ export default function PulseModel({ progress }: { progress: number }) {
                 <group position={[-layout.center.x, -layout.center.y, -layout.center.z]}>
                   <primitive object={scene} />
                   {/* live readout plane, a hair proud of the display inlay */}
-                  <mesh position={layout.screenPos} rotation={[-Math.PI / 2, 0, 0]}>
+                  <mesh position={layout.screenPos} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
                     <planeGeometry args={layout.screenSize} />
                     <meshBasicMaterial
                       ref={screenMat}
@@ -571,6 +671,7 @@ export default function PulseModel({ progress }: { progress: number }) {
               ref={ring}
               rotation={[-Math.PI / 2, 0, 0]}
               position={[0, layout.baseY - 0.02, 0]}
+              renderOrder={1}
             >
               <ringGeometry args={[0.94, 1, 64]} />
               <meshBasicMaterial
@@ -586,10 +687,10 @@ export default function PulseModel({ progress }: { progress: number }) {
 
             {/* link arcs + traveling pulse (entrance only) */}
             <group ref={linesGroup} />
-            <mesh ref={dot} visible={false}>
+            <mesh ref={dot} visible={false} renderOrder={4}>
               <sphereGeometry args={[0.045, 16, 16]} />
               <meshBasicMaterial
-                color={"#DCD2FF"}
+                color={"#E4D8FF"}
                 transparent
                 opacity={0.95}
                 blending={THREE.AdditiveBlending}
@@ -597,10 +698,10 @@ export default function PulseModel({ progress }: { progress: number }) {
                 toneMapped={false}
               />
               {/* soft outer glow riding the same position */}
-              <mesh scale={2.4}>
+              <mesh scale={2.4} renderOrder={4}>
                 <sphereGeometry args={[0.045, 12, 12]} />
                 <meshBasicMaterial
-                  color={"#B49CFF"}
+                  color={"#AC85FF"}
                   transparent
                   opacity={0.22}
                   blending={THREE.AdditiveBlending}
@@ -636,6 +737,7 @@ export default function PulseModel({ progress }: { progress: number }) {
                 }}
                 rotation={[-Math.PI / 2, 0, 0]}
                 position={[side * MOD_X, layout.baseY - 0.015, MOD_Z]}
+                renderOrder={1}
               >
                 <planeGeometry args={[layout.modFootprint * 1.9, layout.modFootprint * 1.9]} />
                 <meshBasicMaterial

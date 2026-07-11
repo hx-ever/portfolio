@@ -9,7 +9,7 @@ export default function Home() {
     <>
       <ModelPrefetcher />
       <DotRail />
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <Hero />
         {SHOWCASES.map((section) => (
           <Showcase key={section.id} section={section} />

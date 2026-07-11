@@ -7,7 +7,7 @@ import styles from "./not-found.module.css";
  */
 export default function NotFound() {
   return (
-    <main className={styles.page}>
+    <main id="main-content" tabIndex={-1} className={styles.page}>
       <div className={styles.glow} aria-hidden="true" />
       <span className={styles.eyebrow}>404 — NOT FOUND</span>
       <h1 className={styles.headline}>

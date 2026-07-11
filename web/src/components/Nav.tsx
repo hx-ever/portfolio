@@ -73,6 +73,7 @@ export default function Nav() {
   return (
     <nav
       ref={navRef}
+      aria-label="Primary"
       className={`${styles.nav} ${scrolled ? styles.scrolled : ""}`}
       data-thick={pill.visible}
       onMouseMove={onNavMouseMove}
@@ -126,6 +127,7 @@ export default function Nav() {
         <Link
           href="/experience"
           onMouseEnter={onLinkEnter}
+          aria-current={pathname === "/experience" ? "page" : undefined}
           className={pathname === "/experience" ? styles.active : undefined}
         >
           Experience
@@ -133,6 +135,7 @@ export default function Nav() {
         <Link
           href="/contact"
           onMouseEnter={onLinkEnter}
+          aria-current={pathname === "/contact" ? "page" : undefined}
           className={pathname === "/contact" ? styles.active : undefined}
         >
           Contact

@@ -66,6 +66,50 @@ button {
   cursor: pointer;
 }
 
+/* Keyboard focus: a consistent, visible ring on every interactive element.
+   Only shows for keyboard users (:focus-visible), so pointer interaction
+   stays clean. Components with a bespoke focus treatment override this. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-focus, #2997ff);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Skip link: first focusable element on the page, off-screen until focused,
+   so keyboard users can jump straight past the fixed nav to the content. */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: var(--z-nav);
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  font-weight: 500;
+  transform: translateY(calc(-100% - 16px));
+  transition: transform 180ms var(--ease-glide);
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline-offset: 2px;
+}
+
+/* The skip target is a landmark, not a control — receiving programmatic
+   focus shouldn't draw a page-wide ring. */
+#main-content:focus,
+#main-content:focus-visible {
+  outline: none;
+}
+
 /* Route transition: template.tsx remounts this wrapper on every navigation,
    fading the new page up from the dark background — a quick fade-through-
    dark rather than a hard cut. */

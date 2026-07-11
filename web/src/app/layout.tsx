@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
@@ -56,6 +56,15 @@ export const metadata: Metadata = {
   },
 };
 
+// Split out of `metadata` per Next 16: theme-color tints the mobile browser
+// chrome to the site's own near-black; the viewport line is the framework
+// default, restated so it's explicit.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#060607",
+};
+
 // Person schema for richer search results; rendered once in the root layout.
 const PERSON_JSONLD = {
   "@context": "https://schema.org",
@@ -81,6 +90,9 @@ export default function RootLayout({
       className={`${display.variable} ${mono.variable} ${body.variable}`}
     >
       <body>
+        <a href="#main-content" className="skip-link">
+          Skip to content
+        </a>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(PERSON_JSONLD) }}

@@ -20,7 +20,6 @@ const LIGHT_MODEL = "/lightmodule.glb";
 // bright relative to its own hue" weight, expressed as a pale purple.
 const ACCENT = "#A78BFA";
 const ACCENT_RGB = "167, 139, 250";
-const ENERGY = "#C9B8FF"; // link pulses/arcs: lifted toward white, reads over the ambient glow
 const TARGET_WIDTH = 1.5; // world units the hub's footprint is scaled to fill
 
 // The GLB lies on its back: the interface face (knobs, domes, screen inlay)
@@ -33,54 +32,51 @@ const TILT_X = 0.08; // slight downward presentation tilt (upright device)
 // --- companion submodules (secondary supporting cast) ---
 // Both share the same 59.5×76×25.6mm enclosure. In the GLB the lid faces +Z
 // with the box standing on its 59.5×76 footprint; FLAT lays it down on that
-// footprint with the lid (violet cap, finger-notch tab) facing up — the
-// resting pose from the product reference. They flank the hub smaller and
-// slightly behind, turned a touch inward, and simply ride the shared scroll
-// yaw. Their palette is re-themed at runtime (see the traversal below):
-// the hub's light body tone on the shell, mid-grey inner, the section's
-// pale purple concentrated on the lid.
+// footprint with the lid (violet cap, finger-notch tab) facing up. Their
+// palette is re-themed at runtime: the hub's light body tone on the shell,
+// mid-grey inner, the section's pale purple on the lid.
+//
+// They flank the hub at deliberately DIFFERENT distances (air nearer + a
+// touch forward, light farther + a touch back) so the broadcast ripple
+// reaches them at physically distinct moments — the acknowledgment stagger
+// is a consequence of real geometry, not a hand-tuned delay.
 const FLAT = -Math.PI / 2;
 const MOD_SCALE = 6.0; // vs the hub's ~13.5 — clearly subordinate
-const MOD_X = 0.95; // flanking offset from the hub's centre
-const MOD_Z = -0.26; // parked slightly behind the hub's face plane
 const MOD_YAW = 0.3; // gentle turn toward the hub
+const MODS = [
+  { x: -0.91, z: -0.12 }, // air — left, nearer   (dist ≈ 0.918)
+  { x: 0.97, z: -0.42 }, // light — right, farther (dist ≈ 1.057)
+] as const;
 
 // --- one-time "link-up" entrance (per session) ---
-// The network coming online: the hub boots first (rings sweep up, dome
-// indicators warm on), then a glowing pulse travels along a thin arc to each
-// submodule in turn — air first, then light — and each answers with a floor
-// glow that settles into a faint ambient breath. Once both are linked the
-// bright arcs die down to barely-there idle links: two distinct hub-to-node
-// threads, not a shared ring — the dramatic pulse is an entrance-only event.
-const LINK_KEY = "hx_corelink_link"; // sessionStorage flag (new choreography)
+// The network coming online: the hub boots (screen powers to a "LINKING"
+// state, dome indicators warm on), then broadcasts — concentric ripple rings
+// expand outward from the hub across the floor, like a radar pulse. As each
+// ripple's front reaches a submodule's real position, that submodule's lid
+// flashes in the accent (the signal arriving). Once BOTH have acknowledged,
+// the connection is established: the live sensor dashboard boots on-screen,
+// the ripples finish dissipating, and the scene settles — nothing persists at
+// rest, no line/arc/ring is ever drawn between the objects.
+const LINK_KEY = "hx_corelink_link"; // sessionStorage flag
 const LINK_TRIGGER = 0.15; // section progress at which the sequence starts
-const BOOT_S = 0.55; // hub screen count-up (step 2)
 const LED_RAMP = [0.15, 0.55] as const; // dome indicators warm on with the boot
-// Each pulse's travel along its arc is a damped spring — the same integrator
-// family as the site's other entrance physics (keycap assembly, buggy
-// suspension, drone hover): released from rest it genuinely accelerates,
-// then decelerates into arrival. ζ≈1 (critical) so it lands without
-// overshooting past the lid. Arrival at ~98.5% settle takes ≈0.65s, so the
-// second release leaves a clear ~0.3s beat after the first pulse lands.
-const PULSE_RELEASE = [0.55, 1.5] as const; // hub -> air, then hub -> light
-const PULSE_K = 90; // same stiffness as the keycap-assembly spring
-const PULSE_C = 19; // ζ≈1 — decisive arrival, no overshoot
-const PULSE_ARRIVED = 0.985; // settle fraction that counts as "landed"
-const ACK_FLASH = 0.55; // acknowledgment glow peak opacity
-const ACK_TAU = 0.16; // exponential flash decay constant (light dying, not a linear ramp)
-const LINES_FADE = [2.3, 2.75] as const; // arcs settle once both are linked
-const DONE_T = 2.85;
-const PULSE_OPACITY = 0.85; // arc brightness while a pulse is in flight
-const IDLE_LINE = 0.09; // settled links: thin, barely-there threads
-const TUBE_SEGS = 32; // arc tube segments; drawRange animates in these units
-const TUBE_RADIAL = 12; // radial segments — smooth fresnel falloff around the tube
-const TUBE_IDX_PER_SEG = TUBE_RADIAL * 6; // radial * 2 triangles * 3 indices
+// Broadcast ripples: 3 concentric rings on a short staggered "scanning burst".
+const RIPPLE_COUNT = 3;
+const RIPPLE_START = 0.35; // brief boot beat before the first broadcast
+const RIPPLE_STAGGER = 0.34; // gap between successive rings
+const RIPPLE_DUR = 1.7; // one ring's lifetime: birth → expanded → faded
+const RIPPLE_MAX_R = 1.45; // final radius — clears the farther module (~1.06)
+const RIPPLE_PEAK = 0.5; // ring opacity at birth (additive)
+// Acknowledgment: the lid brightens the instant the ripple front crosses it.
+const LID_BASE = 0.12; // resting lid self-glow (matches the material author)
+const ACK_BOOST = 1.15; // extra lid emissive at the moment the ripple lands
+const ACK_TAU = 0.3; // exponential decay of the acknowledgment flash
+// Dashboard boot (fires only after BOTH modules acknowledge).
+const BOOT_S = 0.6; // ring-fill + count-up duration
+const DONE_T = 2.9; // all rings faded + dashboard booted → settle to idle
 // --- idle: LED breathing on a slow loop ---
 const IDLE_PERIOD = 5;
 const IDLE_DUR = 1.8;
-// submodule ambient breath — much dimmer than the entrance flash
-const AMBIENT_BASE = 0.05;
-const AMBIENT_AMP = 0.035;
 
 const LED_DIM = 0.1; // dormant indicator emissive
 const LED_ON = 1.3; // steady "active" emissive — dimmed per the exposure discipline
@@ -89,7 +85,9 @@ const LED_ON = 1.3; // steady "active" emissive — dimmed per the exposure disc
 // Two activity-ring indicators (Apple-Watch style): each metric is an arc
 // filled proportionally against its range, with the numeral in the ring's
 // centre. Number and arc derive from the same live value, so the boot
-// count-up and the idle drift animate both together by construction.
+// count-up and the idle drift animate both together by construction. The
+// dashboard is GATED — the screen shows a "LINKING" state until the network
+// is confirmed, then boots the rings.
 const SCREEN_MESH = "Component6";
 const TEX_W = 512;
 const TEX_H = 256;
@@ -120,13 +118,12 @@ function markLinkPlayed() {
 }
 
 const easeOutCubic = (p: number) => 1 - Math.pow(1 - p, 3);
-const easeInOut = (p: number) => p * p * (3 - 2 * p);
+const easeOutQuad = (p: number) => 1 - (1 - p) * (1 - p);
 
 // Product-line CMF, coordinated with AuraEyez: the same light neutral-grey
 // body (#AEAEB2 — AuraEyez's shell tone) across the hub and both submodules,
-// dark window elements framing the display (AuraEyez's dark-bezel-on-light-
-// body move), and the pale purple concentrated at the technology points —
-// knobs, lids, indicator domes/slivers, screen rings, link pulses.
+// dark window elements framing the display, and the pale purple concentrated
+// at the technology points — knobs, lids, indicator domes/slivers, screen.
 // Env exposure lives on scene.environmentIntensity in useFrame — in this
 // three version material.envMapIntensity no longer applies to a
 // scene.environment map, so per-material env tweaks would be silently inert.
@@ -162,10 +159,25 @@ const LED_MAT = new THREE.MeshStandardMaterial({
   emissiveIntensity: LED_DIM,
 });
 
-// Submodule recolor — the GLBs bake a near-black shell (#2E333B body,
-// #1B1E20 inner) that vanishes against the section background, so the real
-// palette is applied at runtime: the hub's light body tone on the shells,
-// a mid-grey inner tray for depth, the pale purple on the lids.
+// The two submodule lids get their own module-level materials (air = 0,
+// light = 1) so each can be driven independently — its emissive flashes up
+// the instant the broadcast ripple reaches it, then decays. Same
+// mutate-in-useFrame discipline as DOME_MAT / LED_MAT above.
+const LID_MATS = [0, 1].map(
+  () =>
+    new THREE.MeshStandardMaterial({
+      color: ACCENT,
+      roughness: 0.48,
+      metalness: 0.2,
+      emissive: ACCENT,
+      emissiveIntensity: LID_BASE,
+    })
+);
+
+// Submodule recolor — the GLBs bake a near-black shell that vanishes against
+// the section background, so the real palette is applied at runtime: the
+// hub's light body tone on the shells, a mid-grey inner tray, pale purple on
+// the lids (whose emissive is driven up on acknowledgment).
 const MOD_BODY_COLOR = "#AEAEB2";
 const MOD_INNER_COLOR = "#77777D";
 const MAT_BY_NAME: Record<string, THREE.MeshStandardMaterial> = {
@@ -187,25 +199,24 @@ const MAT_BY_NAME: Record<string, THREE.MeshStandardMaterial> = {
  * The CoreLink smart-home hub — the real CAD assembly (STEP → GLB), standing
  * upright on its flat base, flanked by its two companion submodules (air +
  * light) lying flat with their pale-purple caps facing up.
- *  - One-time entrance per session: the hub boots (activity rings sweep up
- *    with the count, domes warm on), then a glowing pulse arcs from the hub
- *    to each submodule in turn; each answers with a floor-glow
- *    acknowledgment, and once both are linked the bright arcs settle into
- *    barely-there idle threads — the mesh network is established.
- *  - Idle: two faint hub-to-node link threads, a gentle indicator breath, a
- *    subtle sensor drift animating each ring + numeral together, and a much
- *    fainter ambient breath under each submodule. No cursor interaction.
+ *  - One-time entrance per session: the hub boots (domes warm on, screen
+ *    powers to a "LINKING" state), then broadcasts concentric ripple rings
+ *    outward from its centre. As each ripple front reaches a submodule's real
+ *    position, that submodule's lid flashes — the signal arriving. Because
+ *    the two sit at different distances, they acknowledge at slightly
+ *    different moments. Once BOTH confirm, the live sensor dashboard boots
+ *    on-screen and the ripples dissipate.
+ *  - Idle: nothing broadcast, no ring/line at rest — just a gentle indicator
+ *    breath and a subtle sensor drift animating each ring + numeral together.
  *  - Shares the sections' scroll-scrub yaw; nothing ever travels.
  */
 export default function PulseModel({ progress }: { progress: number }) {
   const group = useRef<THREE.Group>(null);
-  const linesGroup = useRef<THREE.Group>(null); // link arcs attach here on frame 1
-  const dot = useRef<THREE.Mesh>(null);
-  const halos = useRef<(THREE.Mesh | null)[]>([null, null]);
+  const ripples = useRef<(THREE.Mesh | null)[]>([null, null, null]);
   const screenMat = useRef<THREE.MeshBasicMaterial>(null);
 
   // one-time session decision: an already-played (or reduced-motion) visit
-  // starts fully settled — no boot, no pulses, live readout from frame one
+  // starts fully settled — no boot, no ripples, live readout from frame one
   const [skipped] = useState(() => linkPlayed() || prefersReducedMotion());
 
   const link = useRef<{ phase: "waiting" | "running" | "done"; t: number; idle: number }>({
@@ -213,18 +224,16 @@ export default function PulseModel({ progress }: { progress: number }) {
     t: 0,
     idle: 0,
   });
-  const ackFlash = useRef([0, 0]); // per-submodule acknowledgment flash level
-  const ackFired = useRef([false, false]); // each submodule acknowledges once
-  // per-pulse spring state along its arc: s 0 (at hub) -> 1 (at the lid)
-  const pulses = useRef([
-    { s: 0, v: 0 },
-    { s: 0, v: 0 },
-  ]);
+  const ackGlow = useRef([0, 0]); // per-submodule lid flash level (decays)
+  const acked = useRef([false, false]); // each submodule acknowledges once
+  const peakRadius = useRef(0); // monotonic max ripple radius reached
+  const bothAckT = useRef(Infinity); // time both confirmed (gates late ripples)
 
-  // display state: off until the hub boots, counts to rest, then drifts.
-  // `drawnKey` gates canvas redraws to actual value changes.
+  // display state: off until the hub boots, "connecting" during the
+  // broadcast, then boots the dashboard and drifts. `drawnKey` gates canvas
+  // redraws to actual value changes.
   const screen = useRef<{
-    mode: "off" | "boot" | "live";
+    mode: "off" | "connecting" | "boot" | "live";
     t: number;
     temp: number;
     hum: number;
@@ -262,7 +271,7 @@ export default function PulseModel({ progress }: { progress: number }) {
     const scale = TARGET_WIDTH / size.x;
 
     // Upright, the GLB's z-extent becomes the standing height, so the floor
-    // (rings, submodules, ack glows) sits at -z/2 below the hub's centre.
+    // (ripples, submodules) sits at -z/2 below the hub's centre.
     const baseY = -(size.z / 2) * scale;
 
     // The display inlay, measured in the GLB frame: the readout plane sits a
@@ -281,6 +290,10 @@ export default function PulseModel({ progress }: { progress: number }) {
     // becomes depth. The modules rest on the same floor as the hub.
     const modY = baseY + modSize.z / 2;
 
+    // Each submodule's true horizontal distance from the hub centre (origin) —
+    // this is what the ripple front must reach to trigger its acknowledgment.
+    const modDist = MODS.map((m) => Math.hypot(m.x, m.z));
+
     // Fit-clamp extents: hub swept through tilt/yaw/upright, widened to the
     // submodules' outer reach (their depth swings forward at the yaw extreme).
     const fitHalf = worstCaseHalfExtents(
@@ -293,27 +306,15 @@ export default function PulseModel({ progress }: { progress: number }) {
       [-22, 0, 18]
     );
     const yawMax = THREE.MathUtils.degToRad(22);
-    const modReach =
-      (MOD_X + modSize.x / 2) * Math.cos(yawMax) +
-      (Math.abs(MOD_Z) + modSize.y / 2) * Math.sin(yawMax);
+    const modReach = Math.max(
+      ...MODS.map(
+        (m) =>
+          (Math.abs(m.x) + modSize.x / 2) * Math.cos(yawMax) +
+          (Math.abs(m.z) + modSize.y / 2) * Math.sin(yawMax)
+      )
+    );
     fitHalf.w = Math.max(fitHalf.w, modReach);
     fitHalf.h += 0.05; // tilt-group y offset
-
-    // link-pulse arcs: hub's lower face out to each lid's centre. The anchor
-    // is measured, not guessed: upright, the GLB's y-thickness faces the
-    // camera as world z, so starting just proud of that surface keeps the
-    // tube from being born inside the enclosure and popping out through the
-    // fascia like a clipping error.
-    const hubHalfDepth = (size.y / 2) * scale;
-    const hubAnchor = new THREE.Vector3(0, baseY * 0.45, hubHalfDepth + 0.02);
-    const lidY = modY + modSize.z / 2 + 0.02;
-    const arcs = [-1, 1].map((side) => {
-      const end = new THREE.Vector3(side * MOD_X * 0.96, lidY, MOD_Z + 0.06);
-      const mid = hubAnchor.clone().lerp(end, 0.5);
-      mid.y += 0.34;
-      mid.z += 0.1;
-      return new THREE.QuadraticBezierCurve3(hubAnchor, mid, end);
-    });
 
     return {
       center,
@@ -321,18 +322,18 @@ export default function PulseModel({ progress }: { progress: number }) {
       fitHalf,
       baseY,
       modY,
-      modFootprint: Math.max(modSize.x, modSize.y),
-      arcs,
+      modDist,
       screenPos: [sCenter.x, sBox.max.y + 0.0006, sCenter.z] as [number, number, number],
       screenSize: [sSize.x * 0.94, sSize.z * 0.88] as [number, number],
     };
   }, [scene, airScene]);
 
   // Submodule scenes: hover raycasts off (no cursor interaction by design),
-  // and the baked near-black palette re-themed to the light body + the
-  // pale-purple lid (idempotent on the cached scenes).
+  // and the baked near-black palette re-themed to the light body + a mid-grey
+  // inner. The lid mesh is swapped onto its module-level LID_MATS material so
+  // the entrance can flash it independently. Idempotent on the cached scenes.
   useMemo(() => {
-    for (const s of [airScene, lightScene]) {
+    [airScene, lightScene].forEach((s, sceneIdx) => {
       s.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (!mesh.isMesh) return;
@@ -345,16 +346,10 @@ export default function PulseModel({ progress }: { progress: number }) {
         } else if (std.name === "module_inner") {
           std.color.set(MOD_INNER_COLOR);
         } else if (std.name === "module_lid") {
-          std.color.set(ACCENT);
-          std.roughness = 0.48;
-          std.metalness = 0.2;
-          // a whisper of self-glow keeps the lid's purple from greying out
-          // under the white key light — it stays the accent surface
-          std.emissive.set(ACCENT);
-          std.emissiveIntensity = 0.12;
+          mesh.material = LID_MATS[sceneIdx];
         }
       });
-    }
+    });
   }, [airScene, lightScene]);
 
   const fitGroup = useFitClamp(layout.fitHalf.w, layout.fitHalf.h);
@@ -371,78 +366,6 @@ export default function PulseModel({ progress }: { progress: number }) {
     pmrem.dispose();
     return tex;
   }, [gl]);
-
-  // ---- lazily-built link/glow scenography (mutable, render-persistent):
-  // two sampled arc tubes, plus a shared radial halo texture for the
-  // acknowledgment floor glows. Built once from the measured layout.
-  // Each tube carries a fresnel-falloff shader — brightest along the core
-  // where the surface faces the camera, dissolving to nothing at the
-  // silhouette — so the link reads as a rendered beam of light with soft
-  // gradient edges, not a uniform-opacity stroke.
-  const fx = useRef<{
-    lines: THREE.Mesh[];
-    lineMats: THREE.ShaderMaterial[];
-    haloTex: THREE.CanvasTexture;
-  } | null>(null);
-  if (fx.current == null) {
-    const lines: THREE.Mesh[] = [];
-    const lineMats: THREE.ShaderMaterial[] = [];
-    for (const arc of layout.arcs) {
-      // a slim tube reads at every resolution where a 1px GL line vanishes
-      const geo = new THREE.TubeGeometry(arc, TUBE_SEGS, 0.03, TUBE_RADIAL, false);
-      const mat = new THREE.ShaderMaterial({
-        uniforms: {
-          uColor: { value: new THREE.Color(ENERGY) },
-          uOpacity: { value: 0 },
-        },
-        vertexShader: /* glsl */ `
-          varying vec3 vNormal;
-          varying vec3 vView;
-          void main() {
-            vNormal = normalMatrix * normal;
-            vec4 mv = modelViewMatrix * vec4(position, 1.0);
-            vView = -mv.xyz;
-            gl_Position = projectionMatrix * mv;
-          }`,
-        fragmentShader: /* glsl */ `
-          uniform vec3 uColor;
-          uniform float uOpacity;
-          varying vec3 vNormal;
-          varying vec3 vView;
-          void main() {
-            // bright core -> transparent silhouette (soft gradient edge)
-            float core = pow(abs(dot(normalize(vNormal), normalize(vView))), 1.8);
-            gl_FragColor = vec4(uColor, uOpacity * core);
-          }`,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const line = new THREE.Mesh(geo, mat);
-      line.geometry.setDrawRange(0, 0);
-      line.raycast = () => {};
-      // Transparent objects sort by object origin, and a tube spanning the
-      // whole scene has a meaningless single sort point — pin the draw order
-      // explicitly instead (floor glows < screen < arcs < dot). Depth-testing
-      // stays on, so the arc still passes correctly behind/in front of the
-      // opaque models per actual 3D depth as the scene rotates.
-      line.renderOrder = 3;
-      lines.push(line);
-      lineMats.push(mat);
-    }
-    const c = document.createElement("canvas");
-    c.width = c.height = 128;
-    const cctx = c.getContext("2d")!;
-    const g = cctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, `rgba(${ACCENT_RGB}, 0.9)`);
-    g.addColorStop(0.45, `rgba(${ACCENT_RGB}, 0.35)`);
-    g.addColorStop(1, `rgba(${ACCENT_RGB}, 0)`);
-    cctx.fillStyle = g;
-    cctx.fillRect(0, 0, 128, 128);
-    const haloTex = new THREE.CanvasTexture(c);
-    haloTex.colorSpace = THREE.SRGBColorSpace;
-    fx.current = { lines, lineMats, haloTex };
-  }
 
   // ---- screen canvas: lives in a ref (mutable, render-persistent), lazily
   // created once. The Canvas only mounts in the browser, so `document` is
@@ -466,17 +389,58 @@ export default function PulseModel({ progress }: { progress: number }) {
     gfx.current = { ctx, texture, font };
   }
 
-  const drawScreen = (temp: number, hum: number, on: boolean) => {
+  // Draws the display. `mode`: "off" clears it; "connecting" shows the
+  // LINKING state with a scanning dot; "dash" paints the activity rings.
+  const drawScreen = (
+    mode: "off" | "connecting" | "dash",
+    temp = 0,
+    hum = 0,
+    dot = 0
+  ) => {
     const g = gfx.current;
     if (!g) return;
-    const key = on ? `${temp.toFixed(1)}|${Math.round(hum)}` : "off";
     const scr = screen.current;
+    const key =
+      mode === "off"
+        ? "off"
+        : mode === "connecting"
+          ? `conn:${dot}`
+          : `${temp.toFixed(1)}|${Math.round(hum)}`;
     if (key === scr.drawnKey) return;
     scr.drawnKey = key;
 
     const { ctx, texture, font } = g;
     ctx.clearRect(0, 0, TEX_W, TEX_H);
-    if (on) {
+
+    if (mode === "connecting") {
+      // powered-but-not-yet-linked: dim panel, dim bezel, "LINKING" + a
+      // three-dot scanner (one dot lit, cycling)
+      ctx.fillStyle = "rgba(9, 10, 14, 0.94)";
+      ctx.fillRect(0, 0, TEX_W, TEX_H);
+      ctx.strokeStyle = `rgba(${ACCENT_RGB}, 0.22)`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(7, 7, TEX_W - 14, TEX_H - 14);
+      ctx.textAlign = "center";
+      ctx.fillStyle = `rgba(${ACCENT_RGB}, 0.72)`;
+      ctx.font = `500 30px ${font}`;
+      ctx.fillText("L I N K I N G", TEX_W / 2, TEX_H * 0.44);
+      const dy = TEX_H * 0.64;
+      const gap = 34;
+      for (let i = 0; i < 3; i++) {
+        const on = i === dot;
+        ctx.beginPath();
+        ctx.arc(TEX_W / 2 + (i - 1) * gap, dy, 7, 0, Math.PI * 2);
+        if (on) {
+          ctx.fillStyle = ACCENT;
+          ctx.shadowColor = `rgba(${ACCENT_RGB}, 0.85)`;
+          ctx.shadowBlur = 12;
+        } else {
+          ctx.fillStyle = `rgba(${ACCENT_RGB}, 0.22)`;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    } else if (mode === "dash") {
       // dark live panel with a pale-purple bezel line — the accent frame
       ctx.fillStyle = "rgba(9, 10, 14, 0.94)";
       ctx.fillRect(0, 0, TEX_W, TEX_H);
@@ -547,101 +511,76 @@ export default function PulseModel({ progress }: { progress: number }) {
       group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.08);
     }
 
-    // attach the lazily-built link arcs once (JSX must not read the ref)
-    if (linesGroup.current && fx.current && linesGroup.current.children.length === 0) {
-      linesGroup.current.add(...fx.current.lines);
-    }
-
     if (screenMat.current && gfx.current && screenMat.current.map !== gfx.current.texture) {
       screenMat.current.map = gfx.current.texture;
       screenMat.current.needsUpdate = true;
-    }
-    for (const h of halos.current) {
-      const m = h?.material as THREE.MeshBasicMaterial | undefined;
-      if (h && fx.current && m && m.map !== fx.current.haloTex) {
-        m.map = fx.current.haloTex;
-        m.needsUpdate = true;
-      }
     }
 
     const l = link.current;
     const t = state.clock.elapsedTime;
     let led = LED_DIM;
 
-    // ---- one-time link-up choreography ----
+    // ---- one-time broadcast choreography ----
     if (l.phase === "waiting" && progress >= LINK_TRIGGER) {
       l.phase = "running";
       l.t = 0;
     }
     if (l.phase === "running") {
-      // Fixed sub-steps keep the pulse springs identical on every framerate —
-      // the same integration discipline as the keycap-assembly entrance.
-      let remaining = dt;
-      while (remaining > 0) {
-        const h = Math.min(remaining, 1 / 120);
-        remaining -= h;
-        l.t += h;
-        pulses.current.forEach((sp, i) => {
-          if (l.t <= PULSE_RELEASE[i] || ackFired.current[i]) return;
-          sp.v += (PULSE_K * (1 - sp.s) - PULSE_C * sp.v) * h;
-          sp.s += sp.v * h;
-        });
-      }
-      // step 2: the hub wakes — indicators warm on with the screen boot
+      l.t += dt;
+      // step 1: the hub wakes — indicators warm on
       led =
         LED_DIM +
         (LED_ON - LED_DIM) *
           THREE.MathUtils.clamp((l.t - LED_RAMP[0]) / (LED_RAMP[1] - LED_RAMP[0]), 0, 1);
 
-      // steps 3+4: each pulse springs from the hub to its submodule —
-      // accelerating out, decelerating into the lid — and arrival flashes it
-      let dotPlaced = false;
-      pulses.current.forEach((sp, i) => {
-        const line = fx.current?.lines[i];
-        const mat = fx.current?.lineMats[i];
-        if (!line || !mat || l.t <= PULSE_RELEASE[i]) return;
-        if (ackFired.current[i]) return; // landed — full arc stays until the fade
-        const p = THREE.MathUtils.clamp(sp.s, 0, 1);
-        if (sp.s >= PULSE_ARRIVED) {
-          line.geometry.setDrawRange(0, TUBE_SEGS * TUBE_IDX_PER_SEG);
-          ackFired.current[i] = true; // acknowledge exactly once
-          ackFlash.current[i] = 1;
+      // step 2: broadcast — each ripple expands (decelerating) and fades. New
+      // ripples are suppressed once both modules have confirmed.
+      let frontR = 0;
+      for (let i = 0; i < RIPPLE_COUNT; i++) {
+        const mesh = ripples.current[i];
+        if (!mesh) continue;
+        const mat = mesh.material as THREE.MeshBasicMaterial;
+        const emit = RIPPLE_START + i * RIPPLE_STAGGER;
+        const lp = (l.t - emit) / RIPPLE_DUR;
+        if (lp > 0 && lp < 1 && emit <= bothAckT.current) {
+          const r = RIPPLE_MAX_R * easeOutQuad(lp); // fast out, easing to a stop
+          mesh.visible = true;
+          mesh.scale.setScalar(r);
+          mat.opacity = RIPPLE_PEAK * Math.pow(1 - lp, 1.3);
+          if (r > frontR) frontR = r;
         } else {
-          line.geometry.setDrawRange(0, Math.ceil(p * TUBE_SEGS) * TUBE_IDX_PER_SEG);
-          mat.uniforms.uOpacity.value = PULSE_OPACITY;
-          if (dot.current && !dotPlaced) {
-            dotPlaced = true;
-            dot.current.visible = true;
-            dot.current.position.copy(layout.arcs[i].getPoint(p));
-            dot.current.scale.setScalar(1 + 0.25 * Math.sin(t * 14));
-          }
+          mesh.visible = false;
         }
-      });
-      if (!dotPlaced && dot.current) dot.current.visible = false;
-
-      // step 5: both linked — the bright arcs settle to the idle threads
-      // (eased, not a linear cut)
-      const fade = easeInOut(
-        THREE.MathUtils.clamp((l.t - LINES_FADE[0]) / (LINES_FADE[1] - LINES_FADE[0]), 0, 1)
-      );
-      if (l.t >= LINES_FADE[0] && fx.current) {
-        for (const m of fx.current.lineMats)
-          m.uniforms.uOpacity.value = THREE.MathUtils.lerp(PULSE_OPACITY, IDLE_LINE, fade);
       }
+      // the leading front only ever grows — track its high-water mark so an
+      // acknowledgment can't be missed between frames
+      peakRadius.current = Math.max(peakRadius.current, frontR);
+
+      // step 3: acknowledgment — the front reaching a module's real distance
+      // flashes that module's lid, exactly once, at its own natural moment
+      for (let i = 0; i < 2; i++) {
+        if (!acked.current[i] && peakRadius.current >= layout.modDist[i]) {
+          acked.current[i] = true;
+          ackGlow.current[i] = 1;
+        }
+      }
+      if (acked.current[0] && acked.current[1] && bothAckT.current === Infinity) {
+        bothAckT.current = l.t;
+        // step 4: connection confirmed — NOW boot the sensor dashboard
+        if (screen.current.mode === "connecting") {
+          screen.current.mode = "boot";
+          screen.current.t = 0;
+        }
+      }
+
       if (l.t >= DONE_T) {
         l.phase = "done";
-        if (dot.current) dot.current.visible = false;
+        for (const m of ripples.current) if (m) m.visible = false;
         markLinkPlayed();
       }
     } else if (l.phase === "done") {
-      // idle: the links persist as barely-there threads (an already-played
-      // session lands here on frame one, so the settled state is asserted,
-      // not just inherited from the fade), LEDs breathing on a slow loop
-      if (fx.current) {
-        for (const line of fx.current.lines)
-          line.geometry.setDrawRange(0, TUBE_SEGS * TUBE_IDX_PER_SEG);
-        for (const m of fx.current.lineMats) m.uniforms.uOpacity.value = IDLE_LINE;
-      }
+      // idle: nothing broadcast, LEDs breathing on a slow loop
+      for (const m of ripples.current) if (m) m.visible = false;
       l.idle += dt;
       const ip = (l.idle % IDLE_PERIOD) / IDLE_DUR;
       led = LED_ON + (ip < 1 ? 0.25 * Math.sin(Math.PI * ip) : 0);
@@ -649,25 +588,20 @@ export default function PulseModel({ progress }: { progress: number }) {
     DOME_MAT.emissiveIntensity = led * 0.3; // domes glow softer than slivers
     LED_MAT.emissiveIntensity = led;
 
-    // ---- acknowledgment glows: flash on arrival, settle to a faint breath
-    halos.current.forEach((h, i) => {
-      if (!h) return;
-      const m = h.material as THREE.MeshBasicMaterial;
-      // exponential decay — a flash of light dying away, not a linear ramp
-      ackFlash.current[i] *= Math.exp(-dt / ACK_TAU);
-      const settled = l.phase === "done" || ackFired.current[i];
-      const ambient = settled ? AMBIENT_BASE + AMBIENT_AMP * Math.sin(t * 0.8 + i * 2.4) : 0;
-      m.opacity = Math.min(0.7, ambient + ackFlash.current[i] * ACK_FLASH);
-    });
+    // ---- submodule lid acknowledgment flash: brief brighten, exp. decay ----
+    for (let i = 0; i < 2; i++) {
+      ackGlow.current[i] *= Math.exp(-dt / ACK_TAU);
+      LID_MATS[i].emissiveIntensity = LID_BASE + ackGlow.current[i] * ACK_BOOST;
+    }
 
-    // ---- live display ----
+    // ---- gated display ----
     const scr = screen.current;
     if (scr.mode === "off") {
-      if (l.phase !== "waiting") {
-        scr.mode = "boot";
-        scr.t = 0;
-      }
-      drawScreen(0, 0, false);
+      // hold dark until the hub powers, then show the LINKING state
+      if (l.phase === "running") scr.mode = "connecting";
+      drawScreen("off");
+    } else if (scr.mode === "connecting") {
+      drawScreen("connecting", 0, 0, Math.floor((l.t * 2.6) % 3));
     } else if (scr.mode === "boot") {
       scr.t += dt;
       const p = Math.min(1, scr.t / BOOT_S);
@@ -680,7 +614,7 @@ export default function PulseModel({ progress }: { progress: number }) {
         scr.mode = "live";
         scr.nextDrift = t + DRIFT_EVERY[0];
       }
-      drawScreen(scr.temp, scr.hum, true);
+      drawScreen("dash", scr.temp, scr.hum);
     } else {
       // live: gentle sensor drift — retarget every few seconds, ease toward
       // the target so tenths tick over naturally (skipped under reduced motion)
@@ -693,7 +627,7 @@ export default function PulseModel({ progress }: { progress: number }) {
         scr.temp = THREE.MathUtils.lerp(scr.temp, scr.tTemp, 0.04);
         scr.hum = THREE.MathUtils.lerp(scr.hum, scr.tHum, 0.04);
       }
-      drawScreen(scr.temp, scr.hum, true);
+      drawScreen("dash", scr.temp, scr.hum);
     }
   });
 
@@ -706,7 +640,7 @@ export default function PulseModel({ progress }: { progress: number }) {
       {/* slight downward tilt; scroll rotation inside */}
       <group rotation={[TILT_X, 0, 0]} position={[0, -0.05, 0]}>
         <group ref={group}>
-          {/* fit clamp wraps the whole composition — hub, arcs, submodules */}
+          {/* fit clamp wraps the whole composition — hub, ripples, submodules */}
           <group ref={fitGroup}>
             <group scale={layout.scale}>
               {/* stand the hub upright: face to camera, knob edge to floor */}
@@ -727,70 +661,44 @@ export default function PulseModel({ progress }: { progress: number }) {
               </group>
             </group>
 
-            {/* link arcs (bright during the entrance, barely-there at idle)
-                + the traveling pulse (entrance only) */}
-            <group ref={linesGroup} />
-            <mesh ref={dot} visible={false} renderOrder={4}>
-              <sphereGeometry args={[0.045, 16, 16]} />
-              <meshBasicMaterial
-                color={"#F0EAFF"}
-                transparent
-                opacity={0.95}
-                blending={THREE.AdditiveBlending}
-                depthWrite={false}
-                toneMapped={false}
-              />
-              {/* soft outer glow riding the same position */}
-              <mesh scale={2.4} renderOrder={4}>
-                <sphereGeometry args={[0.045, 12, 12]} />
+            {/* broadcast ripples — concentric rings on the floor, expanding
+                outward from the hub's centre (entrance only; hidden at idle) */}
+            {[0, 1, 2].map((i) => (
+              <mesh
+                key={i}
+                ref={(m) => {
+                  ripples.current[i] = m;
+                }}
+                rotation={[-Math.PI / 2, 0, 0]}
+                position={[0, layout.baseY + 0.012, 0]}
+                visible={false}
+                renderOrder={1}
+              >
+                <ringGeometry args={[0.86, 1, 72]} />
                 <meshBasicMaterial
-                  color={ENERGY}
+                  color={ACCENT}
                   transparent
-                  opacity={0.22}
-                  blending={THREE.AdditiveBlending}
+                  opacity={0}
                   depthWrite={false}
+                  side={THREE.DoubleSide}
+                  blending={THREE.AdditiveBlending}
                   toneMapped={false}
                 />
               </mesh>
-            </mesh>
+            ))}
 
-            {/* companion submodules — lying flat, violet caps up, flanking
-                the hub slightly behind and turned a touch inward */}
-            {[
-              { modScene: airScene, side: -1 },
-              { modScene: lightScene, side: 1 },
-            ].map(({ modScene, side }, i) => (
+            {/* companion submodules — lying flat, pale-purple caps up, at
+                deliberately different distances from the hub */}
+            {[airScene, lightScene].map((modScene, i) => (
               <group
                 key={i}
-                position={[side * MOD_X, layout.modY, MOD_Z]}
-                rotation={[0, -side * MOD_YAW, 0]}
+                position={[MODS[i].x, layout.modY, MODS[i].z]}
+                rotation={[0, MODS[i].x < 0 ? MOD_YAW : -MOD_YAW, 0]}
               >
                 <group rotation={[FLAT, 0, 0]} scale={MOD_SCALE}>
                   <primitive object={modScene} />
                 </group>
               </group>
-            ))}
-
-            {/* acknowledgment floor glows under each submodule */}
-            {[-1, 1].map((side, i) => (
-              <mesh
-                key={i}
-                ref={(m) => {
-                  halos.current[i] = m;
-                }}
-                rotation={[-Math.PI / 2, 0, 0]}
-                position={[side * MOD_X, layout.baseY - 0.015, MOD_Z]}
-                renderOrder={1}
-              >
-                <planeGeometry args={[layout.modFootprint * 1.9, layout.modFootprint * 1.9]} />
-                <meshBasicMaterial
-                  transparent
-                  opacity={0}
-                  depthWrite={false}
-                  blending={THREE.AdditiveBlending}
-                  toneMapped={false}
-                />
-              </mesh>
             ))}
           </group>
         </group>

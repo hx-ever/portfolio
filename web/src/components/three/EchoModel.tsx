@@ -72,19 +72,29 @@ function markFlightPlayed() {
 }
 
 // Materials authored here, matte from the start (brightness lessons applied):
-// no emissive anywhere, metalness only on genuinely metallic parts.
-// Dyson-inspired CMF: graphite engineered frame (top of the graphite range —
-// the studio rig is bright); crimson accents live only at the prop tips and
-// motor-mount rings. Sits at the same family base tone as the other models.
+// no emissive anywhere, metalness only on genuinely metallic parts. The frame
+// is tied to the section's deep crimson/plum background rather than neutral
+// graphite — a warm dark gunmetal (R>B>G, a plum undertone) — but NOT one
+// flat tone: the three structural families sit at deliberately different
+// values so the drone reads as a manufactured object with distinct
+// components. Crimson accents still live only at the prop tips + motor rings.
+// The studio rig below keeps all three tones clearly lit against the dark bg.
 const FRAME_MAT = new THREE.MeshStandardMaterial({
-  color: "#47484D",
-  roughness: 0.78,
-  metalness: 0.15,
+  color: "#54444A", // arms/chassis — the structural mid-tone anchor
+  roughness: 0.76,
+  metalness: 0.12,
 });
 const BODY_MAT = new THREE.MeshStandardMaterial({
-  color: "#505157",
-  roughness: 0.72,
-  metalness: 0.15,
+  color: "#5E4C52", // central hub/upper body — a step lighter + warmer, reads as the core
+  roughness: 0.7,
+  metalness: 0.12,
+});
+// landing legs — deeper and a touch cooler than the arms, so they recede
+// slightly (like a different-finish underside part on a real airframe).
+const LEG_MAT = new THREE.MeshStandardMaterial({
+  color: "#443A40",
+  roughness: 0.8,
+  metalness: 0.1,
 });
 const PCB_MAT = new THREE.MeshStandardMaterial({
   color: "#1E4D33",
@@ -134,8 +144,9 @@ function materialFor(name: string): THREE.Material {
   if (/^SOLID00[1-4]$/.test(name)) return MOTOR_MAT;
   if (/Pins/.test(name)) return PIN_MAT;
   if (/pcb|XIAO|Seeed|SOLID$|Shield|Body/.test(name)) return PCB_MAT;
-  if (/chassis|support/.test(name)) return FRAME_MAT;
-  return BODY_MAT;
+  if (/support/.test(name)) return LEG_MAT; // landing legs — own finish
+  if (/chassis/.test(name)) return FRAME_MAT; // arms/frame
+  return BODY_MAT; // central hub / upper body
 }
 
 /**

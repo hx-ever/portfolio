@@ -5,8 +5,9 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import SceneLights from "./SceneLights";
+import { SIGNATURE } from "@/lib/palette";
 
-const ACCENT = "#2997FF";
+const ACCENT = SIGNATURE; // signature copper rim light — the hero is chrome
 const MODEL = "/m_7.glb";
 const TARGET_HEIGHT = 2.15; // world units the base model is scaled to fill
 const WALK_SPEED_LOCAL = 0.72; // root units/sec from the "Walk (RM)" clip

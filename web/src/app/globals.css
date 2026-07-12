@@ -5,6 +5,12 @@
   --dim: #6e6e73;
   --hairline: rgba(255, 255, 255, 0.08);
 
+  /* Signature identity colour — warm copper/amber. Every cross-cutting UI
+     chrome element (nav, links, buttons, hero, dot rail, 404) uses this.
+     Mirrors SIGNATURE in src/lib/palette.ts — keep the two in sync. */
+  --signature: #d89e64;
+  --signature-rgb: 216, 158, 100;
+
   /* Site-wide stacking scale. Every cross-component z-index MUST come from
      this ladder (component-internal stacking may use small local values,
      which stay trapped in their own stacking context). Nothing outranks
@@ -76,7 +82,7 @@ textarea:focus-visible,
 select:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--accent-focus, #2997ff);
+  outline: 2px solid var(--signature);
   outline-offset: 3px;
   border-radius: 4px;
 }

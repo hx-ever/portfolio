@@ -1,3 +1,5 @@
+import { SIGNATURE, SECTION_COLORS } from "./palette";
+
 export type Layout = "model-left" | "model-right" | "model-center";
 
 export interface ShowcaseSection {
@@ -40,7 +42,9 @@ export interface ShowcaseSection {
   motion: string;
 }
 
-export const HERO_ACCENT = "#2997FF";
+// The hero + all shared chrome (Contact dock, Experience timeline, live
+// status) ride the site's single signature colour.
+export const HERO_ACCENT = SIGNATURE;
 
 export const SHOWCASES: ShowcaseSection[] = [
   {
@@ -54,8 +58,8 @@ export const SHOWCASES: ShowcaseSection[] = [
       "An ESP32-powered smart assistant with animated RoboEyes on an OLED display, motion-triggered wake behavior, and a two-knob control interface — enclosure, PCB, and firmware built as one system.",
     cta: "View case study",
     caseStudy: true,
-    accent: "#F0B24A",
-    glow: "240,178,74",
+    accent: SECTION_COLORS.auraeyez.accent,
+    glow: SECTION_COLORS.auraeyez.rgb,
     layout: "model-left",
     gradientFrom: "#060607",
     gradientTo: "#140D07",
@@ -75,8 +79,8 @@ export const SHOWCASES: ShowcaseSection[] = [
     // in-site case study (sensor-board PCB viewer + control-loop firmware
     // view); no public repo for this group project
     caseStudy: true,
-    accent: "#30D158",
-    glow: "48,209,88",
+    accent: SECTION_COLORS.landrover.accent,
+    glow: SECTION_COLORS.landrover.rgb,
     layout: "model-right",
     gradientFrom: "#140D06",
     gradientTo: "#0A1309",
@@ -95,8 +99,8 @@ export const SHOWCASES: ShowcaseSection[] = [
     // in-site case study (PCB viewer + firmware) — the GitHub repo link
     // lives inside it as the secondary footer link
     caseStudy: true,
-    accent: "#5AC8FA",
-    glow: "90,200,250",
+    accent: SECTION_COLORS.hxkeysair.accent,
+    glow: SECTION_COLORS.hxkeysair.rgb,
     layout: "model-center",
     gradientFrom: "#0A1309",
     gradientTo: "#0C0E15",
@@ -115,8 +119,8 @@ export const SHOWCASES: ShowcaseSection[] = [
     // minimal in-site case study (description + repo link); the repo lives in
     // the study's footer rather than as a direct external card link
     caseStudy: true,
-    accent: "#A78BFA",
-    glow: "167,139,250",
+    accent: SECTION_COLORS.corelink.accent,
+    glow: SECTION_COLORS.corelink.rgb,
     layout: "model-left",
     gradientFrom: "#0C0E15",
     gradientTo: "#100C16",
@@ -135,8 +139,8 @@ export const SHOWCASES: ShowcaseSection[] = [
     cta: "View case study",
     // minimal in-site case study (description + repo link)
     caseStudy: true,
-    accent: "#FF375F",
-    glow: "255,55,95",
+    accent: SECTION_COLORS.arx.accent,
+    glow: SECTION_COLORS.arx.rgb,
     layout: "model-right",
     gradientFrom: "#100C16",
     gradientTo: "#140913",

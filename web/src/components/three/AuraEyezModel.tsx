@@ -7,13 +7,14 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import SceneLights from "./SceneLights";
 import { GRAPHITE_DEEP } from "./materials";
+import { SECTION_COLORS } from "@/lib/palette";
 import { relBox } from "./relBox";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
 import type { SectionPointer } from "@/lib/useSectionPointer";
 
 const MODEL = "/auraeyez.glb";
-const ACCENT = "#F0B24A"; // warm amber — matches the device's knob + section glow
+const ACCENT = SECTION_COLORS.auraeyez.accent; // warm amber — the palette anchor
 const TARGET_WIDTH = 1.55; // world units the 80mm device face is scaled to fill
 
 // GLB mesh names (GLTFLoader strips the dots from Blender's "Body1.008" etc.)
@@ -28,8 +29,10 @@ const BODY_MATERIAL = "ABS (White)"; // enclosure shell
 // Device palette — Dyson-inspired CMF: graphite engineered body, with the
 // saturated amber concentrated only at the interaction/technology points
 // (knobs, PIR ring, OLED frame edge). The white eyes stay the focal glow.
-const KNOB_COLOR = "#FFB627"; // knobs: saturated jewel-amber
-const ACCENT_EDGE = "#F5A623"; // PIR ring + OLED frame edge
+// knobs + PIR ring/OLED edge: the section amber, one hue. The knob's
+// metalness supplies the jewel sheen without needing a louder colour.
+const KNOB_COLOR = ACCENT;
+const ACCENT_EDGE = ACCENT;
 
 // --- OLED screen (canvas texture) geometry, in canvas pixels ---
 // Eye look & behaviour follow the FluxGarage RoboEyes library (default mood +
@@ -369,10 +372,10 @@ export default function AuraEyezModel({
     c.width = c.height = 128;
     const ctx = c.getContext("2d")!;
     const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, "rgba(240,178,74,0)");
-    g.addColorStop(0.42, "rgba(240,178,74,0)");
-    g.addColorStop(0.56, "rgba(240,178,74,0.85)");
-    g.addColorStop(1, "rgba(240,178,74,0)");
+    g.addColorStop(0, "rgba(216,158,100,0)");
+    g.addColorStop(0.42, "rgba(216,158,100,0)");
+    g.addColorStop(0.56, "rgba(216,158,100,0.85)");
+    g.addColorStop(1, "rgba(216,158,100,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
     const tex = new THREE.CanvasTexture(c);

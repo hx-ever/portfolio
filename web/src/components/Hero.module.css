@@ -11,8 +11,8 @@
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(760px 540px at 76% 40%, color-mix(in oklab, #2997ff 18%, transparent), transparent 66%),
-    radial-gradient(620px 500px at 4% 98%, rgba(191, 90, 242, 0.13), transparent 62%);
+    radial-gradient(760px 540px at 76% 40%, color-mix(in oklab, var(--signature) 18%, transparent), transparent 66%),
+    radial-gradient(620px 500px at 4% 98%, rgba(var(--signature-rgb), 0.12), transparent 62%);
 }
 
 /* Full-viewport-width character layer, above the text so no part of the
@@ -52,7 +52,7 @@
 }
 
 .dot {
-  color: #2997ff;
+  color: var(--signature);
 }
 
 .tagline {
@@ -68,12 +68,15 @@
   width: 36px;
   height: 3px;
   border-radius: 2px;
-  background: linear-gradient(90deg, #0a84ff, #bf5af2);
+  /* a warm-metal sheen within the single signature family (copper → amber) */
+  background: linear-gradient(90deg, #c98a4e, #ebc488);
   flex-shrink: 0;
 }
 
 .taglineText {
-  background: linear-gradient(93deg, #0a84ff 0%, #bf5af2 35%, #ff375f 68%, #ff9f0a 100%);
+  /* single signature colour, given depth by a copper → amber sheen rather
+     than the old multi-hue sweep of the (now retired) section palette */
+  background: linear-gradient(93deg, #c98a4e 0%, var(--signature) 45%, #ebc488 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

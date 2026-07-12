@@ -31,6 +31,6 @@
 .dot[data-active="true"] {
   height: 22px;
   border-radius: 999px;
-  background: var(--dot-color, #2997ff);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--dot-color, #2997ff) 65%, transparent);
+  background: var(--dot-color, var(--signature));
+  box-shadow: 0 0 12px color-mix(in oklab, var(--dot-color, var(--signature)) 65%, transparent);
 }

@@ -20,8 +20,10 @@ const LOC_RADIUS_FRAC = 0.009; // highlight cluster radius as fraction of width
 const PULSE_MS = 4000; // breathing period for highlighted clusters
 
 const DIM = { r: 148, g: 160, b: 178 }; // resting dot tint
-const BLUE = { r: 41, g: 151, b: 255 }; // #2997FF
-const PURPLE = { r: 191, g: 90, b: 242 }; // #BF5AF2
+// Highlight tones — the site signature (copper) and a deeper copper, so the
+// map's active clusters stay in the single chrome family. (= SIGNATURE)
+const SIG = { r: 216, g: 158, b: 100 }; // #D89E64 — signature copper
+const SIG_DEEP = { r: 198, g: 122, b: 66 }; // #C67A42 — deeper copper for cluster depth
 
 const LOCATIONS = [
   { label: "SINGAPORE", lon: 103.82, lat: 1.35, dx: 16, dy: 16 },
@@ -70,16 +72,16 @@ const mix = (
 const rgba = (c: { r: number; g: number; b: number }, a: number) =>
   `rgba(${c.r.toFixed(0)}, ${c.g.toFixed(0)}, ${c.b.toFixed(0)}, ${a.toFixed(3)})`;
 
-// Base dots: always-visible muted tint at rest, ramping to the blue accent.
+// Base dots: always-visible muted tint at rest, ramping to the copper accent.
 // The rest alpha keeps the whole map clearly readable with no cursor at all.
 const BASE_LUT = Array.from({ length: STEPS + 1 }, (_, i) => {
   const t = i / STEPS;
-  return rgba(mix(DIM, BLUE, t), 0.24 + 0.7 * t);
+  return rgba(mix(DIM, SIG, t), 0.24 + 0.7 * t);
 });
-// Highlight clusters: blue/purple blend, never dim.
+// Highlight clusters: a copper blend within the signature family, never dim.
 const LOC_LUT = Array.from({ length: STEPS + 1 }, (_, i) => {
   const t = i / STEPS;
-  return rgba(mix(mix(BLUE, PURPLE, 0.4), mix(BLUE, PURPLE, 0.15), t), 0.3 + 0.7 * t);
+  return rgba(mix(mix(SIG, SIG_DEEP, 0.4), mix(SIG, SIG_DEEP, 0.15), t), 0.3 + 0.7 * t);
 });
 
 const dotRadius = (t: number) => 1.05 + 0.55 * t;

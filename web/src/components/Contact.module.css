@@ -19,7 +19,7 @@
   pointer-events: none;
   background: radial-gradient(
     720px 560px at -8% 52%,
-    color-mix(in oklab, var(--accent) 14%, rgba(191, 90, 242, 0.5)),
+    color-mix(in oklab, var(--accent) 14%, rgba(var(--signature-rgb), 0.5)),
     transparent 68%
   );
   opacity: 0.5;
@@ -160,7 +160,7 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: 0 14px 30px rgba(41, 151, 255, 0.5);
+  box-shadow: 0 14px 30px rgba(var(--signature-rgb), 0.5);
   opacity: var(--glow, 0);
   transition: opacity 170ms ease-out;
 }
@@ -207,8 +207,8 @@
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(41, 151, 255, 0.35),
-    rgba(41, 151, 255, 0.12) 55%,
+    rgba(var(--signature-rgb), 0.35),
+    rgba(var(--signature-rgb), 0.12) 55%,
     transparent 72%
   );
   animation: ripple 450ms ease-out forwards;

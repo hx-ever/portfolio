@@ -9,8 +9,9 @@ import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
+import { SECTION_COLORS } from "@/lib/palette";
 
-const ACCENT = "#5AC8FA";
+const ACCENT = SECTION_COLORS.hxkeysair.accent; // soft teal
 const MODEL = "/hxkeysair.glb";
 const TARGET_LONG = 1.62; // world units the board's long axis is scaled to fill
 
@@ -47,7 +48,7 @@ const MCU_NODE = "Arduino_Pro_Micro1";
 // Dyson-inspired CMF: deep-navy enclosure; the section's saturated
 // sky-blue lives ONLY on the keycaps — the surfaces the user's fingers touch.
 // Switches beneath stay dark neutral so the interaction point reads alone.
-const CAP_ACCENT = "#2188C8"; // one further subtle step down from #259BE3
+const CAP_ACCENT = ACCENT; // accent keycaps carry the section teal (same hue)
 const CASE_MESHES = /^(Structure|Upper_Plate|Lower_Plate|Base)$/;
 // enclosure: deep rich navy, matte per the established treatment
 const CASE_MAT = new THREE.MeshStandardMaterial({ color: "#1E2C4E", roughness: 0.75, metalness: 0.1 });

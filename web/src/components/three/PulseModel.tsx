@@ -9,17 +9,16 @@ import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
+import { SECTION_COLORS } from "@/lib/palette";
 
 const MODEL = "/corelink.glb";
 const AIR_MODEL = "/airmodule.glb";
 const LIGHT_MODEL = "/lightmodule.glb";
-// The section's pale-purple theme. Lightness is matched to AuraEyez's amber
-// knobs (#FFB627 ≈ HSL 40°/100%/58%, perceived luma ≈ 0.73): a violet at
-// that raw HSL lightness reads dark because blue carries so little luma, so
-// the accent sits at HSL 255°/92%/76% (luma ≈ 0.60) — the same "light and
-// bright relative to its own hue" weight, expressed as a pale purple.
-const ACCENT = "#A78BFA";
-const ACCENT_RGB = "167, 139, 250";
+// The section's soft periwinkle-violet — one of the five matched jewel hues.
+// Drives every accent point: knobs, dome/LED emissives, submodule lids, the
+// screen rings, and the broadcast ripples.
+const ACCENT = SECTION_COLORS.corelink.accent;
+const ACCENT_RGB = SECTION_COLORS.corelink.rgb;
 const TARGET_WIDTH = 1.5; // world units the hub's footprint is scaled to fill
 
 // The GLB lies on its back: the interface face (knobs, domes, screen inlay)

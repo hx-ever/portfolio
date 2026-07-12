@@ -7,9 +7,10 @@ import * as THREE from "three";
 import { relBox } from "./relBox";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp } from "./useFitClamp";
+import { SECTION_COLORS } from "@/lib/palette";
 
 const MODEL = "/arx.glb";
-const ACCENT = "#FF375F";
+const ACCENT = SECTION_COLORS.arx.accent; // soft warm rose
 const TARGET_WIDTH = 1.6; // world units the frame's footprint is scaled to fill
 // Worst-case half-extents of the assembled drone as presented (diagonal
 // footprint under scroll yaw + tilt + hover jitter), used by the live
@@ -112,7 +113,7 @@ const PIN_MAT = new THREE.MeshStandardMaterial({
   metalness: 0.8,
 });
 // props: slightly glossier dark plastic, distinct from the matte frame
-const TIP_ACCENT = "#FF375F"; // saturated crimson — prop tips + motor rings
+const TIP_ACCENT = ACCENT; // soft rose — prop tips + motor rings (same section hue)
 const RING_MAT = new THREE.MeshStandardMaterial({
   color: TIP_ACCENT,
   roughness: 0.4,

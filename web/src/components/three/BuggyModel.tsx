@@ -9,8 +9,9 @@ import SceneLights from "./SceneLights";
 import { relBox } from "./relBox";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { useFitClamp, worstCaseHalfExtents } from "./useFitClamp";
+import { SECTION_COLORS } from "@/lib/palette";
 
-const ACCENT = "#30D158";
+const ACCENT = SECTION_COLORS.landrover.accent; // soft moss green
 const MODEL = "/buggy.glb";
 const TARGET_LENGTH = 1.55; // world units the buggy's wheelbase axis fills (+15%)
 

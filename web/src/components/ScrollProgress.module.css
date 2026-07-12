@@ -7,7 +7,7 @@
   right: 0;
   height: 2px;
   z-index: var(--z-rail);
-  background: linear-gradient(90deg, #0a84ff, #bf5af2);
+  background: linear-gradient(90deg, #c98a4e, var(--signature));
   opacity: 0.75;
   transform: scaleX(0);
   transform-origin: left center;

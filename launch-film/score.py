@@ -142,7 +142,7 @@ bed = np.zeros((int(SR * (DUR + 2)), 2))
 Dadd9, G, Bm, Asus = [146.83, 220.0, 329.63, 369.99], [196.0, 246.94, 293.66, 369.99], [123.47, 246.94, 293.66, 369.99], [110.0, 220.0, 293.66, 329.63]
 hold0 = ev("land")["t"] + 0.3
 sections = [(Dadd9, 0.6, 4.1, 0.05), (G, 4.1, 6.0, 0.055), (Bm, 6.0, 7.45, 0.06), (Asus, 7.45, hold0, 0.065),
-            (Asus, ev("shoot", i=2)["t"], ev("close")["t"], 0.05), ([146.83, 220.0, 293.66, 369.99, 440.0], ev("close")["t"], DUR - 0.9, 0.06)]
+            (Asus, ev("shoot", i=2)["t"], ev("close")["t"], 0.05), ([146.83, 220.0, 293.66, 369.99, 440.0], ev("close")["t"], ev("close")["t"] + 1.0, 0.06)]
 for chordf, t0, t1, g in sections:
     a, x = pad(chordf, t0, t1, g, attack=0.35 if t0 > 1 else 0.9, release=0.25 if abs(t1 - hold0) < 0.01 else 0.9)
     bed[a:a + len(x), 0] += x; bed[a:a + len(x), 1] += x * 0.97

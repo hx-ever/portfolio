@@ -1,0 +1,593 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>hxstudio — one copper trace</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #060607; }
+  #gl, #grain, #vig { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  #vig { pointer-events: none; background: radial-gradient(ellipse 78% 74% at 50% 48%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.5) 100%); }
+  #grain { pointer-events: none; }
+  #hud { position: absolute; left: 16px; top: 12px; font: 12px/1.4 monospace; color: #f5f5f7; white-space: pre; display: none; }
+</style>
+</head>
+<body>
+<canvas id="gl" width="1920" height="1080"></canvas>
+<div id="vig"></div>
+<canvas id="grain" width="1920" height="1080"></canvas>
+<div id="hud"></div>
+<script src="vendor/three.bundle.js"></script>
+<script src="gen/assets.js"></script>
+<script src="motion.js"></script>
+<script src="models.js"></script>
+<script>
+/* One copper trace — a 15 s launch film for hankhsu.com.
+ * One board, world units in millimetres (x right, z toward the viewer, y up). A copper trace leaves the period of
+ * "Hsu Hsin-Wei.", routes through each build's real PCB layout, each board rises into its product, and the trace
+ * comes home as the h logo and the wordmark. Every value is a function of t; __seek(t) is pure. */
+const { clamp, lerp, seg, sstep, spring, ring, ease } = OM;
+const Q = new URLSearchParams(location.search);
+const W = 1920, H = 1080, DUR = 15;
+const ACC = FILM_MODELS.ACCENT;
+const COPPER = '#D89E64', LOGO_ORANGE = '#F7931E', LOGO_YELLOW = '#FFE21F';
+
+// ─────────────────────────────── timeline ───────────────────────────────
+const T = {
+  padOn: 0.15, aStart: 0.70, aEnd: 1.95,
+  aurRise: 2.24, aurBoot: 2.52, aurEyes: 2.82, aurBlink: 3.70, aurGlance: 3.90,
+  bStart: 4.06, bEnd: 4.84,
+  lrRise: 5.08, drive0: 6.04, drive1: 7.40,
+  bus0: 7.42, busV: 1420, busC: 0.11,
+  l4Start: 10.24, logoFill: 0.40, wordDur: 0.68,
+};
+
+// ─────────────────────────────── layout (mm) ───────────────────────────────
+const AUR = { x: 430, z: -190, w: 74.041, h: 85.5218 };
+const LR = { x: 70, z: -205, w: 124.9934, h: 74.803 };
+const HXK = { x: -400, z: 205, w: 76.2762, h: 96.3676 };
+const CL = { x: -20, z: 222, w: 132, h: 58 };
+const ARX = { x: 320, z: 212, w: 128, h: 96 };
+const JX = -330;                                  // where the buggy brakes; the bus leaves from under it
+const FONT_MM = 74, BASE_Z = 26;                  // wordmark size and baseline
+let LOCK;                                         // measured in __ready: logo + wordmark + period pad
+
+// ─────────────────────────────── renderer ───────────────────────────────
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.02)];   // products rise through the board
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#060607');
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new THREEX.RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.9;
+const camera = new THREE.PerspectiveCamera(30, W / H, 4, 20000);
+scene.add(new THREE.AmbientLight('#ffffff', 0.55));
+const key = new THREE.DirectionalLight('#fff7ec', 1.35);
+key.position.set(-380, 900, 520); key.target.position.set(0, 0, 0); scene.add(key, key.target);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.6;
+Object.assign(key.shadow.camera, { left: -760, right: 760, top: 560, bottom: -560, near: 100, far: 2600 }); key.shadow.camera.updateProjectionMatrix();
+const headLight = new THREE.PointLight(COPPER, 0, 230, 0); headLight.position.y = 26; scene.add(headLight);
+
+// ─────────────────────────────── the board ───────────────────────────────
+// Dark solder mask with a via grid every 20 mm — something for the camera to slide against.
+const board = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShaderMaterial({
+  toneMapped: false,
+  vertexShader: `varying vec2 vP; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `varying vec2 vP;
+    void main(){
+      vec2 g = mod(vP + 10.0, 20.0) - 10.0; float d = length(g); float fw = fwidth(d) * 1.2;
+      float dotA = 1.0 - smoothstep(0.85 - fw, 0.85 + fw, d);
+      float fade = clamp(1.6 - fwidth(vP.x) * 1.4, 0.0, 1.0);          // vias fade where they would alias
+      float ringA = (1.0 - smoothstep(0.3 - fw, 0.3 + fw, d));
+      vec3 base = vec3(0.034, 0.037, 0.038), via = vec3(0.085, 0.088, 0.088);
+      vec3 c = mix(base, via, dotA * fade * 0.9); c = mix(c, base * 0.7, ringA * fade);
+      gl_FragColor = vec4(c, 1.0); }`,
+}));
+board.rotation.x = -Math.PI / 2; scene.add(board);
+const shadowCatch = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: 0.55 }));
+shadowCatch.rotation.x = -Math.PI / 2; shadowCatch.position.y = 0.04; shadowCatch.receiveShadow = true; scene.add(shadowCatch);
+
+// ─────────────────────────────── reveal planes ───────────────────────────────
+// Two textures on one plane: the dim version everywhere, the lit one inside a radius from an origin (mode 0) or left
+// of a moving x (mode 1), with a bright front. Used for the PCBs, the logo and the wordmark. Textures stay raw sRGB.
+const REVEAL_FS = `uniform sampler2D tDim, tLit; uniform vec2 uSize, uOrigin; uniform float uR, uW, uMode, uDim, uFront, uAlpha; uniform vec3 uTint;
+  varying vec2 vUv;
+  void main(){
+    vec2 p = vUv * uSize; vec4 a = texture2D(tDim, vUv); vec4 b = texture2D(tLit, vUv);
+    float d = uMode < 0.5 ? length(p - uOrigin) : (p.x - uOrigin.x);
+    float m = 1.0 - smoothstep(uR - uW, uR, d);
+    float front = exp(-pow((d - uR + uW * 0.5) / (uW * 0.6), 2.0)) * uFront * step(0.001, uR);
+    vec4 c = mix(vec4(a.rgb, a.a * uDim), b, m);
+    c.rgb += uTint * front * max(a.a, b.a) * 1.2; c.a = max(c.a, max(a.a, b.a) * front * 0.9);
+    gl_FragColor = vec4(c.rgb, c.a * uAlpha); }`;
+function revealPlane(dim, lit, wmm, hmm, tint) {
+  const tex = c => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; t.anisotropy = 8; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t; };
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, toneMapped: false,
+    uniforms: { tDim: { value: tex(dim) }, tLit: { value: tex(lit) }, uSize: { value: new THREE.Vector2(wmm, hmm) },
+      uOrigin: { value: new THREE.Vector2() }, uR: { value: 0 }, uW: { value: 10 }, uMode: { value: 0 }, uDim: { value: 1 },
+      uFront: { value: 1 }, uAlpha: { value: 1 }, uTint: { value: new THREE.Color(tint || '#ffffff') } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = vec2(uv.x, uv.y); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: REVEAL_FS,
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(wmm, hmm), mat);
+  m.rotation.x = -Math.PI / 2;
+  // uv (0,0) is the plane's bottom-left as drawn; with the −90° tilt that is (−w/2, +h/2) on the board.
+  m.toLocal = (bx, bz) => [bx - (m.position.x - wmm / 2), (m.position.z + hmm / 2) - bz];
+  m.renderOrder = 1;
+  return m;
+}
+const canvasOf = (w, h) => { const c = document.createElement('canvas'); c.width = Math.round(w); c.height = Math.round(h); return c; };
+async function svgCanvas(svg, w, h) {
+  const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode();
+  const c = canvasOf(w, h); c.getContext('2d').drawImage(img, 0, 0, w, h); return c;
+}
+const recolor = (svg, map) => Object.entries(map).reduce((s, [a, b]) => s.split(a).join(b).split(a.toLowerCase()).join(b), svg);
+const mixHex = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
+
+// A KiCad layout → dim (unpowered copper) and lit (the project's accent) versions.
+async function pcbPlane(name, spec, accent) {
+  const svg = ASSETS.svg[name], PX = 16;
+  const dim = recolor(svg, { '#C83434': '#4a3523', '#4D7FC4': '#2f241a', '#FFFFFF': '#0b0c0c', '#F2EDA1': '#5d5a54', '#C2C2C2': '#3b3936', '#D0D2CD': '#3b3936' });
+  const lit = recolor(svg, { '#C83434': accent, '#4D7FC4': mixHex(accent, '#0b0c0c', 0.45), '#FFFFFF': '#0b0c0c', '#F2EDA1': '#ece8df', '#C2C2C2': '#8f8a82', '#D0D2CD': '#8f8a82' });
+  const p = revealPlane(await svgCanvas(dim, spec.w * PX, spec.h * PX), await svgCanvas(lit, spec.w * PX, spec.h * PX), spec.w, spec.h, accent);
+  p.position.set(spec.x, 0.08, spec.z); scene.add(p); return p;
+}
+// CoreLink and Arx have no exported layout: a footprint drawn in the same KiCad grammar.
+function footprintPlane(spec, accent, kind) {
+  const PX = 16, w = spec.w * PX, h = spec.h * PX;
+  const draw = (c, col) => {
+    const g = c.getContext('2d'), u = PX;
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = col.edge; g.lineWidth = 0.25 * u; g.strokeRect(1 * u, 1 * u, w - 2 * u, h - 2 * u);
+    g.strokeStyle = col.cu; g.fillStyle = col.cu; g.lineWidth = 0.9 * u;
+    const pad = (x, y, r = 0.95) => { g.beginPath(); g.arc(x * u, y * u, r * u, 0, 7); g.fill(); g.fillStyle = col.hole; g.beginPath(); g.arc(x * u, y * u, 0.42 * u, 0, 7); g.fill(); g.fillStyle = col.cu; };
+    const line = pts => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * u, y * u) : g.moveTo(x * u, y * u))); g.stroke(); };
+    const W2 = spec.w, H2 = spec.h;
+    if (kind === 'corelink') {
+      for (let i = 0; i < 14; i++) { pad(16 + i * 2.54 * 2, 10); pad(16 + i * 2.54 * 2, 48); }
+      g.strokeStyle = col.cu2; g.lineWidth = 0.6 * u;
+      for (let i = 0; i < 14; i += 2) line([[16 + i * 5.08, 10], [16 + i * 5.08, 18], [26 + i * 5.08, 28], [26 + i * 5.08, 38], [16 + i * 5.08, 48]]);
+      g.strokeStyle = col.cu; g.lineWidth = 0.9 * u;
+      line([[W2 / 2, 1], [W2 / 2, 6], [16 + 6 * 5.08, 10]]);
+      g.strokeStyle = col.silk; g.lineWidth = 0.3 * u; g.strokeRect(10 * u, 6 * u, (W2 - 20) * u, (H2 - 12) * u);
+      g.beginPath(); g.arc(30 * u, 29 * u, 9 * u, 0, 7); g.stroke(); g.beginPath(); g.arc((W2 - 30) * u, 29 * u, 9 * u, 0, 7); g.stroke();
+    } else {
+      const cx = W2 / 2, cy = H2 / 2, mx = 35.4;
+      g.strokeStyle = col.silk; g.lineWidth = 0.3 * u;
+      for (const [sx, sy] of [[1, 1], [-1, -1], [1, -1], [-1, 1]]) { g.beginPath(); g.arc((cx + sx * mx) * u, (cy + sy * mx * 0.82) * u, 17 * u, 0, 7); g.stroke(); }
+      g.strokeRect((cx - 14) * u, (cy - 14) * u, 28 * u, 28 * u);
+      g.strokeStyle = col.cu; g.lineWidth = 0.9 * u;
+      for (const [sx, sy] of [[1, 1], [-1, -1], [1, -1], [-1, 1]]) { line([[cx + sx * 10, cy + sy * 10], [cx + sx * mx * 0.7, cy + sy * mx * 0.58]]); pad(cx + sx * mx, cy + sy * mx * 0.82, 1.6); }
+      line([[cx, 1], [cx, cy - 14]]);
+      for (let i = 0; i < 7; i++) { pad(cx - 7.6 + i * 2.54, cy + 16.5, 0.8); pad(cx - 7.6 + i * 2.54, cy - 16.5, 0.8); }
+    }
+  };
+  const dim = canvasOf(w, h), lit = canvasOf(w, h);
+  draw(dim, { edge: '#3b3936', cu: '#4a3523', cu2: '#2f241a', hole: '#0b0c0c', silk: '#5d5a54' });
+  draw(lit, { edge: '#8f8a82', cu: accent, cu2: mixHex(accent, '#0b0c0c', 0.45), hole: '#0b0c0c', silk: '#ece8df' });
+  const p = revealPlane(dim, lit, spec.w, spec.h, accent);
+  p.position.set(spec.x, 0.08, spec.z); scene.add(p); return p;
+}
+// Silkscreen text on the board (designators, wordmark, tagline): a canvas per string, dim and lit.
+function textPlane(str, font, mmPx, dimCol, litCol, tint, opts = {}) {
+  const PX = opts.px || 10, probe = canvasOf(8, 8).getContext('2d'); probe.font = font(mmPx * PX);
+  const m = probe.measureText(str), pad = 4 * PX;
+  const w = Math.ceil(m.width + pad * 2), asc = Math.ceil(m.actualBoundingBoxAscent), desc = Math.ceil(m.actualBoundingBoxDescent);
+  const h = asc + desc + pad * 2;
+  const mk = col => { const c = canvasOf(w, h), g = c.getContext('2d'); g.font = font(mmPx * PX); g.fillStyle = col; g.textBaseline = 'alphabetic'; g.fillText(str, pad, pad + asc); return c; };
+  const p = revealPlane(mk(dimCol), mk(litCol), w / PX, h / PX, tint);
+  p.textW = m.width / PX; p.pad = pad / PX; p.asc = asc / PX;
+  // place by the text's own left baseline
+  p.placeAt = (x, z) => p.position.set(x - p.pad + w / PX / 2, 0.09, z - (p.pad + p.asc) + h / PX / 2);
+  return p;
+}
+
+// ─────────────────────────────── traces ───────────────────────────────
+// A route is corner points plus a fillet radius per corner, sampled every 0.6 mm; drawn as a ribbon whose drawRange
+// is the revealed length, with a soft additive halo and a vertex-colour gradient along it.
+function route(pts, radii) {
+  const P = pts.map(([x, z]) => new THREE.Vector2(x, z)), out = [P[0].clone()];
+  const arcTo = (A, B, c, r) => {
+    let a0 = Math.atan2(A.y - c.y, A.x - c.x), a1 = Math.atan2(B.y - c.y, B.x - c.x), da = a1 - a0;
+    while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const n = Math.max(2, Math.ceil(Math.abs(da) * r / 0.6));
+    for (let i = 1; i <= n; i++) { const a = a0 + da * i / n; out.push(new THREE.Vector2(c.x + r * Math.cos(a), c.y + r * Math.sin(a))); }
+  };
+  const lineTo = B => { const A = out[out.length - 1], L = A.distanceTo(B), n = Math.max(1, Math.ceil(L / 0.6)); for (let i = 1; i <= n; i++) out.push(A.clone().lerp(B, i / n)); };
+  for (let i = 1; i < P.length - 1; i++) {
+    const u = P[i].clone().sub(P[i - 1]).normalize(), v = P[i + 1].clone().sub(P[i]).normalize();
+    const turn = Math.acos(clamp(u.dot(v), -1, 1)), r = (Array.isArray(radii) ? radii[i - 1] : radii) || 0;
+    if (turn < 1e-3 || r <= 0) { lineTo(P[i]); continue; }
+    const td = r * Math.tan(turn / 2), A = P[i].clone().addScaledVector(u, -td), B = P[i].clone().addScaledVector(v, td);
+    const cross = u.x * v.y - u.y * v.x, perp = new THREE.Vector2(-u.y, u.x).multiplyScalar(cross > 0 ? r : -r);
+    lineTo(A); arcTo(A, B, A.clone().add(perp), r);
+  }
+  lineTo(P[P.length - 1]);
+  const cum = [0]; for (let i = 1; i < out.length; i++) cum.push(cum[i - 1] + out[i].distanceTo(out[i - 1]));
+  return { pts: out, cum, L: cum[cum.length - 1] };
+}
+function at(R, s) {
+  s = clamp(s, 0, R.L); let lo = 0, hi = R.cum.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (R.cum[m] <= s) lo = m; else hi = m; }
+  const k = (s - R.cum[lo]) / Math.max(1e-6, R.cum[hi] - R.cum[lo]);
+  return { x: lerp(R.pts[lo].x, R.pts[hi].x, k), z: lerp(R.pts[lo].y, R.pts[hi].y, k), i: lo };
+}
+function ribbon(R, width, colorAt, { y = 0.14, halo = 7.5, haloOp = 0.2 } = {}) {
+  const n = R.pts.length, mk = (w) => {
+    const pos = new Float32Array(n * 6), col = new Float32Array(n * 6), idx = [];
+    for (let i = 0; i < n; i++) {
+      const a = R.pts[Math.max(0, i - 1)], b = R.pts[Math.min(n - 1, i + 1)];
+      let tx = b.x - a.x, tz = b.y - a.y; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      const nx = -tz * w / 2, nz = tx * w / 2, p = R.pts[i], c = colorAt(R.cum[i] / R.L);
+      pos.set([p.x + nx, y, p.y + nz, p.x - nx, y, p.y - nz], i * 6); col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
+      if (i < n - 1) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); return g;
+  };
+  const core = new THREE.Mesh(mk(width), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  const glow = new THREE.Mesh(mk(halo), new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false, transparent: true, opacity: haloOp, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  core.renderOrder = 3; glow.renderOrder = 2; glow.position.y = -0.02;
+  scene.add(glow, core);
+  return { R, core, glow, set(s0, s1) {
+    const i0 = s1 <= s0 ? 0 : at(R, s0).i, i1 = s1 <= s0 ? 0 : Math.min(n - 1, at(R, s1).i + 1), c = Math.max(0, i1 - i0) * 6;
+    core.geometry.setDrawRange(i0 * 6, c); glow.geometry.setDrawRange(i0 * 6, c); core.visible = glow.visible = c > 0;
+  } };
+}
+const gradient = (...stops) => k => {
+  const n = stops.length - 1, i = Math.min(n - 1, Math.floor(k * n)), f = k * n - i;
+  return new THREE.Color(stops[i]).lerp(new THREE.Color(stops[i + 1]), clamp(f));
+};
+// The current: an additive glow and a small light at the head of whichever trace is running.
+const glowTex = (() => {
+  const c = canvasOf(256, 256), g = c.getContext('2d'), gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.12, 'rgba(255,255,255,0.85)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.25)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256); const t = new THREE.CanvasTexture(c); return t;
+})();
+function decal(size, color, y = 0.06) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: glowTex, color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = y; m.renderOrder = 4; scene.add(m); return m;
+}
+const heads = [0, 1, 2, 3].map(() => decal(30, COPPER, 0.3));
+
+// ─────────────────────────────── build (in __ready) ───────────────────────────────
+let M, PCB = {}, TXT = {}, TR = {}, POOL = {}, PAD, PADGLOW, LOGO, RINGS = [], BUSARR = [], DRIVE;
+const LANES = [-12, -4, 4, 12];
+
+function busLane(o, peel) {
+  // left from under the braked buggy, down the board's left side, right under the wordmark, then peel off
+  const zh = 125 - o, xv = -470 + o, pts = [[JX + 30, LR.z + o], [xv, LR.z + o], [xv, zh], [peel.x, zh], [peel.x, peel.z]];
+  return route(pts, [40 - o, 40 - o, 10]);
+}
+const busS = tau => tau <= 0 ? 0 : T.busV * (tau - T.busC * (1 - Math.exp(-tau / T.busC)));   // soft start, then a steady race
+function busT(s) { let lo = 0, hi = 5; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (busS(m) < s) lo = m; else hi = m; } return hi; }
+
+async function build() {
+  await Promise.all([
+    ['FilmDisplay', ASSETS.font.display, '200 800'], ['FilmMono', ASSETS.font.mono, '500'], ['FilmMono', ASSETS.font.mono6, '600'], ['FilmBody', ASSETS.font.body, '400 700'],
+  ].map(async ([fam, b64, w]) => { const f = new FontFace(fam, Uint8Array.from(atob(b64), c => c.charCodeAt(0)), { weight: w }); await f.load(); document.fonts.add(f); }));
+
+  // the lockup: [h] Hsu Hsin-Wei[.] — the period is the copper pad the film starts on
+  const word = textPlane('Hsu Hsin-Wei', px => `800 ${px}px FilmDisplay`, FONT_MM, '#121212', '#f5f5f7', '#ffffff', { px: 8 });
+  const logoH = FONT_MM * 1.0, logoW = logoH * 208.52 / 232.55, gap = FONT_MM * 0.34, padR = FONT_MM * 0.082;
+  const lockW = logoW + gap + word.textW + FONT_MM * 0.3, x0 = -lockW / 2;
+  LOCK = { logoX: x0, logoW, logoH, textX: x0 + logoW + gap, textW: word.textW };
+  LOCK.P0 = { x: LOCK.textX + word.textW + FONT_MM * 0.15, z: BASE_Z - padR * 1.02, r: padR };
+  LOCK.stemX = LOCK.logoX + logoW * 0.085;
+  word.placeAt(LOCK.textX, BASE_Z); scene.add(word); TXT.word = word;
+  word.material.uniforms.uMode.value = 1; word.material.uniforms.uW.value = 26; word.material.uniforms.uDim.value = 1;
+  // logo: the site's h, dim copper until the current arrives
+  const LPX = 10, logoSvg = ASSETS.svg.hankhsu_logo_icon;
+  const lit = await svgCanvas(logoSvg, logoW * LPX, logoH * LPX), dimC = canvasOf(logoW * LPX, logoH * LPX), dg = dimC.getContext('2d');
+  dg.filter = 'grayscale(1) brightness(0.09) sepia(0.6)'; dg.drawImage(lit, 0, 0);
+  LOGO = revealPlane(dimC, lit, logoW, logoH, LOGO_YELLOW); LOGO.position.set(LOCK.logoX + logoW / 2, 0.09, BASE_Z - logoH / 2); scene.add(LOGO);
+  LOGO.material.uniforms.uW.value = 22;
+  // tagline
+  TXT.tag = textPlane('— Design Engineer', px => `500 ${px}px FilmMono`, 17, COPPER, COPPER, COPPER, { px: 10 });
+  TXT.url = textPlane('hankhsu.com', px => `500 ${px}px FilmMono`, 17, '#8d8d92', '#8d8d92', '#ffffff', { px: 10 });
+  TXT.tag.placeAt(LOCK.textX + 2, BASE_Z + 46); TXT.url.placeAt(LOCK.P0.x + LOCK.P0.r - TXT.url.textW, BASE_Z + 46);
+  scene.add(TXT.tag, TXT.url);
+  // the pad
+  PAD = new THREE.Mesh(new THREE.CircleGeometry(padR, 64), new THREE.MeshBasicMaterial({ color: '#4a3523', toneMapped: false }));
+  PAD.rotation.x = -Math.PI / 2; PAD.position.set(LOCK.P0.x, 0.12, LOCK.P0.z); PAD.renderOrder = 5; scene.add(PAD);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(padR * 0.36, 48), new THREE.MeshBasicMaterial({ color: '#0b0c0c', toneMapped: false }));
+  hole.rotation.x = -Math.PI / 2; hole.position.set(LOCK.P0.x, 0.13, LOCK.P0.z); hole.renderOrder = 6; scene.add(hole); PAD.hole = hole;
+  PADGLOW = decal(padR * 9, COPPER, 0.2);
+  PADGLOW.position.x = LOCK.P0.x; PADGLOW.position.z = LOCK.P0.z;
+
+  // boards
+  PCB.aur = await pcbPlane('auraeyez-pcb-top', AUR, ACC.auraeyez);
+  PCB.lr = await pcbPlane('buggy-pcb-top', LR, ACC.landrover);
+  PCB.hxk = await pcbPlane('hxkeysair-pcb-top', HXK, ACC.hxkeysair);
+  PCB.cl = footprintPlane(CL, ACC.corelink, 'corelink');
+  PCB.arx = footprintPlane(ARX, ACC.arx, 'arx');
+  const label = (s, spec, col, dz) => { const p = textPlane(s, px => `600 ${px}px FilmMono`, 8.5, '#3f3d3a', col, col, { px: 14 }); p.placeAt(spec.x - spec.w / 2, spec.z + dz); scene.add(p); return p; };
+  TXT.lAur = label('U1  AURAEYEZ', AUR, ACC.auraeyez, -AUR.h / 2 - 7);
+  TXT.lLr = label('U2  LAND ROVER', LR, ACC.landrover, -LR.h / 2 - 7);
+  TXT.lHxk = label('U3  HXKEYS AIR', HXK, ACC.hxkeysair, HXK.h / 2 + 16);
+  TXT.lCl = label('U4  CORELINK', CL, ACC.corelink, CL.h / 2 + 16);
+  TXT.lArx = label('U5  ARX', ARX, ACC.arx, ARX.h / 2 + 16);
+
+  // routes
+  const P0 = LOCK.P0, ax = AUR.x, aEntry = AUR.z + AUR.h / 2, kneeX = P0.x + 60;
+  TR.a = ribbon(route([[P0.x + P0.r * 0.6, P0.z], [kneeX, P0.z], [ax, P0.z - (ax - kneeX)], [ax, aEntry]], [8, 8]), 2.4, gradient(COPPER, COPPER, ACC.auraeyez));
+  const bx0 = AUR.x - AUR.w / 2, bz = AUR.z - 6, lrE = LR.x + LR.w / 2;
+  TR.b = ribbon(route([[bx0, bz], [lrE + Math.abs(LR.z - bz), bz], [lrE, LR.z]], [8]), 2.4, gradient(ACC.auraeyez, ACC.landrover));
+  TR.c = ribbon(route([[LR.x - LR.w / 2, LR.z], [JX + 30, LR.z]], []), 2.4, gradient(ACC.landrover, ACC.landrover));
+  const peels = [{ x: HXK.x, z: HXK.z - HXK.h / 2 }, { x: CL.x, z: CL.z - CL.h / 2 }, { x: ARX.x, z: ARX.z - ARX.h / 2 }, { x: LOCK.stemX, z: BASE_Z + 1 }];
+  const ends = [ACC.hxkeysair, ACC.corelink, ACC.arx, LOGO_ORANGE];
+  TR.bus = LANES.map((o, i) => ribbon(busLane(o, peels[i]), 2.0, gradient(ACC.landrover, mixHex(ACC.landrover, ends[i], 0.5), ends[i]), { halo: 6.5 }));
+  BUSARR = TR.bus.map((r, i) => (i < 3 ? T.bus0 : T.l4Start) + busT(r.R.L));
+  T.hxk = BUSARR[0]; T.cl = BUSARR[1]; T.arx = BUSARR[2]; T.logo = BUSARR[3];
+  T.word0 = T.logo + T.logoFill * 0.8; T.close = T.word0 + T.wordDur; T.tag = T.close + 0.1;
+
+  // glow pools under each build (the site's section glow, on the board)
+  POOL.aur = decal(330, ACC.auraeyez); POOL.lr = decal(420, ACC.landrover); POOL.hxk = decal(300, ACC.hxkeysair);
+  POOL.cl = decal(320, ACC.corelink); POOL.arx = decal(320, ACC.arx); POOL.logo = decal(260, LOGO_ORANGE);
+  for (const [k, s] of [['aur', AUR], ['lr', LR], ['hxk', HXK], ['cl', CL], ['arx', ARX]]) { POOL[k].position.x = s.x; POOL[k].position.z = s.z; }
+  POOL.logo.position.set(LOCK.logoX + logoW / 2, 0.06, BASE_Z - logoH / 2);
+  // CoreLink's link pulse: rings on the board
+  for (let i = 0; i < 2; i++) {
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.96, 1, 96), new THREE.MeshBasicMaterial({ color: ACC.corelink, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    r.rotation.x = -Math.PI / 2; r.position.set(CL.x, 0.2, CL.z); r.renderOrder = 4; scene.add(r); RINGS.push(r);
+  }
+
+  // models
+  M = await FILM_MODELS.load(THREE, THREEX);
+  for (const [k, s] of [['auraeyez', AUR], ['buggy', LR], ['hxkeysair', HXK], ['corelink', CL], ['arx', ARX]]) {
+    const m = M[k]; m.group.position.set(s.x, -999, s.z); scene.add(m.group);
+    m.group.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+  }
+  M.buggy.group.rotation.y = Math.PI;                          // caster leads: it drives toward −x
+  // the buggy's drive: ease in, cruise, brake hard — integrated once, sampled by u
+  DRIVE = (() => { const N = 2000, v = u => sstep(0, 0.3, u) * (u < 0.68 ? 1 : Math.pow(1 - (u - 0.68) / 0.32, 1.15)), c = [0];
+    for (let i = 1; i <= N; i++) c.push(c[i - 1] + v((i - 0.5) / N) / N); return u => c[Math.round(clamp(u) * N)] / c[N]; })();
+}
+
+// ─────────────────────────────── state: pure functions of t ───────────────────────────────
+const rise = (t, t0, h, zeta = 0.72, omega = 11) => t < t0 ? -h - 1 : -h * (1 - spring(t - t0, zeta, omega));
+const buggyX = t => lerp(LR.x, JX, DRIVE(seg(t, T.drive0, T.drive1)));
+function propAngle(t) {
+  const t0 = T.arx + 0.06, t1 = T.arx + 0.78, D = 0.5, w0 = 62;
+  if (t < t0) return 0; const up = Math.min(t, t1) - t0; let a = w0 * (up - 0.05 * (1 - Math.exp(-up / 0.05)));
+  if (t > t1) { const u = Math.min(t - t1, D); a += w0 * (u - u * u / (2 * D)); } return a;
+}
+function arxLift(t) { const t0 = T.arx; return 34 * ease.cubicOut(seg(t, t0 + 0.14, t0 + 0.4)) * (1 - Math.pow(seg(t, t0 + 0.52, t0 + 0.74), 3)); }
+
+// where the current is: [{x, z, color, on}] for each running head
+function headsAt(t) {
+  const out = [], P0 = LOCK.P0;
+  const add = (R, s, col, on = 1) => { const p = at(R, s); out.push({ x: p.x, z: p.z, color: col, on }); };
+  if (t >= T.aStart && t < T.aEnd + 0.12) add(TR.a.R, sA(t), COPPER, 1 - seg(t, T.aEnd, T.aEnd + 0.12));
+  if (t >= T.bStart && t < T.bEnd + 0.12) add(TR.b.R, sB(t), mixHex(ACC.auraeyez, ACC.landrover, seg(t, T.bStart, T.bEnd)), 1 - seg(t, T.bEnd, T.bEnd + 0.12));
+  if (t >= T.drive0 && t < T.drive1 + 0.1) add(TR.c.R, sC(t), ACC.landrover, 1 - seg(t, T.drive1, T.drive1 + 0.1));
+  TR.bus.forEach((b, i) => { const t0 = i < 3 ? T.bus0 : T.l4Start; if (t >= t0 && t < BUSARR[i] + 0.12) add(b.R, busS(t - t0), [ACC.hxkeysair, ACC.corelink, ACC.arx, LOGO_ORANGE][i], 1 - seg(t, BUSARR[i], BUSARR[i] + 0.12)); });
+  return out;
+}
+const sA = t => TR.a.R.L * ease.quintInOut(seg(t, T.aStart, T.aEnd));
+const sB = t => TR.b.R.L * ease.expoInOut(seg(t, T.bStart, T.bEnd));
+const sC = t => t < T.drive0 ? 0 : clamp((LR.x - LR.w / 2) - (buggyX(t) - 92), 0, TR.c.R.L);
+
+// ─────────────────────────────── camera ───────────────────────────────
+// A shot is {x, z, d, pitch, yaw} (look point on the board, distance, degrees from vertical, degrees about y).
+// Keys reach their shot on a library curve; chase shots read the head's own position, keyed slightly ahead.
+const SH = {
+  pad:   t => ({ x: LOCK.P0.x, z: LOCK.P0.z, d: 64, pitch: 7, yaw: 0 }),
+  chaseA: t => { const p = at(TR.a.R, sA(t + 0.025)); return { x: p.x, z: p.z, d: lerp(64, 430, ease.cubicInOut(seg(t, T.aStart, T.aEnd))), pitch: lerp(7, 30, seg(t, T.aStart, T.aEnd)), yaw: lerp(0, -8, seg(t, T.aStart, T.aEnd)) }; },
+  aur:   t => ({ x: AUR.x - 4, z: AUR.z + 6, d: 300, pitch: 47, yaw: -16 }),
+  chaseB: t => { const p = at(TR.b.R, sB(t + 0.06)); return { x: p.x, z: p.z + 10, d: 470, pitch: 40, yaw: -4 }; },
+  lr:    t => ({ x: LR.x + 6, z: LR.z + 12, d: 520, pitch: 52, yaw: 14 }),
+  drive: t => ({ x: buggyX(t + 0.08) - 50, z: LR.z + 10, d: 560, pitch: 58, yaw: 22 }),
+  burst: t => ({ x: -55, z: 92, d: 1080, pitch: 36, yaw: 0 }),
+  final: t => ({ x: 0, z: -4, d: 1300, pitch: 14, yaw: 0 }),
+};
+// [time the shot is fully reached, shot, curve into it]
+const KEYS = [
+  [0, 'pad'], [T.aStart, 'pad'],
+  [T.aStart + 0.18, 'chaseA', ease.sineInOut], [T.aEnd - 0.05, 'chaseA'],
+  [T.aEnd + 0.52, 'aur', ease.cubicInOut], [T.bStart - 0.02, 'aur'],
+  [T.bStart + 0.16, 'chaseB', ease.expoInOut], [T.bEnd - 0.05, 'chaseB'],
+  [T.bEnd + 0.6, 'lr', ease.cubicInOut], [T.drive0 - 0.04, 'lr'],
+  [T.drive0 + 0.42, 'drive', ease.sineInOut], [T.drive1 + 0.02, 'drive'],
+  [T.drive1 + 0.82, 'burst', ease.expoOut], [9.35, 'burst'],
+];
+function addFinalKeys() { KEYS.push([T.l4Start, 'burst'], [T.logo + 0.35, 'final', ease.cubicInOut], [DUR, 'final']); }
+const SHAKES = () => [[T.drive1, 5, 9], [T.hxk + 0.05, 7, 10], [T.cl + 0.05, 6, 10], [T.arx + 0.74, 6, 10]];
+function shotAt(t) {
+  let i = 0; while (i < KEYS.length - 1 && KEYS[i + 1][0] <= t) i++;
+  const [ta, na] = KEYS[i]; if (i === KEYS.length - 1) return SH[na](t);
+  const [tb, nb, curve] = KEYS[i + 1], A = SH[na](t), B = SH[nb](t);
+  if (na === nb) return A;
+  const k = (curve || ease.cubicInOut)(seg(t, ta, tb));
+  return { x: lerp(A.x, B.x, k), z: lerp(A.z, B.z, k), d: Math.exp(lerp(Math.log(A.d), Math.log(B.d), k)), pitch: lerp(A.pitch, B.pitch, k), yaw: lerp(A.yaw, B.yaw, k) };
+}
+// the operator: a slow two-sine hand while moving, none in the holds; a shake on each landing
+const handEnv = t => sstep(0.75, 1.2, t) * (1 - sstep(3.0, 3.35, t)) + sstep(4.0, 4.3, t) * (1 - sstep(8.9, 9.3, t)) + sstep(T.l4Start, T.l4Start + 0.3, t) * (1 - sstep(T.logo + 0.1, T.logo + 0.5, t));
+function camAt(t) {
+  const s = shotAt(t), e = handEnv(t) * 0.006 * s.d;
+  let x = s.x + e * (Math.sin(1.7 * t) + 0.6 * Math.sin(2.9 * t + 1)), z = s.z + e * (Math.sin(1.3 * t + 2) + 0.5 * Math.sin(3.3 * t)), roll = 0;
+  for (const [th, amp, decay] of SHAKES()) { const k = OM.shake(t, th, { amp, decay, seed: Math.round(th * 100) }); x += k.x * s.d / 1000; z += k.y * s.d / 1000; roll += k.rot * 0.4; }
+  return { x, z, d: s.d, pitch: s.pitch, yaw: s.yaw, roll };
+}
+function placeCamera(cam, c) {
+  const p = THREE.MathUtils.degToRad(c.pitch), y = THREE.MathUtils.degToRad(c.yaw);
+  cam.position.set(c.x + c.d * Math.sin(p) * Math.sin(y), c.d * Math.cos(p), c.z + c.d * Math.sin(p) * Math.cos(y));
+  cam.up.set(Math.sin(y) * 0 + Math.sin(c.roll || 0), 1, 0).normalize();
+  if (c.pitch < 1) cam.up.set(0, 0, -1);
+  cam.lookAt(c.x, 0, c.z);
+  cam.updateMatrixWorld(true);
+}
+
+// ─────────────────────────────── seek ───────────────────────────────
+const accentOf = k => ({ aur: ACC.auraeyez, lr: ACC.landrover, hxk: ACC.hxkeysair, cl: ACC.corelink, arx: ACC.arx })[k];
+function setReveal(p, origin, r, w) { const u = p.material.uniforms, o = p.toLocal(origin.x, origin.z); u.uOrigin.value.set(o[0], o[1]); u.uR.value = r; if (w) u.uW.value = w; }
+
+function seek(t) {
+  // pad: dim copper, lights at padOn, flashes again when the loop closes
+  const on = sstep(T.padOn, T.padOn + 0.18, t), close = t >= T.close ? Math.exp(-(t - T.close) * 3.2) : 0;
+  PAD.material.color.set(mixHex('#4a3523', COPPER, on));
+  const pr = OM.press(t, T.padOn, { depth: 0.12 }), pr2 = OM.press(t, T.close, { depth: 0.14 });
+  PAD.scale.setScalar(1 - pr.sq * 0.6 - pr2.sq * 0.6); PAD.hole.scale.copy(PAD.scale);
+  PADGLOW.material.opacity = on * (0.35 - 0.2 * sstep(T.aStart, T.aStart + 0.5, t)) + 0.9 * close + 0.18 * sstep(T.close, T.close + 0.3, t);
+
+  // traces
+  TR.a.set(0, sA(t)); TR.b.set(0, sB(t)); TR.c.set(0, sC(t));
+  TR.bus.forEach((b, i) => b.set(0, busS(t - (i < 3 ? T.bus0 : T.l4Start))));
+
+  // boards light as the current arrives: a ripple from the entry
+  const rip = (p, t0, origin, rmax, w = 14) => { setReveal(p, origin, t < t0 ? 0 : rmax * ease.cubicOut(seg(t, t0, t0 + 0.5)), w); };
+  rip(PCB.aur, T.aEnd, { x: AUR.x, z: AUR.z + AUR.h / 2 }, 125);
+  rip(PCB.lr, T.bEnd, { x: LR.x + LR.w / 2, z: LR.z }, 150);
+  rip(PCB.hxk, T.hxk, { x: HXK.x, z: HXK.z - HXK.h / 2 }, 120);
+  rip(PCB.cl, T.cl, { x: CL.x, z: CL.z - CL.h / 2 }, 140);
+  rip(PCB.arx, T.arx, { x: ARX.x, z: ARX.z - ARX.h / 2 }, 140);
+  const lab = (p, t0) => setReveal(p, { x: p.position.x - 999, z: p.position.z }, t < t0 ? 0 : 999 + 140 * seg(t, t0, t0 + 0.35), 8);
+  lab(TXT.lAur, T.aEnd + 0.2); lab(TXT.lLr, T.bEnd + 0.2); lab(TXT.lHxk, T.hxk + 0.15); lab(TXT.lCl, T.cl + 0.15); lab(TXT.lArx, T.arx + 0.15);
+  POOL.aur.material.opacity = 0.16 * sstep(T.aEnd + 0.1, T.aEnd + 0.9, t);
+  POOL.lr.material.opacity = 0.14 * sstep(T.bEnd + 0.1, T.bEnd + 0.9, t);
+  POOL.hxk.material.opacity = 0.16 * sstep(T.hxk, T.hxk + 0.5, t);
+  POOL.cl.material.opacity = 0.16 * sstep(T.cl, T.cl + 0.5, t);
+  POOL.arx.material.opacity = 0.16 * sstep(T.arx, T.arx + 0.5, t);
+  POOL.logo.material.opacity = 0.2 * sstep(T.logo, T.logo + 0.6, t);
+
+  // logo + wordmark close the loop
+  setReveal(LOGO, { x: LOCK.stemX, z: BASE_Z }, t < T.logo ? 0 : 120 * ease.cubicOut(seg(t, T.logo, T.logo + T.logoFill)), 22);
+  const wu = TXT.word.material.uniforms, wx = t < T.word0 ? -999 : lerp(-30, TXT.word.textW + 40, ease.smoother(seg(t, T.word0, T.close)));
+  wu.uOrigin.value.set(0, 0); wu.uR.value = t < T.word0 ? -999 : wx + TXT.word.pad;
+  for (const [k, dt] of [['tag', 0], ['url', 0.12]]) {
+    const r = OM.wordRise(t, T.tag + dt, { dist: 9, s0: 1 }), u = TXT[k].material.uniforms;
+    u.uR.value = 9999; u.uFront.value = 0; u.uAlpha.value = t < T.tag + dt ? 0 : r.op;
+    TXT[k].visible = t >= T.tag + dt; TXT[k].position.z = TXT[k].userData.z0 + r.y;
+  }
+
+  // products
+  const A = M.auraeyez, ay = rise(t, T.aurRise, A.size.y);
+  A.group.position.y = ay; A.group.visible = ay > -A.size.y - 0.5;
+  const boot = seg(t, T.aurBoot, T.aurBoot + 0.3), flick = boot > 0 && boot < 1 ? (Math.sin(boot * 40) > 0.2 ? 1 : 0.35) : boot;
+  const blink = 1 - (t >= T.aurBlink && t < T.aurBlink + 0.16 ? Math.sin(Math.PI * seg(t, T.aurBlink, T.aurBlink + 0.16)) * 0.94 : 0);
+  A.setScreen({ lit: flick, eyes: ease.cubicOut(seg(t, T.aurEyes, T.aurEyes + 0.35)), open: blink, gaze: -ease.expoOut(seg(t, T.aurGlance, T.aurGlance + 0.18)) });
+
+  const B = M.buggy, by = rise(t, T.lrRise, B.size.y, 0.74, 9), bxp = buggyX(t);
+  B.group.position.set(bxp, by, LR.z); B.group.visible = by > -B.size.y - 0.5;
+  const dip = 0.07 * ring(t - T.drive1 + 0.06, 6, 15) - 0.035 * ring(t - T.drive0, 5, 12);
+  B.group.rotation.set(0, Math.PI, 0); B.group.rotateZ(dip);
+  B.setRoll(LR.x - bxp);
+
+  const K = M.hxkeysair, ky = rise(t, T.hxk + 0.03, K.size.y, 0.55, 16), up = ease.expoOut(seg(t, T.hxk + 0.03, T.hxk + 0.2));
+  K.group.position.y = ky; K.group.visible = ky > -K.size.y - 0.5;
+  K.setCaps(c => 42 * up * (1 - spring(t - (T.hxk + 0.24 + c.wave * 0.16 + ((c.i * 47) % 19) / 19 * 0.04), 0.78, 13)));
+
+  const C = M.corelink, cy = rise(t, T.cl + 0.03, C.size.y, 0.6, 14);
+  C.group.position.y = cy; C.group.visible = cy > -C.size.y - 0.5;
+  C.setLeds(sstep(T.cl + 0.15, T.cl + 0.45, t)); C.setDash(ease.cubicOut(seg(t, T.cl + 0.2, T.cl + 0.8)));
+  RINGS.forEach((r, i) => { const k = seg(t, T.cl + 0.12 + i * 0.2, T.cl + 0.12 + i * 0.2 + 0.75); r.scale.setScalar(30 + 170 * ease.cubicOut(k)); r.material.opacity = k > 0 && k < 1 ? 0.55 * (1 - k) : 0; r.visible = k > 0 && k < 1; });
+
+  const X = M.arx, xy = rise(t, T.arx + 0.03, X.size.y, 0.6, 14), land = OM.impact(t, T.arx + 0.74, { sqx: 0.06, sqy: 0.08 });
+  X.group.position.y = xy + arxLift(t); X.group.visible = xy > -X.size.y - 0.5; X.group.scale.set(land.sx, land.sy, land.sx);
+  X.setProps(propAngle(t));
+
+  // the current
+  const hs = headsAt(t), cam = camAt(t);
+  heads.forEach((h, i) => {
+    const q = hs[i]; h.visible = !!q; if (!q) return;
+    h.position.x = q.x; h.position.z = q.z; h.material.color.set(q.color); h.material.opacity = 0.95 * q.on;
+    h.scale.setScalar(clamp(cam.d / 300, 0.3, 2.4));
+  });
+  if (hs.length) { headLight.position.x = hs[0].x; headLight.position.z = hs[0].z; headLight.color.set(hs[0].color); headLight.intensity = 3.2 * hs[0].on; } else headLight.intensity = 0;
+
+  placeCamera(camera, cam);
+  renderer.render(scene, camera);
+  if (Q.has('hud')) { const el = document.getElementById('hud'); el.style.display = 'block'; el.textContent = `t ${t.toFixed(2)}  d ${cam.d.toFixed(0)}  pitch ${cam.pitch.toFixed(1)}`; }
+  LAST_T = t;
+}
+let LAST_T = 0;
+
+// ─────────────────────────────── contract ───────────────────────────────
+function grain() {
+  const c = document.getElementById('grain'), g = c.getContext('2d'), img = g.createImageData(W, H), r = OM.rng(7);
+  for (let i = 0; i < W * H; i++) { const v = r() < 0.5 ? 0 : 255; img.data.set([v, v, v, Math.floor(r() * 7)], i * 4); }
+  g.putImageData(img, 0, 0);
+}
+const scratch = new THREE.PerspectiveCamera(30, W / H, 4, 20000);
+function project(c, pts) { placeCamera(scratch, c); return pts.map(p => { const v = new THREE.Vector3(p[0], p[1] || 0, p[2]).project(scratch); return [(v.x + 1) * W / 2, (1 - v.y) * H / 2, v.z]; }); }
+function movers(t) {
+  const pts = headsAt(t).map(h => [h.x, 0, h.z]);
+  pts.push([buggyX(t), rise(t, T.lrRise, M.buggy.size.y, 0.74, 9) + 120, LR.z], [AUR.x, rise(t, T.aurRise, M.auraeyez.size.y) + 47, AUR.z],
+    [HXK.x, rise(t, T.hxk + 0.03, M.hxkeysair.size.y, 0.55, 16) + 80, HXK.z], [CL.x, rise(t, T.cl + 0.03, M.corelink.size.y, 0.6, 14) + 104, CL.z],
+    [ARX.x + 50, rise(t, T.arx + 0.03, M.arx.size.y, 0.6, 14) + arxLift(t) + 28, ARX.z]);
+  return pts;
+}
+window.__motion = (t0, t1) => {
+  const c0 = camAt(t0), c1 = camAt(t1), grid = [];
+  for (const fx of [0.1, 0.5, 0.9]) for (const fy of [0.15, 0.5, 0.85]) {
+    placeCamera(scratch, c0); const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(fx * 2 - 1, 1 - fy * 2), scratch);
+    const hit = new THREE.Vector3(); if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) grid.push([hit.x, 0, hit.z]);
+  }
+  let far = 0;
+  const a = project(c0, grid), b = project(c1, grid); a.forEach((p, i) => { far = Math.max(far, Math.hypot(p[0] - b[i][0], p[1] - b[i][1])); });
+  const m0 = movers(t0), m1 = movers(t1), n = Math.min(m0.length, m1.length);
+  const pa = project(c0, m0.slice(0, n)), pb = project(c1, m1.slice(0, n));
+  for (let i = 0; i < n; i++) if (Math.abs(pa[i][2]) < 1 && Math.abs(pb[i][2]) < 1) far = Math.max(far, Math.hypot(pa[i][0] - pb[i][0], pa[i][1] - pb[i][1]));
+  if (t1 > T.arx && t0 < T.arx + 1.3) far = Math.max(far, 18 * Math.abs(propAngle(t1) - propAngle(t0)));   // prop tips
+  return far;
+};
+window.__track = () => {
+  // boxes on screen: each object's local box (cached once) through its current matrix, clipped to the frame,
+  // dropped when behind the camera or off frame
+  const box = (obj, op = 1) => {
+    if (!obj.visible || op <= 0.01) return null;
+    if (!obj.userData.lbox) { const inv = new THREE.Matrix4().copy(obj.matrixWorld).invert(), b = new THREE.Box3().setFromObject(obj); obj.userData.lbox = b.applyMatrix4(inv); }
+    const lb = obj.userData.lbox, P = [];
+    for (const x of [lb.min.x, lb.max.x]) for (const y of [lb.min.y, lb.max.y]) for (const z of [lb.min.z, lb.max.z]) {
+      const v = new THREE.Vector3(x, y, z).applyMatrix4(obj.matrixWorld); v.y = Math.max(v.y, 0); v.project(camera);
+      if (v.z < -1 || v.z > 1) return null; P.push([(v.x + 1) * W / 2, (1 - v.y) * H / 2]); }
+    const x0 = Math.max(0, Math.min(...P.map(p => p[0]))), x1 = Math.min(W, Math.max(...P.map(p => p[0])));
+    const y0 = Math.max(0, Math.min(...P.map(p => p[1]))), y1 = Math.min(H, Math.max(...P.map(p => p[1])));
+    return x1 - x0 < 2 || y1 - y0 < 2 ? null : { x: x0, y: y0, w: x1 - x0, h: y1 - y0, op };
+  };
+  const out = {}, t = LAST_T, hs = headsAt(t);
+  if (hs.length) { const [p] = project(camAt(t), [[hs[0].x, 0, hs[0].z]]); if (p[0] > -12 && p[0] < W + 12 && p[1] > -12 && p[1] < H + 12) out.head = { x: p[0] - 12, y: p[1] - 12, w: 24, h: 24, op: hs[0].on }; }
+  const lit = (t0, dur) => clamp((t - t0) / dur);
+  for (const [k, o, op] of [['aur', M.auraeyez.group, 1], ['buggy', M.buggy.group, 1], ['hxk', M.hxkeysair.group, 1], ['cl', M.corelink.group, 1], ['arx', M.arx.group, 1],
+    ['word', TXT.word, 0.08 + 0.92 * lit(T.word0, T.wordDur)], ['logo', LOGO, 0.08 + 0.92 * lit(T.logo, T.logoFill)], ['pad', PAD, 1]]) { const b = box(o, op); if (b) out[k] = b; }
+  return out;
+};
+window.__events = () => [
+  ['pad', T.padOn], ['shoot', T.aStart], ['arrive', T.aEnd, 'aur'], ['rise', T.aurRise, 'aur'], ['boot', T.aurBoot, 'aur'], ['eyes', T.aurEyes, 'aur'], ['blink', T.aurBlink, 'aur'], ['glance', T.aurGlance, 'aur'],
+  ['shoot', T.bStart], ['arrive', T.bEnd, 'lr'], ['rise', T.lrRise, 'lr'], ['drive', T.drive0, 'buggy'], ['brake', T.drive1 - 0.42, 'buggy'], ['stop', T.drive1, 'buggy'],
+  ['bus', T.bus0], ['hit', T.hxk, 'hxk'], ['caps', T.hxk + 0.36, 'hxk'], ['hit', T.cl, 'cl'], ['hit', T.arx, 'arx'], ['land', T.arx + 0.74, 'arx'],
+  ['shoot', T.l4Start], ['arrive', T.logo, 'logo'], ['word', T.word0, 'word'], ['close', T.close, 'pad'], ['tag', T.tag, 'pad'],
+].map(([name, t, who]) => {
+  const where = { aur: AUR, lr: LR, hxk: HXK, cl: CL, arx: ARX, logo: { x: LOCK.stemX, z: BASE_Z }, buggy: { x: buggyX(t), z: LR.z }, word: { x: LOCK.textX + LOCK.textW / 2, z: BASE_Z }, pad: LOCK.P0 }[who];
+  const hs = headsAt(t), p = where || (hs[0] ? { x: hs[0].x, z: hs[0].z } : { x: LOCK.P0.x, z: LOCK.P0.z });
+  const [q] = project(camAt(t), [[p.x, 0, p.z]]);
+  return { name, t: +t.toFixed(3), who, pan: +clamp((q[0] - W / 2) / (W / 2), -1, 1).toFixed(3) };
+});
+// continuous curves for the score, sampled at `rate` Hz: the current's speed on screen and its pan, the buggy's speed
+window.__curves = (rate = 240) => {
+  const n = Math.round(DUR * rate), cur = [], pan = [], drive = [], dt = 1 / rate;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate, h0 = headsAt(t), h1 = headsAt(t + dt);
+    let v = 0, pn = 0;
+    if (h0.length && h1.length) { const [a] = project(camAt(t), [[h0[0].x, 0, h0[0].z]]), [b] = project(camAt(t), [[h1[0].x, 0, h1[0].z]]); v = Math.hypot(b[0] - a[0], b[1] - a[1]) / dt * h0[0].on; pn = clamp((a[0] - W / 2) / (W / 2), -1, 1); }
+    cur.push(+v.toFixed(1)); pan.push(+pn.toFixed(3)); drive.push(+(Math.abs(buggyX(t + dt) - buggyX(t)) / dt).toFixed(1));
+  }
+  return { rate, current: cur, pan, drive, heads: Array.from({ length: n }, (_, i) => headsAt(i / rate).length) };
+};
+
+window.__ready = (async () => {
+  await build(); addFinalKeys(); grain();
+  for (const k of ['tag', 'url']) TXT[k].userData.z0 = TXT[k].position.z;
+  window.__meta = { dur: DUR, fps: 30, inFrame: { pad: [0, 0.7], head: [0.75, 1.9], aur: [2.6, 4.0], buggy: [5.6, 7.6], word: [12.0, 15, 'whole'], logo: [12.0, 15, 'whole'] } };
+  seek(0); return true;
+})();
+window.__seek = async t => { await window.__ready; seek(t); return true; };
+window.__meta = { dur: DUR, fps: 30 };
+
+if (Q.has('play')) window.__ready.then(() => { const t0 = performance.now(); const loop = () => { seek(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); }; loop(); });
+else if (Q.has('t')) window.__ready.then(() => seek(parseFloat(Q.get('t'))));
+</script>
+</body>
+</html>

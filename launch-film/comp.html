@@ -530,8 +530,8 @@ function buildCamera() {
     u5: t => ({ x: DEV.arx.x, z: DEV.arx.z + 4, h: 18, d: 360, pitch: 50, yaw: lerp(12, 18, seg(t, 7.3, 8.0)) }),
     end: t => ({ x: END.x, z: END.z, h: 0, d: END.d * (1 - 0.02 * ease.sineInOut(seg(t, T.push[0], T.push[1]))), pitch: END.pitch, yaw: 0 }),
   };
-  KEYS = [[0, 'macro'], [0.95, 'macro'], [1.35, 'track0', SETTLE], [2.05, 'track0'], [2.75, 'u1', SETTLE], [3.5, 'u1'],
-    [4.0, 'run1', TRAVEL], [4.1, 'run1'], [4.62, 'u2', SETTLE], [4.85, 'u2'], [5.45, 'u3', TRAVEL], [5.85, 'u3'], [6.45, 'u4', TRAVEL],
+  KEYS = [[0, 'macro'], [0.95, 'macro'], [1.4, 'track0', TRAVEL], [1.95, 'track0'], [2.85, 'u1', TRAVEL], [3.5, 'u1'],
+    [4.0, 'run1', TRAVEL], [4.1, 'run1'], [4.7, 'u2', TRAVEL], [4.85, 'u2'], [5.45, 'u3', TRAVEL], [5.85, 'u3'], [6.45, 'u4', TRAVEL],
     [6.85, 'u4'], [7.45, 'u5', TRAVEL], [8.0, 'u5'], [10.0, 'end', TRAVEL], [DUR, 'end']];
 }
 function shotAt(t) {
@@ -620,12 +620,11 @@ function seek(t) {
   // U2: status LED, the rover rolls a quarter turn into its spot
   const B = DEV.lr.m, r = SETTLE(seg(t, T.roll[0], T.roll[1]));
   B.setRoll(-ROVER_ROLL * (1 - r)); B.group.position.x = roverX(t); DEV.lr.contact.position.x = B.group.position.x;
-  B.led.visible = t >= T.build[1] + 0.4; B.led.set(t >= arrive(1) ? lerp(14, 3, end) * (0.35 + 0.65 * tintAmtOf(1, t)) * sstep(arrive(1), arrive(1) + 0.08, t) : 0, mixTint(TINT.landrover, '#FFF1DC', 1 - tintAmtOf(1, t)));
   // U3: keycaps light in a ripple from the corner the current enters
   const K = DEV.hxk.m, rk = T.ripple[0], kx0 = K.capGlow.length ? Math.min(...K.capGlow.map(c => c.x)) : 0;
-  K.setGlow(c => { const delay = (c.x - kx0) * 0.0035 + (c.z - DEV.hxk.z + 60) * 0.0012; const k = sstep(rk + delay, rk + delay + 0.12, t); return k * lerp(1.6, 0.9, end) * (0.45 + 0.55 * tintAmtOf(2, t)); }, mixTint(TINT.hxkeysair, '#FFF1DC', 1 - tintAmtOf(2, t)));
+  K.setGlow(c => { const delay = (c.x - kx0) * 0.0035 + (c.z - DEV.hxk.z + 60) * 0.0012; const k = sstep(rk + delay, rk + delay + 0.12, t); return k * lerp(0.9, 0.45, end) * (0.4 + 0.6 * tintAmtOf(2, t)); }, '#51BEC8');
   // U4: light-pipe ring and the radar ping, two 1 px rings out and gone in 0.8 s
-  const C = DEV.cl.m; C.ring.visible = t >= T.build[3] + 0.35; C.ring.set(t >= arrive(3) ? lerp(4.5, 1.0, end) * (0.05 + 0.95 * tintAmtOf(3, t)) * sstep(arrive(3), arrive(3) + 0.1, t) : 0, mixTint(TINT.corelink, '#FFF1DC', 1 - tintAmtOf(3, t)));
+  const C = DEV.cl.m; C.setLeds(t >= arrive(3) ? lerp(2.4, 0.8, end) * (0.4 + 0.6 * tintAmtOf(3, t)) * sstep(arrive(3) + 0.05, arrive(3) + 0.4, t) : 0);
   C.setDash(SETTLE(seg(t, arrive(3) + 0.05, arrive(3) + 0.7)));
   RINGS.forEach((rg, i) => { const k = seg(t, T.radar + i * 0.16, T.radar + i * 0.16 + 0.64); rg.scale.setScalar(lerp(70, 190, SETTLE(k)));
     rg.material.uniforms.uA.value = k > 0 && k < 1 ? (1 - k) * 0.9 : 0; rg.visible = k > 0 && k < 1; });
@@ -633,7 +632,6 @@ function seek(t) {
   const X = DEV.arx.m, p0 = T.props, spin = propAngle(t), blur = sstep(p0 + 0.18, p0 + 0.45, t);
   X.setProps(spin, blur, sstep(T.build[4] + 0.3, T.build[4] + 0.5, t));
   X.group.position.y = 10 * SETTLE(seg(t, p0 + 0.1, p0 + 0.7)) + 2 * Math.sin(2 * Math.PI * (t - p0) / 1.5) * sstep(p0 + 0.4, p0 + 0.9, t);
-  X.led.visible = t >= T.build[4] + 0.4; X.led.set(t >= arrive(4) ? lerp(14, 3, end) * (0.35 + 0.65 * tintAmtOf(4, t)) * sstep(arrive(4), arrive(4) + 0.08, t) : 0, mixTint(TINT.arx, '#FFF1DC', 1 - tintAmtOf(4, t)));
 
   // name: the h ignites, the glyphs rise from behind the baseline, the full stop lands
   const lg = seg(t, T.logo, T.logo + 0.35);
@@ -669,7 +667,7 @@ function propAngle(t) {
 // ─────────────────────────────── contract ───────────────────────────────
 function project(c, pts) { placeCam(scratch, c); return pts.map(p => { const v = new THREE.Vector3(p[0], p[1] || 0, p[2]).project(scratch); return [(v.x + 1) * W / 2, (1 - v.y) * H / 2, v.z]; }); }
 function movers(t) {
-  const pts = []; const h = headOf(t); if (h) pts.push([h.x, 0, h.z]);
+  const pts = [];                                   // fixed membership, so t0 and t1 compare the same points (pulses are measured per segment below)
   pts.push([DEV.lr.x - ROVER_ROLL * 54 * (1 - SETTLE(seg(t, T.roll[0], T.roll[1]))), 60, DEV.lr.z]);
   for (let i = 0; i < 5; i++) { const k = ORDER[i], bk = T.build[i] + 0.16; pts.push([DEV[k].x, DEV[k].h + 12 * (1 - SETTLE(seg(t, bk, bk + 0.6))), DEV[k].z]); }
   pts.push([DEV.arx.x, 10 * SETTLE(seg(t, T.props + 0.1, T.props + 0.7)) + 2 * Math.sin(2 * Math.PI * (t - T.props) / 1.5) * sstep(T.props + 0.4, T.props + 0.9, t) + 20, DEV.arx.z]);

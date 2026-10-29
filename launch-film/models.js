@@ -21,19 +21,19 @@
   // ── the rig's materials ────────────────────────────────────────────────────────────────────────────────────────
   function rig(THREE) {
     const P = (o) => new THREE.MeshPhysicalMaterial(o);
-    const carbonTex = (() => {               // 2/2 twill, 4 px per tow; tiled by the shader in object space
+    const carbonTex = (() => {               // 2/2 twill, 4 px per tow, light so it modulates the part's own colour
       const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
       for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
         const over = ((x + y) >> 1) % 2 === 0, x0 = x * 4, y0 = y * 4;
         const gr = over ? g.createLinearGradient(x0, y0, x0 + 4, y0) : g.createLinearGradient(x0, y0, x0, y0 + 4);
-        gr.addColorStop(0, '#141416'); gr.addColorStop(0.5, over ? '#2a2a2e' : '#232327'); gr.addColorStop(1, '#141416');
+        gr.addColorStop(0, '#a4a4a4'); gr.addColorStop(0.5, over ? '#ffffff' : '#e2e2e2'); gr.addColorStop(1, '#a4a4a4');
         g.fillStyle = gr; g.fillRect(x0, y0, 4, 4);
       }
       const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
     })();
     const carbon = P({ color: '#ffffff', roughness: 0.42, metalness: 0.0, clearcoat: 0.35, clearcoatRoughness: 0.35 });
     carbon.weaveTex = carbonTex;
-    return {
+    const R = {
       white: P({ color: '#E7E4DE', roughness: 0.45, metalness: 0, specularIntensity: 0.45, sheen: 0.25, sheenRoughness: 0.6, sheenColor: new THREE.Color('#ffffff') }),
       satin: P({ color: '#E9E6E0', roughness: 0.34, metalness: 0, specularIntensity: 0.5 }),
       frosted: P({ color: '#E4E9EA', roughness: 0.62, metalness: 0, specularIntensity: 0.4, sheen: 0.5, sheenRoughness: 0.8, sheenColor: new THREE.Color('#ffffff') }),
@@ -48,6 +48,16 @@
       motor: P({ color: '#18181A', roughness: 0.36, metalness: 0.75 }),
       carbon,
     };
+    // the site's own colour on the rig's surface: paint(kind, '#hex') or paint(kind, THREE.Color) for a CAD colour
+    const cache = new Map();
+    R.paint = (kind, color) => {
+      const key = kind + (color.isColor ? color.getHexString() : color);
+      if (!cache.has(key)) { const m = R[kind].clone(); m.weaveTex = R[kind].weaveTex; if (color.isColor) m.color.copy(color); else m.color.set(color); cache.set(key, m); }
+      return cache.get(key);
+    };
+    // a CAD material's own colour, dimmed the way the site dims near-white albedo
+    R.cad = std => { const c = std.color.clone(); if (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.55) c.multiplyScalar(0.85); return R.paint('white', c); };
+    return R;
   }
 
   // Every device material: the end-card dim/desaturate, and (for carbon) the weave in object space.
@@ -66,7 +76,7 @@
           .replace('#include <color_fragment>', `#include <color_fragment>
             vec3 an = abs(normalize(vObjN)); an /= (an.x + an.y + an.z);
             vec3 wv = texture2D(tWeave, vObj.yz / 8.0).rgb * an.x + texture2D(tWeave, vObj.xz / 8.0).rgb * an.y + texture2D(tWeave, vObj.xy / 8.0).rgb * an.z;
-            diffuseColor.rgb *= wv;`);
+            diffuseColor.rgb *= wv * 1.4;`);
       }
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uEnd;')
         .replace('#include <dithering_fragment>', `#include <dithering_fragment>
@@ -129,18 +139,19 @@
     g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
   }
 
-  // ── U1 AuraEyez ──────────────────────────────────────────────────────────────────────────────────────────────
+  // ── U1 AuraEyez — grey ABS body, copper knobs and PIR ring, black bezel, frosted PIR lens, graphite backplate ──
   async function auraeyez(THREE, THREEX, R) {
     const scene = await parse(THREEX, 'auraeyez');
     scene.traverse(o => {
       if (!o.isMesh) return;
-      if (o.name === 'Body1008' || o.name === 'Body1009') { o.material = R.brass; return; }
-      const n = [].concat(o.material)[0].name || '';
-      o.material = n === 'ABS (White)' ? R.white : n === 'Plastic - Glossy (Black)' ? R.gloss : n.startsWith('PEKK') ? R.brass
-        : n === 'Glass - Medium Color' ? R.frosted : n === 'Paint - Enamel Glossy (Yellow)' ? R.graphite : R.white;
+      if (o.name === 'Body1008' || o.name === 'Body1009') { o.material = R.paint('brass', '#D89E64'); return; }
+      const std = [].concat(o.material)[0], n = std.name || '';
+      o.material = n === 'ABS (White)' ? R.paint('white', '#AEAEB2') : n === 'Plastic - Glossy (Black)' ? R.paint('gloss', '#1E1E20')
+        : n.startsWith('PEKK') ? R.paint('brass', '#D89E64') : n === 'Glass - Medium Color' ? R.paint('frosted', '#DDE2E2')
+        : n === 'Paint - Enamel Glossy (Yellow)' ? R.paint('graphite', '#3A3A3D') : R.cad(std);
     });
     const m = partsOf(THREE, mount(THREE, scene, [Math.PI, 0, 0]));
-    // OLED: eyes drawn RoboEyes-style on a transparent canvas just above the cover glass; warm white with a copper glow
+    // OLED: eyes drawn RoboEyes-style on a transparent canvas just above the cover glass
     const glass = scene.getObjectByName('Body5002'), gb = new THREE.Box3().setFromObject(glass);
     const gc = gb.getCenter(new THREE.Vector3()), gs = gb.getSize(new THREE.Vector3());
     const W = 512, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -155,7 +166,7 @@
       g.clearRect(0, 0, W, H);
       if (eyes > 0) {
         const grow = 1 - Math.pow(1 - eyes, 3);
-        g.save(); g.globalAlpha = Math.min(1, eyes * 1.4); g.fillStyle = '#FFF1DC'; g.shadowColor = TINT.auraeyez; g.shadowBlur = 26;
+        g.save(); g.globalAlpha = Math.min(1, eyes * 1.4); g.fillStyle = '#ffffff'; g.shadowColor = 'rgba(255,255,255,0.55)'; g.shadowBlur = 22;
         for (const side of [-1, 1]) {
           const lean = 1 + 0.18 * Math.max(0, gaze * side), w = 135 * (0.85 + 0.15 * grow), h = 155 * grow * Math.max(0.05, open) * lean;
           const cx = W / 2 + side * 96 + gaze * 40, cy = H / 2;
@@ -169,29 +180,33 @@
     return m;
   }
 
-  // ── U2 Land Rover ────────────────────────────────────────────────────────────────────────────────────────────
+  // ── U2 Land Rover — green-grey plates, green boards with terminal blocks, blue electrolytic, silver and gold hardware ──
   async function buggy(THREE, THREEX, R) {
     const scene = await parse(THREEX, 'buggy');
-    const MATS = [['wheelwithout', R.graphite], ['tyre', R.rubber], ['motor', R.motor], ['gear', R.graphite], ['encoder', R.black],
-      ['batteryframe', R.graphite], ['battery', R.graphite], ['ballhousing', R.alu], ['ball', R.black]];
+    const PCB = R.paint('mask', '#237A3C'), TERM = R.paint('satin', '#52D96A'), CAP = R.paint('satin', '#2A36A0'), SILVER = R.paint('alu', '#B9BEC4'),
+      GOLD = R.paint('gold', '#C9A227'), IC = R.paint('black', '#141518'), CONN = R.paint('black', '#1B1C1F'), HEAD = R.paint('satin', '#C7CBD1');
+    const MATS = [['wheelwithout', R.paint('graphite', '#37383C')], ['tyre', R.paint('rubber', '#17181B')], ['motor', R.paint('motor', '#3A3F45')],
+      ['gear', R.paint('graphite', '#3E4046')], ['encoder', R.paint('black', '#1E1F22')], ['batteryframe', R.paint('white', '#333B36')],
+      ['battery', R.paint('graphite', '#2E3B4E')], ['ballhousing', R.paint('alu', '#9AA1AA')], ['ball', R.paint('black', '#26272B')]];
+    const PLATE = R.paint('white', '#333B36');
+    const EXPLICIT = { motordriverboard: PCB, motordriverboard001: TERM, motordriverboard002: TERM, motordriverboard003: TERM, motordriverboard004: TERM,
+      motordriverboard005: CAP, motordriverboard048: SILVER, motordriverboard049: SILVER, motordriverboard050: SILVER, motordriverboard051: SILVER,
+      motordriverboard052: CONN, stm32mountboard: PCB, stm32mountboard001: CONN, stm32mountboard002: HEAD, stm32mountboard003: SILVER,
+      stm32mountboard004: HEAD, stm32mountboard005: SILVER };
     scene.updateMatrixWorld(true);
     scene.traverse(o => {
       if (!o.isMesh) return;
       const n = o.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (n === 'motordriverboard' || n === 'stm32mountboard') { o.material = R.mask; return; }
-      const EXPLICIT = { motordriverboard001: R.graphite, motordriverboard002: R.graphite, motordriverboard003: R.graphite, motordriverboard004: R.graphite,
-        motordriverboard005: R.black, motordriverboard048: R.alu, motordriverboard049: R.alu, motordriverboard050: R.alu, motordriverboard051: R.alu,
-        motordriverboard052: R.black, stm32mountboard001: R.black, stm32mountboard002: R.graphite, stm32mountboard003: R.gold,
-        stm32mountboard004: R.graphite, stm32mountboard005: R.gold };
       if (EXPLICIT[n]) { o.material = EXPLICIT[n]; return; }
-      if (n.startsWith('motordriverboard') || n.startsWith('stm32mountboard')) {
+      if (n.startsWith('motordriverboard')) {
         const s = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()).multiplyScalar(1000), big = Math.max(s.x, s.y);
-        o.material = big >= 2 && big <= 3 && s.z <= 3.5 ? R.gold : s.z >= 6 && big <= 2.5 ? R.alu : R.black;
+        o.material = big >= 2 && big <= 3 && s.z <= 3.5 ? GOLD : s.z >= 6 && big <= 2.5 ? SILVER : IC;
         return;
       }
-      if (n.startsWith('connector') || n.startsWith('connplate')) { o.material = R.black; return; }
+      if (n.startsWith('stm32mountboard')) { o.material = IC; return; }
+      if (n.startsWith('connector') || n.startsWith('connplate')) { o.material = CONN; return; }
       const hit = MATS.find(([stem]) => n.startsWith(stem));
-      o.material = hit ? hit[1] : R.white;
+      o.material = hit ? hit[1] : PLATE;
     });
     const wheels = [];
     for (const name of ['Wheel', 'Wheel001']) {
@@ -202,27 +217,24 @@
     }
     const m = partsOf(THREE, mount(THREE, scene, [Math.PI / 2, 0, 0]));
     m.setRoll = ang => { for (const p of wheels) p.rotation.y = ang; };
-    const l = led(THREE, TINT.landrover, new THREE.SphereGeometry(2.6, 20, 12));
-    l.position.set(-m.size.x * 0.32, m.size.y + 1.2, m.size.z * 0.1); m.group.add(l); m.led = l;
     return m;
   }
 
-  // ── U3 Hxkeys Air ────────────────────────────────────────────────────────────────────────────────────────────
+  // ── U3 Hxkeys Air — navy case, teal keycaps and encoder knob; the rest in their CAD colours ──
   async function hxkeysair(THREE, THREEX, R) {
     const scene = await parse(THREEX, 'hxkeysair');
     const CAPS = ['MX_Normal_Tilted_v11', 'MX_Normal_Tilted_v12', 'MX_Normal_Tilted_v13', 'MX_Normal_Tilted_v14', 'MX_Normal_v11',
-      'MX_Normal_v12', 'MX_Normal_v13', 'MX_Normal_v14', '1x2_R3_v61', '1x2_R3_v62'];
+      'MX_Normal_v12', 'MX_Normal_v13', 'MX_Normal_v14', '1x2_R3_v61', '1x2_R3_v62', 'Body5012'];
     scene.traverse(o => {
       if (!o.isMesh) return;
-      o.material = /^(Structure|Upper_Plate|Lower_Plate|Base)$/.test(o.name) ? R.white : /Body5012/.test(o.parent && o.parent.name || '') || o.name === 'Body5012' ? R.brass : R.graphite;
+      o.material = /^(Structure|Upper_Plate|Lower_Plate|Base)$/.test(o.name) ? R.paint('white', '#1E2C4E') : R.cad([].concat(o.material)[0]);
     });
     const caps = CAPS.map(n => scene.getObjectByName(n)).filter(Boolean);
-    caps.forEach(c => c.traverse(o => { if (o.isMesh) o.material = R.frosted; }));
-    const knob = scene.getObjectByName('Body5012'); if (knob) knob.traverse(o => { if (o.isMesh) o.material = R.brass; });
+    caps.forEach(c => c.traverse(o => { if (o.isMesh) o.material = R.paint('frosted', '#51BEC8'); }));
     const m = partsOf(THREE, mount(THREE, scene, [-Math.PI / 2, 0, 0]));
-    // each cap's own materials glow in the ice tint, in a ripple from the corner the current enters
+    // each cap's own materials glow, in a ripple from the corner the current enters
     m.capGlow = caps.map(node => {
-      const mats = []; node.traverse(o => { if (o.isMesh) for (const mt of [].concat(o.material)) { mt.emissive = new THREE.Color(TINT.hxkeysair); mats.push(mt); } });
+      const mats = []; node.traverse(o => { if (o.isMesh) for (const mt of [].concat(o.material)) { mt.emissive = new THREE.Color('#51BEC8'); mats.push(mt); } });
       const c = new THREE.Box3().setFromObject(node).getCenter(new THREE.Vector3());
       return { mats, x: c.x, z: c.z };
     });
@@ -230,18 +242,18 @@
     return m;
   }
 
-  // ── U4 CoreLink ──────────────────────────────────────────────────────────────────────────────────────────────
+  // ── U4 CoreLink — grey shell and fascia, violet knobs, violet domes and LEDs that light when it boots ──
   async function corelink(THREE, THREEX, R) {
     const scene = await parse(THREEX, 'corelink');
-    const BY = { body: R.satin, cap: R.satin, placeholder: R.mask, Component5: R.mask, Component6: R.gloss, Body1: R.graphite,
-      knobleft: R.brass, knobright: R.brass, Component9: R.frosted, Component10: R.frosted, Component7: R.black, Component8: R.black };
-    scene.traverse(o => { if (o.isMesh) o.material = BY[o.name] || R.satin; });
+    const BY = { body: R.paint('satin', '#AEAEB2'), cap: R.paint('satin', '#A6A6AB'), placeholder: R.paint('mask', '#234230'), Component5: R.paint('mask', '#234230'),
+      Component6: R.paint('gloss', '#101215'), Body1: R.paint('graphite', '#232327'), knobleft: R.paint('brass', '#917EDD'), knobright: R.paint('brass', '#917EDD'),
+      Component9: R.paint('frosted', '#4A4260'), Component10: R.paint('frosted', '#4A4260'), Component7: R.paint('black', '#1B1D22'), Component8: R.paint('black', '#1B1D22') };
+    scene.traverse(o => { if (o.isMesh) o.material = BY[o.name] || R.paint('satin', '#AEAEB2'); });
     const m = partsOf(THREE, mount(THREE, scene, [Math.PI / 2, 0, 0]));
-    // the light-pipe ring: a thin torus just proud of the front face, lavender when powered
-    const front = m.size.z / 2 + 0.4, ringR = Math.min(m.size.x, m.size.y) * 0.47;
-    const ring = led(THREE, TINT.corelink, new THREE.TorusGeometry(ringR, 0.9, 10, 96));
-    ring.position.set(0, m.size.y / 2, front); m.group.add(ring); m.ring = ring;
-    // the dashboard on the inlay, neutral warm white
+    const lights = []; for (const n of ['Component7', 'Component8', 'Component9', 'Component10']) { const o = scene.getObjectByName(n); if (o) o.traverse(q => { if (q.isMesh) for (const mt of [].concat(q.material)) { mt.emissive = new THREE.Color('#917EDD'); lights.push(mt); } }); }
+    m.setLeds = k => { for (const mt of lights) mt.emissiveIntensity = 0.1 + k; };
+    m.setLeds(0);
+    // the dashboard on the inlay: two rings in the CoreLink violet, as on the site
     const inlay = scene.getObjectByName('Component6');
     m.setDash = () => {};
     if (inlay) {
@@ -256,55 +268,58 @@
         const q = Math.round(k * 45) / 45; if (q === last) return; last = q;
         g.clearRect(0, 0, W, H);
         for (const [x, v, lo, hi, unit] of [[W * 0.32, 24.6, 15, 35, '°'], [W * 0.68, 58, 0, 100, '%']]) {
-          g.lineWidth = 11; g.strokeStyle = 'rgba(255,241,220,0.10)'; g.beginPath(); g.arc(x, H / 2, 62, 0, Math.PI * 2); g.stroke();
-          g.strokeStyle = 'rgba(255,241,220,0.9)'; g.lineCap = 'round';
+          g.lineWidth = 13; g.strokeStyle = 'rgba(255,255,255,0.08)'; g.beginPath(); g.arc(x, H / 2, 62, 0, Math.PI * 2); g.stroke();
+          g.strokeStyle = '#917EDD'; g.lineCap = 'round';
           g.beginPath(); g.arc(x, H / 2, 62, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (v - lo) / (hi - lo) * q); g.stroke();
-          g.fillStyle = `rgba(255,241,220,${q})`; g.font = '600 32px FilmMono'; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillStyle = `rgba(245,245,247,${q})`; g.font = '600 32px FilmMono'; g.textAlign = 'center'; g.textBaseline = 'middle';
           g.fillText((unit === '°' ? (v * q).toFixed(1) : Math.round(v * q)) + unit, x, H / 2 + 2);
         }
-        mat.color.setScalar(1.6); tex.needsUpdate = true;
+        mat.color.setScalar(1.5); tex.needsUpdate = true;
       };
       m.setDash(0);
     }
     return m;
   }
 
-  // ── U5 Arx ───────────────────────────────────────────────────────────────────────────────────────────────────
+  // ── U5 Arx — mauve-grey frame (carbon weave), warmer body, dark legs, green board, silver motors, rose rings and prop tips ──
   async function arx(THREE, THREEX, R) {
     const scene = await parse(THREEX, 'arx');
-    const matFor = n => /^SOLID00[1-4]$/.test(n) ? R.motor : /Pins/.test(n) ? R.gold : /pcb|XIAO|Seeed|SOLID$|Shield|Body/.test(n) ? R.mask
-      : /support/.test(n) ? R.graphite : R.carbon;
+    const matFor = n => /^SOLID00[1-4]$/.test(n) ? R.paint('alu', '#8E9298') : /Pins/.test(n) ? R.paint('gold', '#C9A227')
+      : /pcb|XIAO|Seeed|SOLID$|Shield|Body/.test(n) ? R.paint('mask', '#1E4D33') : /support/.test(n) ? R.paint('graphite', '#443A40')
+      : /chassis/.test(n) ? R.paint('carbon', '#54444A') : R.paint('carbon', '#5E4C52');
     scene.traverse(o => {
       if (!o.isMesh) return;
       if (/^(tilt[1-4]|circular[1-4]|fan_v\d+)$/.test(o.name)) { o.visible = false; return; }
       o.material = matFor(o.name);
     });
     const m = partsOf(THREE, mount(THREE, scene, [0, 0, 0]));
-    // two-blade props in smoked black; above a spin rate they hand over to a faint disc (what the eye sees)
+    // two-blade props: dark root, rose tip (the site's blade); above a spin rate they hand over to a faint disc
     const blade = (() => {
-      const pos = [], idx = [], SPAN = 12, CH = 5;
+      const pos = [], col = [], idx = [], SPAN = 12, CH = 5, dark = new THREE.Color('#1A1B1E'), tip = new THREE.Color('#DC7482'), mix = new THREE.Color();
       for (let i = 0; i <= SPAN; i++) {
         const t = i / SPAN, r = 3.5 + 13.5 * t, chord = 6.2 * (0.45 + 0.55 * Math.sin(Math.PI * (0.18 + 0.82 * t))) * (1 - 0.3 * t * t), tw = 0.62 - 0.44 * t;
-        for (let j = 0; j <= CH; j++) { const c = (j / CH - 0.5) * chord; pos.push(r, c * Math.sin(tw), c * Math.cos(tw)); }
+        const k = Math.min(1, Math.max(0, (t - 0.72) / 0.23)); mix.copy(dark).lerp(tip, k * k * (3 - 2 * k));
+        for (let j = 0; j <= CH; j++) { const c = (j / CH - 0.5) * chord; pos.push(r, c * Math.sin(tw), c * Math.cos(tw)); col.push(mix.r, mix.g, mix.b); }
       }
       for (let i = 0; i < SPAN; i++) for (let j = 0; j < CH; j++) { const a = i * (CH + 1) + j; idx.push(a, a + CH + 1, a + 1, a + 1, a + CH + 1, a + CH + 2); }
-      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      geo.setIndex(idx); geo.computeVertexNormals(); return geo;
     })();
-    const PROP = inject(new THREE.MeshPhysicalMaterial({ color: '#1A1A1C', roughness: 0.35, metalness: 0, side: THREE.DoubleSide, transparent: true }));
+    const PROP = inject(new THREE.MeshPhysicalMaterial({ color: '#ffffff', vertexColors: true, roughness: 0.35, metalness: 0, side: THREE.DoubleSide, transparent: true }));
     const DISC = inject(new THREE.MeshBasicMaterial({ color: '#2a2a2d', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    const RING = inject(R.paint('brass', '#DC7482').clone());
     const props = [];
     for (const [x, z, dir] of [[35.4, 35.4, 1], [-35.4, -35.4, 1], [35.4, -35.4, -1], [-35.4, 35.4, -1]]) {
       const p = new THREE.Group(); p.position.set(x, m.size.y - 2, z);
-      const b1 = new THREE.Mesh(blade, PROP), b2 = new THREE.Mesh(blade, PROP); b2.rotation.y = Math.PI; p.add(b1, b2);
+      p.add(new THREE.Mesh(blade, PROP)); const b2 = new THREE.Mesh(blade, PROP); b2.rotation.y = Math.PI; p.add(b2);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.9, 10, 32), RING); ring.rotation.x = Math.PI / 2; p.add(ring);
       const disc = new THREE.Mesh(new THREE.RingGeometry(3.5, 17, 48), DISC); disc.rotation.x = -Math.PI / 2; p.add(disc);
-      m.group.add(p); props.push({ p, dir, b1, b2 });
+      m.group.add(p); props.push({ p, dir });
     }
     m.setProps = (ang, blur, op = 1) => {
-      PROP.opacity = op * (1 - 0.85 * blur); DISC.opacity = op * 0.22 * blur;
+      PROP.opacity = op * (1 - 0.85 * blur); DISC.opacity = op * 0.22 * blur; RING.transparent = op < 0.999; RING.opacity = op;
       for (const q of props) { q.p.rotation.y = q.dir * ang; q.p.visible = op > 0.002; }
     };
-    const l = led(THREE, TINT.arx, new THREE.SphereGeometry(2.2, 20, 12));
-    l.position.set(0, m.size.y + 1.0, 8); m.group.add(l); m.led = l;
     return m;
   }
 

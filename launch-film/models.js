@@ -34,9 +34,9 @@
     const carbon = P({ color: '#ffffff', roughness: 0.42, metalness: 0.0, clearcoat: 0.35, clearcoatRoughness: 0.35 });
     carbon.weaveTex = carbonTex;
     const R = {
-      white: P({ color: '#E7E4DE', roughness: 0.45, metalness: 0, specularIntensity: 0.45, sheen: 0.25, sheenRoughness: 0.6, sheenColor: new THREE.Color('#ffffff') }),
-      satin: P({ color: '#E9E6E0', roughness: 0.34, metalness: 0, specularIntensity: 0.5 }),
-      frosted: P({ color: '#E4E9EA', roughness: 0.62, metalness: 0, specularIntensity: 0.4, sheen: 0.5, sheenRoughness: 0.8, sheenColor: new THREE.Color('#ffffff') }),
+      white: P({ color: '#E7E4DE', roughness: 0.32, metalness: 0, specularIntensity: 0.6, clearcoat: 0.35, clearcoatRoughness: 0.22 }),
+      satin: P({ color: '#E9E6E0', roughness: 0.28, metalness: 0, specularIntensity: 0.6, clearcoat: 0.45, clearcoatRoughness: 0.18 }),
+      frosted: P({ color: '#E4E9EA', roughness: 0.42, metalness: 0, specularIntensity: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.3 }),
       brass: P({ color: '#C9A15A', roughness: 0.4, metalness: 1, envMapIntensity: 1.6 }),
       gold: P({ color: '#D9B46C', roughness: 0.38, metalness: 1, envMapIntensity: 1.4 }),
       mask: P({ color: '#1F3A2B', roughness: 0.5, metalness: 0, clearcoat: 0.3, clearcoatRoughness: 0.4 }),
@@ -56,6 +56,9 @@
       return cache.get(key);
     };
     // a CAD material's own colour, dimmed the way the site dims near-white albedo
+    // anodised accents: part metal, so the colour itself reads instead of only the room's reflection
+    R.copper = (() => { const m = R.brass.clone(); m.color.set('#D89E64'); m.metalness = 0.55; m.roughness = 0.32; return m; })();
+    R.violet = (() => { const m = R.brass.clone(); m.color.set('#917EDD'); m.metalness = 0.55; m.roughness = 0.32; return m; })();
     R.cad = std => { const c = std.color.clone(); if (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b > 0.55) c.multiplyScalar(0.85); return R.paint('white', c); };
     return R;
   }
@@ -144,11 +147,11 @@
     const scene = await parse(THREEX, 'auraeyez');
     scene.traverse(o => {
       if (!o.isMesh) return;
-      if (o.name === 'Body1008' || o.name === 'Body1009') { o.material = R.paint('brass', '#D89E64'); return; }
+      if (o.name === 'Body1008' || o.name === 'Body1009') { o.material = R.copper; return; }
       const std = [].concat(o.material)[0], n = std.name || '';
-      o.material = n === 'ABS (White)' ? R.paint('white', '#AEAEB2') : n === 'Plastic - Glossy (Black)' ? R.paint('gloss', '#1E1E20')
-        : n.startsWith('PEKK') ? R.paint('brass', '#D89E64') : n === 'Glass - Medium Color' ? R.paint('frosted', '#DDE2E2')
-        : n === 'Paint - Enamel Glossy (Yellow)' ? R.paint('graphite', '#3A3A3D') : R.cad(std);
+      o.material = n === 'ABS (White)' ? R.paint('white', '#E3E3E8') : n === 'Plastic - Glossy (Black)' ? R.paint('gloss', '#1E1E20')
+        : n.startsWith('PEKK') ? R.copper : n === 'Glass - Medium Color' ? R.paint('frosted', '#DDE2E2')
+        : n === 'Paint - Enamel Glossy (Yellow)' ? R.paint('graphite', '#4A4A50') : R.cad(std);
     });
     const m = partsOf(THREE, mount(THREE, scene, [Math.PI, 0, 0]));
     // OLED: eyes drawn RoboEyes-style on a transparent canvas just above the cover glass
@@ -185,10 +188,10 @@
     const scene = await parse(THREEX, 'buggy');
     const PCB = R.paint('mask', '#237A3C'), TERM = R.paint('satin', '#52D96A'), CAP = R.paint('satin', '#2A36A0'), SILVER = R.paint('alu', '#B9BEC4'),
       GOLD = R.paint('gold', '#C9A227'), IC = R.paint('black', '#141518'), CONN = R.paint('black', '#1B1C1F'), HEAD = R.paint('satin', '#C7CBD1');
-    const MATS = [['wheelwithout', R.paint('graphite', '#37383C')], ['tyre', R.paint('rubber', '#17181B')], ['motor', R.paint('motor', '#3A3F45')],
-      ['gear', R.paint('graphite', '#3E4046')], ['encoder', R.paint('black', '#1E1F22')], ['batteryframe', R.paint('white', '#333B36')],
-      ['battery', R.paint('graphite', '#2E3B4E')], ['ballhousing', R.paint('alu', '#9AA1AA')], ['ball', R.paint('black', '#26272B')]];
-    const PLATE = R.paint('white', '#333B36');
+    const MATS = [['wheelwithout', R.paint('graphite', '#55575D')], ['tyre', R.paint('rubber', '#17181B')], ['motor', R.paint('motor', '#3A3F45')],
+      ['gear', R.paint('graphite', '#3E4046')], ['encoder', R.paint('black', '#1E1F22')], ['batteryframe', R.paint('white', '#4F7D63')],
+      ['battery', R.paint('graphite', '#3D5A85')], ['ballhousing', R.paint('alu', '#9AA1AA')], ['ball', R.paint('black', '#26272B')]];
+    const PLATE = R.paint('white', '#4F7D63');
     const EXPLICIT = { motordriverboard: PCB, motordriverboard001: TERM, motordriverboard002: TERM, motordriverboard003: TERM, motordriverboard004: TERM,
       motordriverboard005: CAP, motordriverboard048: SILVER, motordriverboard049: SILVER, motordriverboard050: SILVER, motordriverboard051: SILVER,
       motordriverboard052: CONN, stm32mountboard: PCB, stm32mountboard001: CONN, stm32mountboard002: HEAD, stm32mountboard003: SILVER,
@@ -227,7 +230,7 @@
       'MX_Normal_v12', 'MX_Normal_v13', 'MX_Normal_v14', '1x2_R3_v61', '1x2_R3_v62', 'Body5012'];
     scene.traverse(o => {
       if (!o.isMesh) return;
-      o.material = /^(Structure|Upper_Plate|Lower_Plate|Base)$/.test(o.name) ? R.paint('white', '#1E2C4E') : R.cad([].concat(o.material)[0]);
+      o.material = /^(Structure|Upper_Plate|Lower_Plate|Base)$/.test(o.name) ? R.paint('white', '#2E4F9A') : R.cad([].concat(o.material)[0]);
     });
     const caps = CAPS.map(n => scene.getObjectByName(n)).filter(Boolean);
     caps.forEach(c => c.traverse(o => { if (o.isMesh) o.material = R.paint('frosted', '#51BEC8'); }));
@@ -245,10 +248,10 @@
   // ── U4 CoreLink — grey shell and fascia, violet knobs, violet domes and LEDs that light when it boots ──
   async function corelink(THREE, THREEX, R) {
     const scene = await parse(THREEX, 'corelink');
-    const BY = { body: R.paint('satin', '#AEAEB2'), cap: R.paint('satin', '#A6A6AB'), placeholder: R.paint('mask', '#234230'), Component5: R.paint('mask', '#234230'),
-      Component6: R.paint('gloss', '#101215'), Body1: R.paint('graphite', '#232327'), knobleft: R.paint('brass', '#917EDD'), knobright: R.paint('brass', '#917EDD'),
+    const BY = { body: R.paint('satin', '#E1E1E6'), cap: R.paint('satin', '#D7D7DD'), placeholder: R.paint('mask', '#234230'), Component5: R.paint('mask', '#234230'),
+      Component6: R.paint('gloss', '#101215'), Body1: R.paint('satin', '#BEBEC8'), knobleft: R.violet, knobright: R.violet,
       Component9: R.paint('frosted', '#4A4260'), Component10: R.paint('frosted', '#4A4260'), Component7: R.paint('black', '#1B1D22'), Component8: R.paint('black', '#1B1D22') };
-    scene.traverse(o => { if (o.isMesh) o.material = BY[o.name] || R.paint('satin', '#AEAEB2'); });
+    scene.traverse(o => { if (o.isMesh) o.material = BY[o.name] || R.paint('satin', '#E1E1E6'); });
     const m = partsOf(THREE, mount(THREE, scene, [Math.PI / 2, 0, 0]));
     const lights = []; for (const n of ['Component7', 'Component8', 'Component9', 'Component10']) { const o = scene.getObjectByName(n); if (o) o.traverse(q => { if (q.isMesh) for (const mt of [].concat(q.material)) { mt.emissive = new THREE.Color('#917EDD'); lights.push(mt); } }); }
     m.setLeds = k => { for (const mt of lights) mt.emissiveIntensity = 0.1 + k; };
@@ -285,8 +288,8 @@
   async function arx(THREE, THREEX, R) {
     const scene = await parse(THREEX, 'arx');
     const matFor = n => /^SOLID00[1-4]$/.test(n) ? R.paint('alu', '#8E9298') : /Pins/.test(n) ? R.paint('gold', '#C9A227')
-      : /pcb|XIAO|Seeed|SOLID$|Shield|Body/.test(n) ? R.paint('mask', '#1E4D33') : /support/.test(n) ? R.paint('graphite', '#443A40')
-      : /chassis/.test(n) ? R.paint('carbon', '#54444A') : R.paint('carbon', '#5E4C52');
+      : /pcb|XIAO|Seeed|SOLID$|Shield|Body/.test(n) ? R.paint('mask', '#1E4D33') : /support/.test(n) ? R.paint('graphite', '#5E4E58')
+      : /chassis/.test(n) ? R.paint('carbon', '#8A5F70') : R.paint('carbon', '#946C7A');
     scene.traverse(o => {
       if (!o.isMesh) return;
       if (/^(tilt[1-4]|circular[1-4]|fan_v\d+)$/.test(o.name)) { o.visible = false; return; }

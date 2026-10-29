@@ -59,18 +59,18 @@ const camera = new THREE.PerspectiveCamera(FOV, W / H, 5, 20000);
   const panel = (w, h, col, k, pos, look) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(...pos); m.lookAt(...look); env.add(m); };
   panel(5, 4, '#fff6ea', 1.5, [-2.6, 3.6, -2.2], [0, 0, 0]);
   panel(1.6, 5, '#ffb877', 1.8, [3.4, 1.2, -3.0], [0, 0, 0]);
-  panel(6, 1.6, '#a9b8d6', 0.18, [0, 0.6, 4.6], [0, 0, 0]);
+  panel(6, 2.2, '#c4cee0', 0.55, [0, 0.9, 4.6], [0, 0, 0]);
   panel(9, 9, '#3a3430', 0.25, [0, 4.9, 0], [0, 0, 0]);
-  const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(env, 0.02).texture; scene.environmentIntensity = 0.9;
+  const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(env, 0.02).texture; scene.environmentIntensity = 1.15;
 })();
 scene.add(new THREE.AmbientLight('#ffffff', 0.05));
-const key = new THREE.DirectionalLight('#fff4e6', 1.7);                  // soft key, top-left at 45°
+const key = new THREE.DirectionalLight('#fff4e6', 2.1);                  // soft key, top-left at 45°
 key.position.set(-700, 990, -700); scene.add(key, key.target);
 key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 5; key.shadow.bias = -0.0005; key.shadow.normalBias = 0.8;
 Object.assign(key.shadow.camera, { left: -820, right: 820, top: 620, bottom: -620, near: 200, far: 3200 }); key.shadow.camera.updateProjectionMatrix();
 const rim = new THREE.DirectionalLight('#f0a560', 3.4);                  // warm copper rim from behind-right, ~2× key
 rim.position.set(800, 420, -1000); scene.add(rim, rim.target);
-const fill = new THREE.DirectionalLight('#a8b8d8', 0.12);                // very low cool fill
+const fill = new THREE.DirectionalLight('#c4cee0', 0.55);                // very low cool fill
 fill.position.set(-300, 300, 1000); scene.add(fill, fill.target);
 const pulseLight = new THREE.PointLight('#ffd39a', 0, 160, 0); pulseLight.position.y = 18; scene.add(pulseLight);
 
@@ -254,6 +254,7 @@ async function build() {
   for (const k of ORDER) {
     const m = M[MODEL[k]], c = boardAt(...TARGET[k]);
     if (k === 'lr') m.group.rotation.y = 0;                                  // caster leading toward the centre of the frame
+    if (k === 'cl') m.group.rotation.y = -0.26;                              // CoreLink's face turned a little toward the key
     m.group.position.set(c.x, 0, c.z); scene.add(m.group); m.group.updateMatrixWorld(true);
     const b = new THREE.Box3().setFromObject(m.group);
     DEV[k] = { m, x: c.x, z: c.z, box: { x0: b.min.x - 9, x1: b.max.x + 9, z0: b.min.z - 9, z1: b.max.z + 9 }, h: b.max.y };
@@ -469,7 +470,7 @@ const POST = (() => {
       c = lin2srgb(aces(c));
       c *= 1.0 - 0.075 * smoothstep(0.12, 0.95, r2);                                  // vignette ~7 %
       float n = hash(floor(gl_FragCoord.xy)) - 0.5, n2 = hash(floor(gl_FragCoord.xy) + 37.0) - 0.5;
-      c += (n * 0.6 + n2 * 0.4) * 0.025 * (0.35 + 0.65 * (1.0 - dot(c, vec3(0.333))));   // fine static grain, ~2.5 %
+      c += (n * 0.6 + n2 * 0.4) * 0.022 * (1.0 - smoothstep(0.05, 0.22, dot(c, vec3(0.333))));   // fine grain in the dark ground only (anti-banding); products stay clean
       c = mix(c, texture2D(tFrame0, vUv).rgb, uDissolve);
       gl_FragColor = vec4(c, 1.0); }`,
     { tColor: { value: main.texture }, tDepth: { value: main.depthTexture }, tDof: { value: h2[1].texture }, tBloom: { value: b[0].texture }, tFrame0: { value: frame0.texture },

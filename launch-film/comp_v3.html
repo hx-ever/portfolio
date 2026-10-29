@@ -1,0 +1,818 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>hxstudio — one copper trace (v3)</title>
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0A0908; }
+  #gl { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  #hud { position: absolute; left: 16px; top: 12px; font: 12px/1.4 monospace; color: #f5f5f7; white-space: pre; display: none; }
+</style>
+</head>
+<body>
+<canvas id="gl" width="1920" height="1080"></canvas>
+<div id="hud"></div>
+<script src="vendor/three.bundle.js"></script>
+<script src="gen/assets.js"></script>
+<script src="motion.js"></script>
+<script src="models.js"></script>
+<script>
+/* One copper trace, v3 — the v1 film (draft_v1) re-shot in the v2 look (hxstudio-hero), 60 fps.
+ * From v1, verbatim: the timeline, the layout, the routes and their colour stops, the camera keys and curves, every
+ * device's animation, the current's heads. From v2: the renderer (linear HDR → bloom on emissives, DOF on close-ups,
+ * ACES, sRGB, vignette, grain), the light rig, the board, the device materials, the courtyard outlines, the type.
+ * Flat graphics are authored in display colours and pre-inverted through ACES so they land exactly. __seek(t) is pure. */
+const { clamp, lerp, seg, sstep, spring, ring, ease } = OM;
+const SETTLE = OM.bezier(0.16, 1, 0.3, 1);
+const Q = new URLSearchParams(location.search);
+const W = 1920, H = 1080, DUR = 15, FOV = 30, EXPOSURE = 1.0;
+const ACC = { auraeyez: '#D89E64', landrover: '#83C25D', hxkeysair: '#51BEC8', corelink: '#917EDD', arx: '#DC7482' };   // v1's accents
+const COPPER = '#D89E64', LOGO_ORANGE = '#F7931E', LOGO_YELLOW = '#FFE21F';
+const PAL = { bg: '#0A0908', lift: '#15110D', off: '#2A1E15', trace: '#C8813F', hi: '#FFD39A', core: '#FFF1DC', name: '#F5F3EF',
+  sub: '#D09860', url: '#808078', label: '#787878', silk: '#CFC9BF' };
+
+// ─────────────────────────────── timeline (v1) ───────────────────────────────
+const T = {
+  padOn: 0.15, aStart: 0.70, aEnd: 1.95,
+  aurRise: 2.24, aurBoot: 2.52, aurEyes: 2.82, aurBlink: 3.70, aurGlance: 3.90,
+  bStart: 4.06, bEnd: 4.84,
+  lrRise: 5.08, drive0: 6.04, drive1: 7.40,
+  bus0: 7.42, busV: 1420, busC: 0.11,
+  l4Start: 10.42, logoFill: 0.40, wordDur: 0.68,
+};
+
+// ─────────────────────────────── layout (mm, v1) ───────────────────────────────
+const AUR = { x: 430, z: -190, w: 74.041, h: 85.5218 };
+const LR = { x: 70, z: -205, w: 124.9934, h: 74.803 };
+const HXK = { x: -400, z: 205, w: 76.2762, h: 96.3676 };
+const CL = { x: -20, z: 222, w: 132, h: 58 };
+const ARX = { x: 320, z: 212, w: 128, h: 96 };
+const JX = -330;                                  // where the buggy brakes; the bus leaves from under it
+const FONT_MM = 74, BASE_Z = 26;                  // wordmark size and baseline
+let LOCK;                                         // measured in __ready: logo + wordmark + period pad
+
+// ─────────────────────────────── renderer, light rig, studio (v2) ───────────────────────────────
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+renderer.toneMapping = THREE.NoToneMapping; renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap; renderer.shadowMap.autoUpdate = false;
+const scene = new THREE.Scene(); scene.background = null;
+const camera = new THREE.PerspectiveCamera(FOV, W / H, 4, 20000);
+
+// a dark studio for reflections only: black room, a top-left softbox, a warm strip behind-right, a faint cool fill
+(() => {
+  const env = new THREE.Scene(), box = new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: '#050404', side: THREE.BackSide }));
+  env.add(box);
+  const panel = (w, h, col, k, pos, look) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(...pos); m.lookAt(...look); env.add(m); };
+  panel(5, 4, '#fff6ea', 1.5, [-2.6, 3.6, -2.2], [0, 0, 0]);
+  panel(1.6, 5, '#ffb877', 1.8, [3.4, 1.2, -3.0], [0, 0, 0]);
+  panel(6, 2.2, '#c4cee0', 0.55, [0, 0.9, 4.6], [0, 0, 0]);
+  panel(9, 9, '#3a3430', 0.25, [0, 4.9, 0], [0, 0, 0]);
+  const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(env, 0.02).texture; scene.environmentIntensity = 1.15;
+})();
+renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.02)];   // products rise through the board
+scene.add(new THREE.AmbientLight('#ffffff', 0.05));
+const key = new THREE.DirectionalLight('#fff4e6', 2.1);                  // soft key, top-left at 45°
+key.position.set(-700, 990, -700); scene.add(key, key.target);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 5; key.shadow.bias = -0.0005; key.shadow.normalBias = 0.8;
+Object.assign(key.shadow.camera, { left: -820, right: 820, top: 620, bottom: -620, near: 200, far: 3200 }); key.shadow.camera.updateProjectionMatrix();
+const rim = new THREE.DirectionalLight('#f0a560', 3.4);                  // warm copper rim from behind-right, ~2× key
+rim.position.set(800, 420, -1000); scene.add(rim, rim.target);
+const fill = new THREE.DirectionalLight('#c4cee0', 0.55);                // very low cool fill
+fill.position.set(-300, 300, 1000); scene.add(fill, fill.target);
+const pulseLight = new THREE.PointLight('#ffd39a', 0, 160, 0); pulseLight.position.y = 18; scene.add(pulseLight);
+
+// ─────────────────────────────── colour: display palette → pre-tonemap linear ───────────────────────────────
+const IN = new THREE.Matrix3().set(0.59719, 0.35458, 0.04823, 0.07600, 0.90834, 0.01566, 0.02840, 0.13383, 0.83777);
+const OUT = new THREE.Matrix3().set(1.60475, -0.53108, -0.07367, -0.10208, 1.10813, -0.00605, -0.00327, -0.07276, 1.07602);
+const INI = IN.clone().invert(), OUTI = OUT.clone().invert();
+const glm = m => { const e = m.elements; return `mat3(${e.map(v => v.toFixed(8)).join(',')})`; };   // elements are column-major, as GLSL wants
+const COLOR_GLSL = `
+  vec3 srgb2lin(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
+  vec3 lin2srgb(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+  vec3 invACES(vec3 y) {                       // display-linear → the value ACES (three's fit, exposure ${EXPOSURE}) maps onto it
+    vec3 b = clamp(${glm(OUTI)} * clamp(y, 0.0, 1.0), 0.0, 0.982);
+    vec3 A = 1.0 - 0.983729 * b, B = 0.0245786 - 0.432951 * b, C = -(0.000090537 + 0.238081 * b);
+    vec3 v = (-B + sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
+    return max(${glm(INI)} * v, 0.0) * 0.6 / ${EXPOSURE.toFixed(3)};
+  }
+  vec3 pre(vec3 srgb) { return invACES(srgb2lin(srgb)); }`;
+const lin = hex => new THREE.Color(hex);                                    // THREE.Color stores linear values
+const v3 = hex => { const c = lin(hex); return new THREE.Vector3(c.r, c.g, c.b); };
+
+// ─────────────────────────────── the board (v2) ───────────────────────────────
+const GRID = 16.7;
+const board = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.ShaderMaterial({
+  uniforms: { uBg: { value: v3(PAL.bg) }, uLift: { value: v3(PAL.lift) } },
+  vertexShader: `varying vec2 vP; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vP = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }`,
+  fragmentShader: `${COLOR_GLSL}
+    uniform vec3 uBg, uLift; varying vec2 vP;
+    void main(){
+      vec2 s = gl_FragCoord.xy / vec2(${W}.0, ${H}.0) - vec2(0.5, 0.53); s.x *= ${(W / H).toFixed(4)};
+      vec3 c = mix(uLift, uBg, smoothstep(0.0, 0.85, length(s)));
+      vec2 g = mod(vP + ${GRID / 2}, ${GRID}) - ${GRID / 2}; float d = length(g), fw = fwidth(d) * 1.1;
+      float dotA = (1.0 - smoothstep(0.75 - fw, 0.75 + fw, d)) * clamp(1.4 - fw * 0.9, 0.0, 1.0);
+      c = mix(c, vec3(1.0), 0.04 * dotA);
+      gl_FragColor = vec4(invACES(c), 1.0); }`,
+}));
+board.rotation.x = -Math.PI / 2; scene.add(board);
+const shadowCatch = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.ShadowMaterial({ opacity: 0.32 }));
+shadowCatch.rotation.x = -Math.PI / 2; shadowCatch.position.y = 0.05; shadowCatch.receiveShadow = true; scene.add(shadowCatch);
+
+// ─────────────────────────────── flat layers on the board (v2) ───────────────────────────────
+const canvasOf = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
+const texOf = c => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; t.anisotropy = 8; t.minFilter = THREE.LinearMipmapLinearFilter; return t; };
+const LAYER_FS = `${COLOR_GLSL}
+  uniform sampler2D tDim, tLit; uniform vec2 uSize, uOrigin; uniform float uR, uW, uMode, uFront, uAlpha, uGain, uDim; uniform vec3 uFrontCol;
+  varying vec2 vUv;
+  void main(){
+    vec2 p = vUv * uSize; vec4 a = texture2D(tDim, vUv), b = texture2D(tLit, vUv);
+    float d = uMode < 0.5 ? length(p - uOrigin) : p.x - uOrigin.x;
+    float m = 1.0 - smoothstep(uR - uW, uR, d);
+    float front = exp(-pow((d - uR + uW * 0.45) / (uW * 0.55), 2.0)) * uFront * step(0.001, uR);
+    vec4 c = mix(a, b, m);
+    vec3 col = pre(c.rgb * uDim) * uGain + pre(uFrontCol) * front * 2.5 * max(a.a, b.a);
+    gl_FragColor = vec4(col, max(c.a, front * max(a.a, b.a)) * uAlpha); }`;
+function layer(dim, lit, wmm, hmm, frontHex = PAL.hi) {
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+    uniforms: { tDim: { value: texOf(dim) }, tLit: { value: texOf(lit) }, uSize: { value: new THREE.Vector2(wmm, hmm) }, uOrigin: { value: new THREE.Vector2() },
+      uR: { value: 0 }, uW: { value: 8 }, uMode: { value: 0 }, uFront: { value: 1 }, uAlpha: { value: 0 }, uGain: { value: 1 }, uDim: { value: 1 }, uFrontCol: { value: fc(frontHex) } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: LAYER_FS });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(wmm, hmm), mat);
+  m.rotation.x = -Math.PI / 2; m.renderOrder = 2;
+  m.toLocal = (bx, bz) => [bx - (m.position.x - wmm / 2), (m.position.z + hmm / 2) - bz];
+  m.u = mat.uniforms; scene.add(m); return m;
+}
+const fc = hex => { const c = new THREE.Color(); c.setStyle(hex, THREE.NoColorSpace); return c; };   // a display colour, unconverted
+async function svgCanvas(svg, w, h) { const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); await img.decode(); const c = canvasOf(w, h); c.getContext('2d').drawImage(img, 0, 0, w, h); return c; }
+const recolor = (svg, map) => Object.entries(map).reduce((s, [a, b]) => s.split(a).join(b).split(a.toLowerCase()).join(b), svg);
+const mixHex = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
+function stripText(svg, drop) {                // remove KiCad stroked-text groups by their <desc>
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  for (const g of [...doc.querySelectorAll('g')]) { const d = g.querySelector(':scope > desc'); if (d && drop.includes(d.textContent.trim())) g.remove(); }
+  for (const t of [...doc.querySelectorAll('text')]) if (drop.includes(t.textContent.trim())) t.remove();
+  return new XMLSerializer().serializeToString(doc);
+}
+// text in display colours; returns the canvas and its metrics in mm
+function textCanvas(str, font, mm, color, { px = 10, spacing = 0, pad = 3 } = {}) {
+  const g0 = canvasOf(8, 8).getContext('2d'); g0.font = font(mm * px); g0.letterSpacing = `${spacing * mm * px}px`;
+  const mt = g0.measureText(str), P = pad * px, asc = Math.ceil(mt.actualBoundingBoxAscent), desc = Math.ceil(Math.max(2, mt.actualBoundingBoxDescent));
+  const c = canvasOf(mt.width + P * 2, asc + desc + P * 2), g = c.getContext('2d');
+  g.font = font(mm * px); g.letterSpacing = `${spacing * mm * px}px`; g.fillStyle = color; g.textBaseline = 'alphabetic'; g.fillText(str, P, P + asc);
+  return { c, w: c.width / px, h: c.height / px, textW: mt.width / px, pad: P / px, asc: asc / px, px, ctx: g0 };
+}
+const placeText = (m, T0, x, z) => m.position.set(x - T0.pad + T0.w / 2, 0.12, z - (T0.pad + T0.asc) + T0.h / 2);
+
+// ─────────────────────────────── traces (v1 geometry, v2 shading) ───────────────────────────────
+// A route is corner points plus a fillet radius per corner, sampled every 0.6 mm; drawn as a ribbon whose drawRange
+// is the revealed length, with a soft additive halo and a vertex-colour gradient along it.
+function route(pts, radii) {
+  const P = pts.map(([x, z]) => new THREE.Vector2(x, z)), out = [P[0].clone()];
+  const arcTo = (A, B, c, r) => {
+    let a0 = Math.atan2(A.y - c.y, A.x - c.x), a1 = Math.atan2(B.y - c.y, B.x - c.x), da = a1 - a0;
+    while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const n = Math.max(2, Math.ceil(Math.abs(da) * r / 0.6));
+    for (let i = 1; i <= n; i++) { const a = a0 + da * i / n; out.push(new THREE.Vector2(c.x + r * Math.cos(a), c.y + r * Math.sin(a))); }
+  };
+  const lineTo = B => { const A = out[out.length - 1], L = A.distanceTo(B), n = Math.max(1, Math.ceil(L / 0.6)); for (let i = 1; i <= n; i++) out.push(A.clone().lerp(B, i / n)); };
+  for (let i = 1; i < P.length - 1; i++) {
+    const u = P[i].clone().sub(P[i - 1]).normalize(), v = P[i + 1].clone().sub(P[i]).normalize();
+    const turn = Math.acos(clamp(u.dot(v), -1, 1)), r = (Array.isArray(radii) ? radii[i - 1] : radii) || 0;
+    if (turn < 1e-3 || r <= 0) { lineTo(P[i]); continue; }
+    const td = r * Math.tan(turn / 2), A = P[i].clone().addScaledVector(u, -td), B = P[i].clone().addScaledVector(v, td);
+    const cross = u.x * v.y - u.y * v.x, perp = new THREE.Vector2(-u.y, u.x).multiplyScalar(cross > 0 ? r : -r);
+    lineTo(A); arcTo(A, B, A.clone().add(perp), r);
+  }
+  lineTo(P[P.length - 1]);
+  const cum = [0]; for (let i = 1; i < out.length; i++) cum.push(cum[i - 1] + out[i].distanceTo(out[i - 1]));
+  return { pts: out, cum, L: cum[cum.length - 1] };
+}
+function at(R, s) {
+  s = clamp(s, 0, R.L); let lo = 0, hi = R.cum.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (R.cum[m] <= s) lo = m; else hi = m; }
+  const k = (s - R.cum[lo]) / Math.max(1e-6, R.cum[hi] - R.cum[lo]);
+  return { x: lerp(R.pts[lo].x, R.pts[hi].x, k), z: lerp(R.pts[lo].y, R.pts[hi].y, k), i: lo };
+}
+// The core is the stop colour exactly (pre-inverted, anti-aliased edges); the halo adds 0.2 of it in display space.
+const RIBBON_VS = `attribute vec3 aCol; attribute float aV; varying vec3 vC; varying float vV;
+  void main(){ vC = aCol; vV = aV; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`;
+const RIBBON_CORE = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, vertexShader: RIBBON_VS,
+  fragmentShader: `${COLOR_GLSL} varying vec3 vC; varying float vV;
+    void main(){ float e = 1.0 - smoothstep(0.62, 1.0, abs(vV)); gl_FragColor = vec4(invACES(vC), e); }` });
+const RIBBON_HALO = (op) => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, vertexShader: RIBBON_VS,
+  uniforms: { uOp: { value: op } },
+  fragmentShader: `${COLOR_GLSL} uniform float uOp; varying vec3 vC; varying float vV;
+    void main(){ float e = 1.0 - smoothstep(0.55, 1.0, abs(vV)); gl_FragColor = vec4(pre(uOp * lin2srgb(vC)) * e, 1.0); }` });
+function ribbon(R, width, colorAt, { y = 0.14, halo = 7.5, haloOp = 0.2 } = {}) {
+  const n = R.pts.length, mk = (w) => {
+    const pos = new Float32Array(n * 6), col = new Float32Array(n * 6), side = new Float32Array(n * 2), idx = [];
+    for (let i = 0; i < n; i++) {
+      const a = R.pts[Math.max(0, i - 1)], b = R.pts[Math.min(n - 1, i + 1)];
+      let tx = b.x - a.x, tz = b.y - a.y; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      const nx = -tz * w / 2, nz = tx * w / 2, p = R.pts[i], c = colorAt(R.cum[i] / R.L);
+      pos.set([p.x + nx, y, p.y + nz, p.x - nx, y, p.y - nz], i * 6); col.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6); side.set([1, -1], i * 2);
+      if (i < n - 1) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aCol', new THREE.BufferAttribute(col, 3)); g.setAttribute('aV', new THREE.BufferAttribute(side, 1)); g.setIndex(idx); return g;
+  };
+  const core = new THREE.Mesh(mk(width), RIBBON_CORE);
+  const glow = new THREE.Mesh(mk(halo), RIBBON_HALO(haloOp));
+  core.renderOrder = 3; glow.renderOrder = 2; glow.position.y = -0.02;
+  scene.add(glow, core);
+  return { R, core, glow, set(s0, s1) {
+    const i0 = s1 <= s0 ? 0 : at(R, s0).i, i1 = s1 <= s0 ? 0 : Math.min(n - 1, at(R, s1).i + 1), c = Math.max(0, i1 - i0) * 6;
+    core.geometry.setDrawRange(i0 * 6, c); glow.geometry.setDrawRange(i0 * 6, c); core.visible = glow.visible = c > 0;
+  } };
+}
+const gradient = (...stops) => k => {
+  const n = stops.length - 1, i = Math.min(n - 1, Math.floor(k * n)), f = k * n - i;
+  return new THREE.Color(stops[i]).lerp(new THREE.Color(stops[i + 1]), clamp(f));
+};
+// The current: v1's radial falloff in the trace colour (additive, display space) around a white-hot emissive core.
+function glowDecal(size, color, { y = 0.3, hot = 0 } = {}) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { uC: { value: v3(color) }, uOp: { value: 0 }, uHot: { value: hot } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `${COLOR_GLSL} uniform vec3 uC; uniform float uOp, uHot; varying vec2 vUv;
+      float prof(float r){ return r < 0.12 ? mix(1.0, 0.85, r / 0.12) : r < 0.35 ? mix(0.85, 0.25, (r - 0.12) / 0.23) : mix(0.25, 0.0, clamp((r - 0.35) / 0.65, 0.0, 1.0)); }
+      void main(){
+        float r = length(vUv - 0.5) * 2.0, g = prof(r) * uOp, h = exp(-r * r / 0.006) * uOp * uHot;
+        vec3 c = pre(clamp(lin2srgb(uC) * g + vec3(h * 0.9), 0.0, 1.0)) + vec3(h * 9.0);
+        gl_FragColor = vec4(c, 1.0); }` }));
+  m.rotation.x = -Math.PI / 2; m.position.y = y; m.renderOrder = 4; m.u = m.material.uniforms;
+  m.setColor = hex => m.u.uC.value.copy(v3(hex)); scene.add(m); return m;
+}
+const heads = [0, 1, 2, 3].map(() => glowDecal(30, COPPER, { hot: 1 }));
+
+// a silkscreen loop (v2's courtyard outline): a strip with anti-aliased edges, drawn in by length
+function outline(R, width = 0.7, y = 0.11) {
+  const n = R.pts.length, pos = new Float32Array(n * 6), aS = new Float32Array(n * 2), aV = new Float32Array(n * 2), idx = [];
+  for (let i = 0; i < n; i++) {
+    const a = R.pts[Math.max(0, i - 1)], b = R.pts[Math.min(n - 1, i + 1)]; let tx = b.x - a.x, tz = b.y - a.y; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+    const nx = -tz * width / 2, nz = tx * width / 2, p = R.pts[i];
+    pos.set([p.x + nx, y, p.y + nz, p.x - nx, y, p.y - nz], i * 6); aS.set([R.cum[i], R.cum[i]], i * 2); aV.set([1, -1], i * 2);
+    if (i < n - 1) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aS', new THREE.BufferAttribute(aS, 1));
+  g.setAttribute('aV', new THREE.BufferAttribute(aV, 1)); g.setIndex(idx);
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { uDraw: { value: 1e9 }, uDim: { value: 0.55 }, uC: { value: v3(PAL.silk) } },
+    vertexShader: `attribute float aS; attribute float aV; varying float vS; varying float vV; void main(){ vS = aS; vV = aV; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `${COLOR_GLSL} uniform float uDraw, uDim; uniform vec3 uC; varying float vS; varying float vV;
+      void main(){ if (vS > uDraw) discard; float edge = 1.0 - smoothstep(0.62, 1.0, abs(vV)); gl_FragColor = vec4(invACES(uC * uDim), edge); }` });
+  const m = new THREE.Mesh(g, mat); m.renderOrder = 3; m.R = R; m.u = mat.uniforms; scene.add(m); return m;
+}
+
+// ─────────────────────────────── end-card camera helpers ───────────────────────────────
+const scratch = new THREE.PerspectiveCamera(FOV, W / H, 4, 20000);
+function boardAt(px, py, c) {
+  placeCamera(scratch, c); const r = new THREE.Raycaster(); r.setFromCamera(new THREE.Vector2(px / W * 2 - 1, 1 - py / H * 2), scratch);
+  const hit = new THREE.Vector3(); r.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit); return { x: hit.x, z: hit.z };
+}
+function toScreen(c, x, y, z) { placeCamera(scratch, c); const v = new THREE.Vector3(x, y, z).project(scratch); return [(v.x + 1) * W / 2, (1 - v.y) * H / 2]; }
+const SUB_CY = 648, SUB_PX = 24, LABEL_PX = 19.6, CAP_PX = 68;               // end-card type sizes in pixels (v2's sizes; the name's cap from the brief)
+
+// ─────────────────────────────── build (in __ready) ───────────────────────────────
+let M, PCB = {}, TXT = {}, TR = {}, PAD, PADGLOW, LOGO, NAME, SUB, URL, DIV, RINGS = [], BUSARR = [], DRIVE, DEV = {};
+const LANES = [-12, -4, 4, 12];
+const LABEL = { aur: 'U1 · AURAEYEZ', lr: 'U2 · LAND ROVER', hxk: 'U3 · HXKEYS AIR', cl: 'U4 · CORELINK', arx: 'U5 · ARX' };
+
+function busLane(o, peel) {
+  // left from under the braked buggy, down the board's left side, right under the wordmark, then peel off
+  const zh = 125 - o, xv = -470 + o, pts = [[JX + 30, LR.z + o], [xv, LR.z + o], [xv, zh], [peel.x, zh], [peel.x, peel.z]];
+  return route(pts, [40 - o, 40 - o, 10]);
+}
+const busS = tau => tau <= 0 ? 0 : T.busV * (tau - T.busC * (1 - Math.exp(-tau / T.busC)));   // soft start, then a steady race
+function busT(s) { let lo = 0, hi = 5; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (busS(m) < s) lo = m; else hi = m; } return hi; }
+
+function footprintArt(kind, w, h) {
+  const PX = 14, mk = col => {
+    const c = canvasOf(w * PX, h * PX), g = c.getContext('2d'), u = PX; g.lineCap = 'round'; g.lineJoin = 'round';
+    const pad = (x, y, r = 0.9) => { g.fillStyle = col.cu; g.beginPath(); g.arc(x * u, y * u, r * u, 0, 7); g.fill(); g.fillStyle = '#0A0908'; g.beginPath(); g.arc(x * u, y * u, r * 0.42 * u, 0, 7); g.fill(); };
+    const line = (pts, wd = 0.6, c2 = col.cu) => { g.strokeStyle = c2; g.lineWidth = wd * u; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * u, y * u) : g.moveTo(x * u, y * u))); g.stroke(); };
+    g.strokeStyle = col.edge; g.lineWidth = 0.25 * u; g.strokeRect(1 * u, 1 * u, (w - 2) * u, (h - 2) * u);
+    if (kind === 'cl') {
+      for (let i = 0; i < 12; i++) { pad(14 + i * 8.6, 8); pad(14 + i * 8.6, h - 8); }
+      for (let i = 0; i < 12; i += 2) line([[14 + i * 8.6, 8], [14 + i * 8.6, 15], [22 + i * 8.6, 22], [22 + i * 8.6, h - 15], [14 + i * 8.6, h - 8]], 0.5, col.cu2);
+      g.strokeStyle = col.silk; g.lineWidth = 0.3 * u; g.beginPath(); g.arc(w * 0.3 * u, h / 2 * u, 8 * u, 0, 7); g.stroke(); g.beginPath(); g.arc(w * 0.7 * u, h / 2 * u, 8 * u, 0, 7); g.stroke();
+    } else {
+      const cx = w / 2, cy = h / 2;
+      g.strokeStyle = col.silk; g.lineWidth = 0.3 * u;
+      for (const [sx, sy] of [[1, 1], [-1, -1], [1, -1], [-1, 1]]) { g.beginPath(); g.arc((cx + sx * 35.4) * u, (cy + sy * 30) * u, 16 * u, 0, 7); g.stroke(); }
+      g.strokeRect((cx - 13) * u, (cy - 13) * u, 26 * u, 26 * u);
+      for (const [sx, sy] of [[1, 1], [-1, -1], [1, -1], [-1, 1]]) { line([[cx + sx * 9, cy + sy * 9], [cx + sx * 24, cy + sy * 20]], 0.8); pad(cx + sx * 35.4, cy + sy * 30, 1.5); }
+      for (let i = 0; i < 7; i++) { pad(cx - 7.6 + i * 2.54, cy + 16, 0.7); pad(cx - 7.6 + i * 2.54, cy - 16, 0.7); }
+    }
+    return c;
+  };
+  return [mk({ edge: '#2f2c28', cu: '#3A2A1C', cu2: '#241a12', silk: '#4a4640' }), mk({ edge: '#6e6962', cu: PAL.trace, cu2: '#6a4524', silk: PAL.silk })];
+}
+
+// A soft contact shadow under a device: its lowest 26 mm seen from above, max-blended, blurred twice; black on the board.
+function bakeContact(m, wmm, hmm) {
+  const S = 256, rtA = new THREE.WebGLRenderTarget(S, S), rtB = new THREE.WebGLRenderTarget(S, S);
+  const g = m.group, saved = g.position.clone(); g.position.set(0, 0, 0); g.updateMatrixWorld(true);
+  const tmp = new THREE.Scene(); tmp.add(g);
+  const cam = new THREE.OrthographicCamera(-wmm / 2 * 1.25, wmm / 2 * 1.25, hmm / 2 * 1.25, -hmm / 2 * 1.25, 1, 2000);
+  cam.position.set(0, 1000, 0); cam.up.set(0, 0, -1); cam.lookAt(0, 0, 0);
+  tmp.overrideMaterial = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendEquation: THREE.MaxEquation,
+    vertexShader: `varying float vY; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vY = w.y; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `varying float vY; void main(){ float k = 1.0 - smoothstep(0.0, 26.0, vY); gl_FragColor = vec4(k * k, 0.0, 0.0, 1.0); }` });
+  const prevClear = renderer.getClearColor(new THREE.Color()), prevA = renderer.getClearAlpha();
+  renderer.setClearColor(0x000000, 1); renderer.setRenderTarget(rtA); renderer.clear(); renderer.render(tmp, cam);
+  const blur = (src, dst, dir) => { POST.blurMat.uniforms.tSrc.value = src.texture; POST.blurMat.uniforms.uDir.value.set(dir[0] / S, dir[1] / S); POST.quad.material = POST.blurMat; renderer.setRenderTarget(dst); renderer.render(POST.qscene, POST.qcam); };
+  for (const r of [3.5, 2.0]) { blur(rtA, rtB, [r, 0]); blur(rtB, rtA, [0, r]); }
+  renderer.setRenderTarget(null); renderer.setClearColor(prevClear, prevA);
+  scene.add(g); g.position.copy(saved); g.updateMatrixWorld(true);
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { tC: { value: rtA.texture }, uA: { value: 0 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform sampler2D tC; uniform float uA; varying vec2 vUv; void main(){ float k = texture2D(tC, vUv).r; gl_FragColor = vec4(0.0, 0.0, 0.0, clamp(k * 1.25, 0.0, 0.85) * uA); }` });
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(wmm * 1.25, hmm * 1.25), mat); p.rotation.x = -Math.PI / 2; p.renderOrder = 1; p.u = mat.uniforms;
+  scene.add(p); return p;
+}
+
+async function build() {
+  await Promise.all([['FilmDisplay', ASSETS.font.display, '200 800'], ['FilmMono', ASSETS.font.mono, '500'], ['FilmMono', ASSETS.font.mono6, '600'], ['FilmBody', ASSETS.font.body, '400 700']]
+    .map(async ([fam, b64, w]) => { const f = new FontFace(fam, Uint8Array.from(atob(b64), c => c.charCodeAt(0)), { weight: w }); await f.load(); document.fonts.add(f); }));
+  const END = SH.final(DUR);
+
+  // the lockup (v1's geometry): [h] Hsu Hsin-Wei[.] — the period is the copper pad the film starts on
+  const probe = canvasOf(8, 8).getContext('2d'); probe.font = `800 ${FONT_MM * 8}px FilmDisplay`;
+  const wordW = probe.measureText('Hsu Hsin-Wei').width / 8;
+  const logoH = FONT_MM * 1.0, logoW = logoH * 208.52 / 232.55, gap = FONT_MM * 0.34, padR = FONT_MM * 0.082;
+  const lockW = logoW + gap + wordW + FONT_MM * 0.3, x0 = -lockW / 2;
+  LOCK = { logoX: x0, logoW, logoH, textX: x0 + logoW + gap, textW: wordW };
+  LOCK.P0 = { x: LOCK.textX + wordW + FONT_MM * 0.15, z: BASE_Z - padR * 1.02, r: padR };
+  LOCK.stemX = LOCK.logoX + logoW * 0.085;
+
+  // the name, v2's type: bold grotesk in off-white, cap height from the brief, tracked so it spans v1's wordmark exactly
+  const capMM = BASE_Z - boardAt(toScreen(END, LOCK.textX, 0, BASE_Z)[0], toScreen(END, LOCK.textX, 0, BASE_Z)[1] - CAP_PX, END).z;
+  probe.font = '700 100px FilmDisplay'; const capRatio = probe.measureText('H').actualBoundingBoxAscent / 100;
+  const F = capMM / capRatio, widthAt = sp => textCanvas('Hsu Hsin-Wei', px => `700 ${px}px FilmDisplay`, F, PAL.name, { px: 9, spacing: sp }).textW;
+  const w0 = widthAt(0), w1 = widthAt(0.01), spacing = clamp((wordW - w0) / ((w1 - w0) / 0.01), -0.05, 0.05);
+  const nameT = textCanvas('Hsu Hsin-Wei', px => `700 ${px}px FilmDisplay`, F, PAL.name, { px: 9, spacing });
+  LOCK.nameF = F; LOCK.nameSpacing = spacing; LOCK.nameW = nameT.textW; LOCK.capMM = capMM;
+  // per-glyph boundaries for the mask (x from the plane's left edge, mm)
+  const glyphX = []; { const g = nameT.ctx; let acc = ''; for (const ch of 'Hsu Hsin-Wei') { glyphX.push(nameT.pad + g.measureText(acc).width / nameT.px); acc += ch; } }
+  NAME = new THREE.Mesh(new THREE.PlaneGeometry(nameT.w, nameT.h), new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+    uniforms: { tMap: { value: texOf(nameT.c) }, uSize: { value: new THREE.Vector2(nameT.w, nameT.h) }, uGX: { value: glyphX.concat(Array(16 - glyphX.length).fill(1e4)) },
+      uGK: { value: Array(16).fill(0) }, uBase: { value: nameT.h - nameT.pad - nameT.asc }, uRise: { value: capMM * 1.15 }, uDim: { value: 1 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `${COLOR_GLSL}
+      uniform sampler2D tMap; uniform vec2 uSize; uniform float uGX[16]; uniform float uGK[16]; uniform float uBase, uRise, uDim; varying vec2 vUv;
+      void main(){
+        vec2 p = vUv * uSize; int gi = 0; for (int i = 0; i < 16; i++) if (p.x >= uGX[i]) gi = i;
+        float k = 0.0; for (int i = 0; i < 16; i++) if (i == gi) k = uGK[i];
+        if (p.y < uBase - 0.6) discard;                                       // the baseline is the mask
+        vec2 q = vec2(p.x, p.y + (1.0 - k) * uRise);
+        if (k <= 0.0) discard;
+        vec4 c = texture2D(tMap, q / uSize);
+        gl_FragColor = vec4(pre(c.rgb * uDim), c.a * step(q.y, uSize.y)); }` }));
+  NAME.rotation.x = -Math.PI / 2; NAME.renderOrder = 4; placeText(NAME, nameT, LOCK.textX, BASE_Z); scene.add(NAME);
+
+  // logo: the site's h with its amber gradient; ignites from the stem where the last trace lands
+  const LPX = 12, logoLit = await svgCanvas(ASSETS.svg.hankhsu_logo_icon, logoW * LPX, logoH * LPX);
+  LOGO = layer(canvasOf(8, 8), logoLit, logoW, logoH, PAL.core); LOGO.position.set(LOCK.logoX + logoW / 2, 0.12, BASE_Z - logoH / 2); LOGO.renderOrder = 4;
+  LOGO.u.uW.value = 22;
+
+  // subtitle, v2's one line: "— Product Engineer │ hankhsu.com", mono 24 px, +4 % tracking, from the name's left edge
+  const subZ0 = boardAt(960, SUB_CY, END).z, monoMM = boardAt(960, SUB_CY + SUB_PX / 2, END).z - boardAt(960, SUB_CY - SUB_PX / 2, END).z;
+  const subT = textCanvas('— Product Engineer', px => `500 ${px}px FilmMono`, monoMM, PAL.sub, { px: 16, spacing: 0.04 });
+  const urlT = textCanvas('hankhsu.com', px => `500 ${px}px FilmMono`, monoMM, PAL.url, { px: 16, spacing: 0.04 });
+  probe.font = `500 100px FilmMono`; const capM = probe.measureText('P').actualBoundingBoxAscent / 100 * monoMM;
+  const subBase = subZ0 + capM / 2;                                           // the line's cap-height centre sits on SUB_CY
+  SUB = layer(subT.c, subT.c, subT.w, subT.h); URL = layer(urlT.c, urlT.c, urlT.w, urlT.h);
+  const sepGap = monoMM * 0.9;
+  placeText(SUB, subT, LOCK.textX, subBase); placeText(URL, urlT, LOCK.textX + subT.textW + sepGap * 2, subBase);
+  const divC = canvasOf(4, 64); { const g = divC.getContext('2d'); g.fillStyle = PAL.name; g.fillRect(0, 0, 4, 64); }
+  const divW = boardAt(961, SUB_CY, END).x - boardAt(960, SUB_CY, END).x;
+  DIV = layer(divC, divC, divW, monoMM * 0.95); DIV.position.set(LOCK.textX + subT.textW + sepGap, 0.12, subBase - capM / 2);
+  for (const p of [SUB, URL, DIV]) { p.z0 = p.position.z; p.renderOrder = 4; p.u.uR.value = 1e4; }
+
+  // the pad: v2's copper via, at v1's period
+  PAD = new THREE.Mesh(new THREE.CircleGeometry(padR, 96), new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+    uniforms: { uOn: { value: 0 }, uSheen: { value: -2 }, uGlint: { value: 0 }, uDim: { value: 1 }, uR: { value: padR }, uDark: { value: v3('#24180F') }, uCu: { value: v3(PAL.trace) }, uHi: { value: v3(PAL.hi) }, uCore: { value: v3(PAL.core) } },
+    vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `${COLOR_GLSL}
+      uniform float uOn, uSheen, uGlint, uDim, uR; uniform vec3 uDark, uCu, uHi, uCore; varying vec2 vP;
+      void main(){
+        float r = length(vP) / uR, fw = fwidth(r);
+        float ring = smoothstep(0.38 - fw, 0.38 + fw, r) * (1.0 - smoothstep(1.0 - fw * 1.5, 1.0, r));
+        if (ring <= 0.0) discard;
+        vec3 c = mix(uDark, uCu, uOn);
+        float bev = smoothstep(0.38, 0.55, r) * (1.0 - smoothstep(0.85, 1.0, r));
+        c *= 0.82 + 0.3 * bev;
+        float sh = exp(-pow((dot(vP / uR, normalize(vec2(1.0, 0.6))) - uSheen) / 0.22, 2.0));
+        c = mix(c, uHi, clamp(sh * uOn * 0.9 + uGlint * 0.8, 0.0, 1.0)) * uDim;
+        vec3 col = invACES(clamp(c, 0.0, 1.0)) + invACES(uCore) * (uGlint * 2.6 + uOn * 0.25) * smoothstep(0.38, 0.6, r);
+        gl_FragColor = vec4(col, ring); }` }));
+  PAD.rotation.x = -Math.PI / 2; PAD.position.set(LOCK.P0.x, 0.14, LOCK.P0.z); PAD.renderOrder = 5; scene.add(PAD);
+  PADGLOW = glowDecal(padR * 9, COPPER, { y: 0.2 }); PADGLOW.position.x = LOCK.P0.x; PADGLOW.position.z = LOCK.P0.z;
+
+  // boards: v2's dim/lit art at v1's spots; U2's node lights in the rover's green, as in v1
+  const ART = { aur: ['auraeyez-pcb-top', AUR], lr: ['buggy-pcb-top', LR], hxk: ['hxkeysair-pcb-top', HXK] };
+  const DIM = { '#C83434': '#3A2A1C', '#4D7FC4': '#241a12', '#FFFFFF': '#0A0908', '#F2EDA1': '#4a4640', '#C2C2C2': '#2f2c28', '#D0D2CD': '#2f2c28' };
+  const LIT = { '#C83434': PAL.trace, '#4D7FC4': '#6a4524', '#FFFFFF': '#0A0908', '#F2EDA1': PAL.silk, '#C2C2C2': '#6e6962', '#D0D2CD': '#6e6962' };
+  const LIT_LR = { '#C83434': ACC.landrover, '#4D7FC4': mixHex(ACC.landrover, '#0A0908', 0.45), '#FFFFFF': '#0A0908', '#F2EDA1': '#ece8df', '#C2C2C2': '#8f8a82', '#D0D2CD': '#8f8a82' };
+  for (const [k, [name, s]] of Object.entries(ART)) {
+    const PX = 14; let svg = ASSETS.svg[name];
+    if (k === 'lr') svg = stripText(svg, ['Ximing Wang']);
+    if (/ximing/i.test(svg)) throw new Error('author text left in ' + name);
+    const art = layer(await svgCanvas(recolor(svg, DIM), s.w * PX, s.h * PX), await svgCanvas(recolor(svg, k === 'lr' ? LIT_LR : LIT), s.w * PX, s.h * PX), s.w, s.h, k === 'lr' ? '#CFF2B0' : PAL.hi);
+    art.position.set(s.x, 0.08, s.z); art.u.uAlpha.value = 1; art.u.uW.value = 14; PCB[k] = art;
+  }
+  PCB.lr.u.uGain.value = 1.4;                                                 // the node reads green from the end card
+  for (const [k, s, w, h] of [['cl', CL, 124, 52], ['arx', ARX, 118, 92]]) {
+    const [dim, lit] = footprintArt(k, w, h), art = layer(dim, lit, w, h);
+    art.position.set(s.x, 0.08, s.z); art.u.uAlpha.value = 1; art.u.uW.value = 14; PCB[k] = art;
+  }
+
+  // routes (v1, verbatim)
+  const P0 = LOCK.P0, ax = AUR.x, aEntry = AUR.z + AUR.h / 2, kneeX = P0.x + 60;
+  TR.a = ribbon(route([[P0.x + P0.r * 0.6, P0.z], [kneeX, P0.z], [ax, P0.z - (ax - kneeX)], [ax, aEntry]], [8, 8]), 2.4, gradient(COPPER, COPPER, ACC.auraeyez));
+  const bx0 = AUR.x - AUR.w / 2, bz = AUR.z - 6, lrE = LR.x + LR.w / 2;
+  TR.b = ribbon(route([[bx0, bz], [lrE + Math.abs(LR.z - bz), bz], [lrE, LR.z]], [8]), 2.4, gradient(ACC.auraeyez, ACC.landrover));
+  TR.c = ribbon(route([[LR.x - LR.w / 2, LR.z], [JX + 30, LR.z]], []), 2.4, gradient(ACC.landrover, ACC.landrover));
+  const peels = [{ x: HXK.x, z: HXK.z - HXK.h / 2 }, { x: CL.x, z: CL.z - CL.h / 2 }, { x: ARX.x, z: ARX.z - ARX.h / 2 }, { x: LOCK.stemX, z: BASE_Z + 1 }];
+  const ends = [ACC.hxkeysair, ACC.corelink, ACC.arx, LOGO_ORANGE];
+  TR.bus = LANES.map((o, i) => ribbon(busLane(o, peels[i]), 2.0, gradient(ACC.landrover, mixHex(ACC.landrover, ends[i], 0.5), ends[i]), { halo: 6.5 }));
+  BUSARR = TR.bus.map((r, i) => (i < 3 ? T.bus0 : T.l4Start) + busT(r.R.L));
+  T.hxk = BUSARR[0]; T.cl = BUSARR[1]; T.arx = BUSARR[2]; T.logo = BUSARR[3];
+  T.word0 = T.logo + T.logoFill * 0.8; T.close = T.word0 + T.wordDur; T.tag = T.close + 0.1;
+  // each glyph rises as v1's wipe front reaches it: wx = lerp(−30, textW + 40, smoother(u)) across word0 → close
+  { const tOf = x => { const k = clamp((x + 30) / (wordW + 70)); let lo = 0, hi = 1; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (ease.smoother(m) < k) lo = m; else hi = m; } return T.word0 + hi * (T.close - T.word0); };
+    NAME.glyphT = glyphX.map((gx, i) => { const a0 = gx - nameT.pad, a1 = (i + 1 < glyphX.length ? glyphX[i + 1] : nameT.pad + nameT.textW) - nameT.pad, s = tOf(a0 + 0.25 * (a1 - a0)); return [s, Math.max(s + 0.14, tOf(a1 + 8))]; }); }
+
+  // CoreLink's link pulse: v2's 1 px rings in the CoreLink violet
+  for (let i = 0; i < 2; i++) {
+    const r = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uA: { value: 0 }, uC: { value: v3(ACC.corelink) } },
+      vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `${COLOR_GLSL} uniform float uA; uniform vec3 uC; varying vec2 vP;
+        void main(){ float r = length(vP), fw = fwidth(r); float a = 1.0 - smoothstep(0.0, fw * 1.2, abs(r - 1.0)); if (a <= 0.0) discard; gl_FragColor = vec4(invACES(uC) * 1.6, a * uA); }` }));
+    r.rotation.x = -Math.PI / 2; r.position.set(CL.x, 0.2, CL.z); r.renderOrder = 5; scene.add(r); RINGS.push(r);
+  }
+
+  // models: v2's materials, fully assembled, at v1's spots
+  M = await FILM_MODELS.load(THREE, THREEX);
+  FILM_MODELS.U.uEnd.value = 0;
+  M.buggy.group.rotation.y = Math.PI;                          // caster leads: it drives toward −x
+  M.hxkeysair.setGlow(() => 0);
+  const SPOT = { aur: ['auraeyez', AUR.x, AUR.z], lr: ['buggy', JX, LR.z], hxk: ['hxkeysair', HXK.x, HXK.z], cl: ['corelink', CL.x, CL.z], arx: ['arx', ARX.x, ARX.z] };
+  for (const [k, [name, x, z]] of Object.entries(SPOT)) {
+    const m = M[name]; m.setBuild(() => ({ off: 0, op: 1 }));
+    m.group.position.set(x, 0, z); scene.add(m.group); m.group.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(m.group);
+    const d = DEV[k] = { m, x, z, box: { x0: b.min.x - 9, x1: b.max.x + 9, z0: b.min.z - 9, z1: b.max.z + 9 } };
+    // courtyard: v2's rounded-rect silkscreen loop, on the board from the start, brightening as the device arrives
+    const { x0, x1, z0, z1 } = d.box, r = 6;
+    d.outline = outline(route([[x0 + r * 2, z1], [x0, z1], [x0, z0], [x1, z0], [x1, z1], [x0 + r * 2 - 0.01, z1]], [r, r, r, r]));
+    d.contact = bakeContact(m, x1 - x0, z1 - z0); d.contact.position.set(x, 0.06, z);
+    m.group.position.y = -999;
+  }
+  // designators: v2's mono labels in grey, under each device; U1 right-aligned clear of the vertical trace (x 1615 px)
+  const mmPerPx = (boardAt(1060, 540, END).x - boardAt(860, 540, END).x) / 200, labelMM = LABEL_PX * mmPerPx;
+  for (const k of Object.keys(SPOT)) {
+    const d = DEV[k], lt = textCanvas(LABEL[k], px => `500 ${px}px FilmMono`, labelMM, PAL.label, { px: 14, spacing: 0.06 });
+    d.label = layer(canvasOf(8, 8), lt.c, lt.w, lt.h); d.label.u.uMode.value = 1; d.label.u.uFront.value = 0; d.label.u.uW.value = 8; d.label.u.uAlpha.value = 1; d.label.renderOrder = 4;
+    const zb = d.box.z1 + 19;
+    let lx = d.box.x0;
+    if (k === 'aur') { const right = Math.min(d.box.x1, boardAt(1615 - 16 - 6, toScreen(END, AUR.x, 0, zb)[1], END).x); lx = right - lt.textW; }
+    placeText(d.label, lt, lx, zb); d.label.lt = lt; d.label.lx = lx; d.label.zb = zb;
+  }
+
+  // the buggy's drive: ease in, cruise, brake hard — integrated once, sampled by u
+  DRIVE = (() => { const N = 2000, v = u => sstep(0, 0.3, u) * (u < 0.68 ? 1 : Math.pow(1 - (u - 0.68) / 0.32, 1.15)), c = [0];
+    for (let i = 1; i <= N; i++) c.push(c[i - 1] + v((i - 0.5) / N) / N); return u => c[Math.round(clamp(u) * N)] / c[N]; })();
+}
+
+// ─────────────────────────────── state: pure functions of t (v1) ───────────────────────────────
+const rise = (t, t0, h, zeta = 0.72, omega = 11) => t < t0 ? -h - 1 : -h * (1 - spring(t - t0, zeta, omega));
+const buggyX = t => lerp(LR.x, JX, DRIVE(seg(t, T.drive0, T.drive1)));
+function propAngle(t) {
+  const t0 = T.arx + 0.06, t1 = T.arx + 0.62, D = 0.34, w0 = 62;
+  if (t < t0) return 0; const up = Math.min(t, t1) - t0; let a = w0 * (up - 0.05 * (1 - Math.exp(-up / 0.05)));
+  if (t > t1) { const u = Math.min(t - t1, D); a += w0 * (u - u * u / (2 * D)); } return a;
+}
+function arxLift(t) { const t0 = T.arx; return 30 * ease.cubicOut(seg(t, t0 + 0.12, t0 + 0.34)) * (1 - Math.pow(seg(t, t0 + 0.42, t0 + 0.62), 3)); }
+
+// where the current is: [{x, z, color, on}] for each running head
+function headsAt(t) {
+  const out = [], P0 = LOCK.P0;
+  const add = (R, s, col, on = 1) => { const p = at(R, s); out.push({ x: p.x, z: p.z, color: col, on }); };
+  if (t >= T.aStart && t < T.aEnd + 0.12) add(TR.a.R, sA(t), COPPER, 1 - seg(t, T.aEnd, T.aEnd + 0.12));
+  if (t >= T.bStart && t < T.bEnd + 0.12) add(TR.b.R, sB(t), mixHex(ACC.auraeyez, ACC.landrover, seg(t, T.bStart, T.bEnd)), 1 - seg(t, T.bEnd, T.bEnd + 0.12));
+  if (t >= T.drive0 && t < T.drive1 + 0.1) add(TR.c.R, sC(t), ACC.landrover, 1 - seg(t, T.drive1, T.drive1 + 0.1));
+  TR.bus.forEach((b, i) => { const t0 = i < 3 ? T.bus0 : T.l4Start; if (t >= t0 && t < BUSARR[i] + 0.12) add(b.R, busS(t - t0), [ACC.hxkeysair, ACC.corelink, ACC.arx, LOGO_ORANGE][i], 1 - seg(t, BUSARR[i], BUSARR[i] + 0.12)); });
+  return out;
+}
+const sA = t => TR.a.R.L * ease.quintInOut(seg(t, T.aStart, T.aEnd));
+const sB = t => TR.b.R.L * ease.expoInOut(seg(t, T.bStart, T.bEnd));
+const sC = t => t < T.drive0 ? 0 : clamp((LR.x - LR.w / 2) - (buggyX(t) - 92), 0, TR.c.R.L);
+
+// ─────────────────────────────── camera (v1, verbatim) ───────────────────────────────
+// A shot is {x, z, d, pitch, yaw} (look point on the board, distance, degrees from vertical, degrees about y).
+// Keys reach their shot on a library curve; chase shots read the head's own position, keyed slightly ahead.
+const SH = {
+  pad:   t => ({ x: LOCK.P0.x, z: LOCK.P0.z, d: 64, pitch: 7, yaw: 0 }),
+  chaseA: t => { const p = at(TR.a.R, sA(t + 0.025)); return { x: p.x, z: p.z, d: lerp(64, 430, ease.cubicInOut(seg(t, T.aStart, T.aEnd))), pitch: lerp(7, 30, seg(t, T.aStart, T.aEnd)), yaw: lerp(0, -8, seg(t, T.aStart, T.aEnd)) }; },
+  aur:   t => ({ x: AUR.x - 4, z: AUR.z + 6, d: 300, pitch: 47, yaw: -16 }),
+  chaseB: t => { const p = at(TR.b.R, sB(t + 0.06)); return { x: p.x, z: p.z + 10, d: 470, pitch: 40, yaw: -4 }; },
+  lr:    t => ({ x: LR.x + 6, z: LR.z + 12, d: 520, pitch: 52, yaw: 14 }),
+  drive: t => ({ x: buggyX(t + 0.08) - 50, z: LR.z + 10, d: 560, pitch: 58, yaw: 22 }),
+  burst: t => ({ x: -55, z: 92, d: 1080, pitch: 36, yaw: 0 }),
+  final: t => ({ x: 0, z: -4, d: 1300, pitch: 14, yaw: 0 }),
+};
+// [time the shot is fully reached, shot, curve into it]
+const KEYS = [
+  [0, 'pad'], [T.aStart, 'pad'],
+  [T.aStart + 0.18, 'chaseA', ease.sineInOut], [T.aEnd - 0.05, 'chaseA'],
+  [T.aEnd + 0.52, 'aur', ease.cubicInOut], [T.bStart - 0.02, 'aur'],
+  [T.bStart + 0.16, 'chaseB', ease.expoInOut], [T.bEnd - 0.05, 'chaseB'],
+  [T.bEnd + 0.6, 'lr', ease.cubicInOut], [T.drive0 - 0.04, 'lr'],
+  [T.drive0 + 0.42, 'drive', ease.sineInOut], [T.drive1 + 0.02, 'drive'],
+  [T.drive1 + 0.82, 'burst', ease.expoOut], [9.35, 'burst'],
+];
+function addFinalKeys() { KEYS.push([T.l4Start, 'burst'], [T.logo + 0.35, 'final', ease.cubicInOut], [DUR, 'final']); }
+const SHAKES = () => [[T.drive1, 5, 9], [T.hxk + 0.05, 7, 10], [T.cl + 0.05, 6, 10], [T.arx + 0.62, 6, 10]];
+function shotAt(t) {
+  let i = 0; while (i < KEYS.length - 1 && KEYS[i + 1][0] <= t) i++;
+  const [ta, na] = KEYS[i]; if (i === KEYS.length - 1) return SH[na](t);
+  const [tb, nb, curve] = KEYS[i + 1], A = SH[na](t), B = SH[nb](t);
+  if (na === nb) return A;
+  const k = (curve || ease.cubicInOut)(seg(t, ta, tb));
+  return { x: lerp(A.x, B.x, k), z: lerp(A.z, B.z, k), d: Math.exp(lerp(Math.log(A.d), Math.log(B.d), k)), pitch: lerp(A.pitch, B.pitch, k), yaw: lerp(A.yaw, B.yaw, k) };
+}
+// the operator: a slow two-sine hand while moving, none in the holds; a shake on each landing
+const handEnv = t => sstep(0.75, 1.2, t) * (1 - sstep(3.0, 3.35, t)) + sstep(4.0, 4.3, t) * (1 - sstep(8.9, 9.3, t)) + sstep(T.l4Start, T.l4Start + 0.3, t) * (1 - sstep(T.logo + 0.1, T.logo + 0.5, t));
+function camAt(t) {
+  const s = shotAt(t), e = handEnv(t) * 0.006 * s.d;
+  let x = s.x + e * (Math.sin(1.7 * t) + 0.6 * Math.sin(2.9 * t + 1)), z = s.z + e * (Math.sin(1.3 * t + 2) + 0.5 * Math.sin(3.3 * t)), roll = 0;
+  for (const [th, amp, decay] of SHAKES()) { const k = OM.shake(t, th, { amp, decay, seed: Math.round(th * 100) }), g = 1 - sstep(th + 0.3, th + 0.55, t); x += k.x * s.d / 1000 * g; z += k.y * s.d / 1000 * g; roll += k.rot * 0.4 * g; }
+  return { x, z, d: s.d, pitch: s.pitch, yaw: s.yaw, roll };
+}
+function placeCamera(cam, c) {
+  const p = THREE.MathUtils.degToRad(c.pitch), y = THREE.MathUtils.degToRad(c.yaw);
+  cam.position.set(c.x + c.d * Math.sin(p) * Math.sin(y), c.d * Math.cos(p), c.z + c.d * Math.sin(p) * Math.cos(y));
+  cam.up.set(Math.sin(y) * 0 + Math.sin(c.roll || 0), 1, 0).normalize();
+  if (c.pitch < 1) cam.up.set(0, 0, -1);
+  cam.lookAt(c.x, 0, c.z);
+  cam.updateMatrixWorld(true);
+}
+
+// the lens (v2's rig): focus on the shot's subject; shallow on the close-ups, fully sharp from 650 mm out
+const SUBJECT_Y = { aur: 42, lr: 30, drive: 30 };
+function LENS(t, c) {
+  let i = 0; while (i < KEYS.length - 1 && KEYS[i + 1][0] <= t) i++;
+  const [ta, na] = KEYS[i], nxt = KEYS[Math.min(i + 1, KEYS.length - 1)], k = i === KEYS.length - 1 || na === nxt[1] ? 0 : (nxt[2] || ease.cubicInOut)(seg(t, ta, nxt[0]));
+  const y = lerp(SUBJECT_Y[na] || 0, SUBJECT_Y[nxt[1]] || 0, k);
+  placeCamera(scratch, c);
+  const focus = scratch.position.distanceTo(new THREE.Vector3(c.x, y, c.z));
+  return { focus, ap: 20 * (1 - sstep(330, 650, c.d)), max: 16, bloom: 0.6 };
+}
+
+// ─────────────────────────────── post (v2): DOF, bloom, ACES, grain, edge CA ───────────────────────────────
+const POST = (() => {
+  const HF = THREE.HalfFloatType, rt = (w, h, o = {}) => new THREE.WebGLRenderTarget(w, h, Object.assign({ type: HF, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false }, o));
+  const main = new THREE.WebGLRenderTarget(W, H, { type: HF, samples: 4, depthBuffer: true, depthTexture: new THREE.DepthTexture(W, H, THREE.UnsignedIntType) });
+  const h2 = [rt(W / 2, H / 2), rt(W / 2, H / 2)], b = [rt(W / 2, H / 2), rt(W / 4, H / 4), rt(W / 8, H / 8), rt(W / 16, H / 16)], bt = [rt(W / 2, H / 2), rt(W / 4, H / 4), rt(W / 8, H / 8), rt(W / 16, H / 16)];
+  const qscene = new THREE.Scene(), qcam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); qscene.add(quad);
+  const VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+  const sm = (fs, uniforms) => new THREE.ShaderMaterial({ uniforms, vertexShader: VS, fragmentShader: fs, depthTest: false, depthWrite: false });
+  const DEPTH = `uniform sampler2D tDepth; uniform float uNear, uFar, uFocus, uAp, uMaxCoc;
+    float viewZ(vec2 uv){ float d = texture2D(tDepth, uv).x; return (uNear * uFar) / ((uFar - uNear) * d - uFar); }
+    float coc(vec2 uv){ float z = -viewZ(uv); return clamp(uAp * abs(z - uFocus) / z, 0.0, uMaxCoc); }`;
+  const prefilter = sm(`${DEPTH} uniform sampler2D tColor; uniform vec2 uTexel; varying vec2 vUv;
+    void main(){ vec3 c = vec3(0.0); float k = 0.0;
+      for (int i = 0; i < 4; i++) { vec2 o = (vec2(float(i - (i / 2) * 2), float(i / 2)) - 0.5) * uTexel; c += texture2D(tColor, vUv + o).rgb; k = max(k, coc(vUv + o)); }
+      gl_FragColor = vec4(min(c * 0.25, vec3(60.0)), k); }`,
+    { tColor: { value: main.texture }, tDepth: { value: main.depthTexture }, uTexel: { value: new THREE.Vector2(1 / W, 1 / H) }, uNear: { value: 4 }, uFar: { value: 20000 }, uFocus: { value: 1000 }, uAp: { value: 0 }, uMaxCoc: { value: 16 } });
+  const gather = sm(`uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uMax; varying vec2 vUv;
+    void main(){ vec4 c0 = texture2D(tSrc, vUv); float r0 = c0.a * 0.5; vec3 acc = c0.rgb; float wsum = 1.0;
+      for (int i = 1; i < 44; i++) { float fi = float(i); float r = sqrt(fi / 44.0) * uMax * 0.5; float a = fi * 2.39996;
+        vec2 o = vec2(cos(a), sin(a)) * r * uTexel; vec4 s = texture2D(tSrc, vUv + o);
+        float sr = s.a * 0.5; float w = smoothstep(r - 1.0, r + 0.5, sr) * (sr >= r0 ? 1.0 : smoothstep(r - 1.0, r + 0.5, r0));
+        acc += s.rgb * w; wsum += w; }
+      gl_FragColor = vec4(acc / wsum, c0.a); }`, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2(2 / W, 2 / H) }, uMax: { value: 16 } });
+  const bright = sm(`uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uThr; varying vec2 vUv;
+    void main(){ vec3 c = vec3(0.0); for (int i = 0; i < 4; i++) { vec2 o = (vec2(float(i - (i / 2) * 2), float(i / 2)) - 0.5) * uTexel; c += min(texture2D(tSrc, vUv + o).rgb, vec3(80.0)); } c *= 0.25;
+      float l = max(c.r, max(c.g, c.b)); float k = max(l - uThr, 0.0); k = k * k / (k + 2.0); gl_FragColor = vec4(c * k / max(l, 1e-4), 1.0); }`,
+    { tSrc: { value: main.texture }, uTexel: { value: new THREE.Vector2(1 / W, 1 / H) }, uThr: { value: 7.5 } });
+  const blurMat = sm(`uniform sampler2D tSrc; uniform vec2 uDir; varying vec2 vUv;
+    void main(){ vec4 c = texture2D(tSrc, vUv) * 0.2270270;
+      c += (texture2D(tSrc, vUv + uDir * 1.3846153) + texture2D(tSrc, vUv - uDir * 1.3846153)) * 0.3162162;
+      c += (texture2D(tSrc, vUv + uDir * 3.2307692) + texture2D(tSrc, vUv - uDir * 3.2307692)) * 0.0702702; gl_FragColor = c; }`, { tSrc: { value: null }, uDir: { value: new THREE.Vector2() } });
+  const copyAdd = sm(`uniform sampler2D tA, tB; uniform float uK; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tA, vUv) + texture2D(tB, vUv) * uK; }`, { tA: { value: null }, tB: { value: null }, uK: { value: 1 } });
+  const composite = sm(`${DEPTH} uniform sampler2D tColor, tDof, tBloom; uniform float uDof, uBloom; varying vec2 vUv;
+    vec3 aces(vec3 color){ color *= ${EXPOSURE.toFixed(3)} / 0.6;
+      color = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777)) * color;
+      vec3 a = color * (color + 0.0245786) - 0.000090537, b = color * (0.983729 * color + 0.4329510) + 0.238081; color = a / b;
+      color = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602)) * color; return clamp(color, 0.0, 1.0); }
+    vec3 lin2srgb(vec3 c){ return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+    vec3 scene(vec2 uv){ vec3 c = texture2D(tColor, uv).rgb; if (uDof > 0.5) { float k = smoothstep(0.7, 2.2, coc(uv)); c = mix(c, texture2D(tDof, uv).rgb, k); } return c + texture2D(tBloom, uv).rgb * uBloom; }
+    float hash(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+    void main(){
+      vec2 d = vUv - 0.5; float r2 = dot(d * vec2(1.7778, 1.0), d * vec2(1.7778, 1.0));
+      vec2 ca = d * 0.5 / vec2(${W}.0, ${H}.0) * 2.0 * smoothstep(0.15, 0.6, r2);   // ≤ 0.5 px at the corners
+      vec3 c = vec3(scene(vUv + ca).r, scene(vUv).g, scene(vUv - ca).b);
+      c = lin2srgb(aces(c));
+      c *= 1.0 - 0.075 * smoothstep(0.12, 0.95, r2);                                  // vignette ~7 %
+      float n = hash(floor(gl_FragCoord.xy)) - 0.5, n2 = hash(floor(gl_FragCoord.xy) + 37.0) - 0.5;
+      c += (n * 0.6 + n2 * 0.4) * 0.022 * (1.0 - smoothstep(0.05, 0.22, dot(c, vec3(0.333))));   // fine grain in the dark ground only (anti-banding); products stay clean
+      gl_FragColor = vec4(c, 1.0); }`,
+    { tColor: { value: main.texture }, tDepth: { value: main.depthTexture }, tDof: { value: h2[1].texture }, tBloom: { value: b[0].texture },
+      uNear: { value: 4 }, uFar: { value: 20000 }, uFocus: { value: 1000 }, uAp: { value: 0 }, uMaxCoc: { value: 16 }, uDof: { value: 0 }, uBloom: { value: 1 } });
+  const pass = (mat, target) => { quad.material = mat; renderer.setRenderTarget(target); renderer.render(qscene, qcam); };
+  function render(cam, lens) {
+    renderer.setRenderTarget(main); renderer.setClearColor(0x000000, 1); renderer.clear(); renderer.render(scene, cam);
+    for (const m of [prefilter, composite]) { m.uniforms.uNear.value = cam.near; m.uniforms.uFar.value = cam.far; m.uniforms.uFocus.value = lens.focus; m.uniforms.uAp.value = lens.ap; m.uniforms.uMaxCoc.value = lens.max || 16; }
+    const dof = lens.ap > 0.2;
+    if (dof) { pass(prefilter, h2[0]); gather.uniforms.tSrc.value = h2[0].texture; gather.uniforms.uMax.value = lens.max || 16; pass(gather, h2[1]); }
+    pass(bright, b[0]);
+    for (let i = 1; i < 4; i++) { blurMat.uniforms.tSrc.value = b[i - 1].texture; blurMat.uniforms.uDir.value.set(1 / b[i - 1].width, 0); pass(blurMat, bt[i]); blurMat.uniforms.tSrc.value = bt[i].texture; blurMat.uniforms.uDir.value.set(0, 1 / bt[i].height); pass(blurMat, b[i]); }
+    for (let i = 3; i > 0; i--) { blurMat.uniforms.tSrc.value = b[i].texture; blurMat.uniforms.uDir.value.set(1 / b[i].width, 1 / b[i].height); pass(blurMat, bt[i]); copyAdd.uniforms.tA.value = b[i - 1].texture; copyAdd.uniforms.tB.value = bt[i].texture; copyAdd.uniforms.uK.value = 0.85; pass(copyAdd, bt[i - 1]); [b[i - 1], bt[i - 1]] = [bt[i - 1], b[i - 1]]; }
+    composite.uniforms.tBloom.value = b[0].texture; composite.uniforms.uDof.value = dof ? 1 : 0; composite.uniforms.uBloom.value = lens.bloom ?? 0.6;
+    pass(composite, null); renderer.setRenderTarget(null);
+  }
+  return { render, quad, qscene, qcam, blurMat };
+})();
+
+// ─────────────────────────────── seek ───────────────────────────────
+const EYE_GLOW = 3.0, LED_K = 1.6;
+function seek(t) {
+  // pad: dark copper, powers at padOn, flares when the loop closes (v1's timing, v2's via)
+  const on = sstep(T.padOn, T.padOn + 0.18, t), close = t >= T.close ? Math.exp(-(t - T.close) * 3.2) * (1 - sstep(T.close + 0.5, T.close + 1.0, t)) : 0;
+  PAD.material.uniforms.uOn.value = on; PAD.material.uniforms.uGlint.value = close;
+  const pr = OM.press(t, T.padOn, { depth: 0.12 }), pr2 = OM.press(t, T.close, { depth: 0.14 });
+  PAD.scale.setScalar(1 - pr.sq * 0.6 - pr2.sq * 0.6);
+  PADGLOW.u.uOp.value = on * (0.35 - 0.2 * sstep(T.aStart, T.aStart + 0.5, t)) + 0.9 * close + 0.18 * sstep(T.close, T.close + 0.3, t);
+
+  // traces
+  TR.a.set(0, sA(t)); TR.b.set(0, sB(t)); TR.c.set(0, sC(t));
+  TR.bus.forEach((b, i) => b.set(0, busS(t - (i < 3 ? T.bus0 : T.l4Start))));
+
+  // boards light as the current arrives: a ripple from the entry
+  const rip = (p, t0, origin, rmax, w = 14) => { const o = p.toLocal(origin.x, origin.z); p.u.uOrigin.value.set(o[0], o[1]); p.u.uR.value = t < t0 ? 0 : rmax * ease.cubicOut(seg(t, t0, t0 + 0.5)); p.u.uW.value = w; };
+  rip(PCB.aur, T.aEnd, { x: AUR.x, z: AUR.z + AUR.h / 2 }, 125);
+  rip(PCB.lr, T.bEnd, { x: LR.x + LR.w / 2, z: LR.z }, 150);
+  rip(PCB.hxk, T.hxk, { x: HXK.x, z: HXK.z - HXK.h / 2 }, 120);
+  rip(PCB.cl, T.cl, { x: CL.x, z: CL.z - CL.h / 2 }, 140);
+  rip(PCB.arx, T.arx, { x: ARX.x, z: ARX.z - ARX.h / 2 }, 140);
+  // courtyards draw in as each device arrives (U2's where the rover parks); designators wipe on with v1's reveal
+  for (const [k, tc, t0] of [['aur', T.aurRise - 0.1, T.aEnd + 0.2], ['lr', T.drive1 - 0.15, T.drive1 + 0.2], ['hxk', T.hxk - 0.02, T.hxk + 0.15], ['cl', T.cl - 0.02, T.cl + 0.15], ['arx', T.arx - 0.02, T.arx + 0.15]]) {
+    const d = DEV[k], ol = SETTLE(seg(t, tc, tc + 0.22));
+    d.outline.u.uDraw.value = ol * d.outline.R.L; d.outline.visible = ol > 0;
+    d.label.u.uR.value = t < t0 ? 0 : d.label.lt.w / 2 + 140 * seg(t, t0, t0 + 0.35);
+  }
+
+  // logo + name close the loop
+  const lg = seg(t, T.logo, T.logo + T.logoFill);
+  LOGO.u.uAlpha.value = t >= T.logo ? 1 : 0; LOGO.u.uR.value = t < T.logo ? 0 : 120 * ease.cubicOut(lg); LOGO.u.uFront.value = 1 - seg(t, T.logo + 0.2, T.logo + 0.6);
+  const lo = LOGO.toLocal(LOCK.stemX, BASE_Z); LOGO.u.uOrigin.value.set(lo[0], lo[1]);
+  LOGO.u.uGain.value = 1 + 1.8 * (t >= T.logo ? Math.exp(-(t - T.logo) * 4) : 0);
+  const gk = NAME.material.uniforms.uGK.value;
+  for (let g = 0; g < 16; g++) gk[g] = g < NAME.glyphT.length ? SETTLE(seg(t, NAME.glyphT[g][0], NAME.glyphT[g][1])) : 0;
+  NAME.visible = t >= NAME.glyphT[0][0];
+  for (const [p, dt, op] of [[SUB, 0, 1], [DIV, 0.12, 0.3], [URL, 0.12, 1]]) {
+    const r = OM.wordRise(t, T.tag + dt, { dist: 9, s0: 1 });
+    p.u.uAlpha.value = t < T.tag + dt ? 0 : r.op * op; p.visible = t >= T.tag + dt; p.position.z = p.z0 + r.y;
+  }
+
+  // products (v1's animation on v2's models)
+  const A = M.auraeyez, ay = rise(t, T.aurRise, A.size.y);
+  A.group.position.y = ay; A.group.visible = ay > -A.size.y - 0.5;
+  const boot = seg(t, T.aurBoot, T.aurBoot + 0.3), flick = boot > 0 && boot < 1 ? (Math.sin(boot * 40) > 0.2 ? 1 : 0.35) : boot;
+  const blink = 1 - (t >= T.aurBlink && t < T.aurBlink + 0.16 ? Math.sin(Math.PI * seg(t, T.aurBlink, T.aurBlink + 0.16)) * 0.94 : 0);
+  A.setScreen({ lit: flick, eyes: ease.cubicOut(seg(t, T.aurEyes, T.aurEyes + 0.35)), open: blink, gaze: -ease.expoOut(seg(t, T.aurGlance, T.aurGlance + 0.18)), glow: EYE_GLOW, scaleIn: true });
+
+  const B = M.buggy, by = rise(t, T.lrRise, B.size.y, 0.74, 9), bxp = buggyX(t);
+  B.group.position.set(bxp, by, LR.z); B.group.visible = by > -B.size.y - 0.5;
+  const dip = 0.07 * ring(t - T.drive1 + 0.06, 6, 15) - 0.035 * ring(t - T.drive0, 5, 12);
+  B.group.rotation.set(0, Math.PI, 0); B.group.rotateZ(dip);
+  B.setRoll((LR.x - bxp) / B.wheelR);
+
+  const K = M.hxkeysair, ky = rise(t, T.hxk + 0.03, K.size.y, 0.55, 16), up = ease.expoOut(seg(t, T.hxk + 0.03, T.hxk + 0.2));
+  K.group.position.y = ky; K.group.visible = ky > -K.size.y - 0.5;
+  K.setCaps(c => 42 * up * (1 - spring(t - (T.hxk + 0.24 + c.wave * 0.16 + ((c.i * 47) % 19) / 19 * 0.04), 0.78, 13)));
+
+  const C = M.corelink, cy = rise(t, T.cl + 0.03, C.size.y, 0.6, 14);
+  C.group.position.y = cy; C.group.visible = cy > -C.size.y - 0.5;
+  C.setLeds(LED_K * sstep(T.cl + 0.15, T.cl + 0.45, t)); C.setDash(ease.cubicOut(seg(t, T.cl + 0.2, T.cl + 0.8)));
+  RINGS.forEach((r, i) => { const k = seg(t, T.cl + 0.12 + i * 0.2, T.cl + 0.12 + i * 0.2 + 0.75); r.scale.setScalar(30 + 170 * ease.cubicOut(k)); r.material.uniforms.uA.value = k > 0 && k < 1 ? 0.55 * (1 - k) : 0; r.visible = k > 0 && k < 1; });
+
+  const X = M.arx, xy = rise(t, T.arx + 0.03, X.size.y, 0.6, 14), land = OM.impact(t, T.arx + 0.62, { sqx: 0.06, sqy: 0.08 }), lgx = 1 - sstep(T.arx + 0.95, T.arx + 1.15, t);
+  X.group.position.y = xy + arxLift(t); X.group.visible = xy > -X.size.y - 0.5; X.group.scale.set(1 + (land.sx - 1) * lgx, 1 + (land.sy - 1) * lgx, 1 + (land.sx - 1) * lgx);
+  X.setProps(propAngle(t), 0, 1);
+
+  // contact shadows follow their device and come up as it clears the board
+  for (const [k, m, x, y] of [['aur', A, AUR.x, ay], ['lr', B, bxp, by], ['hxk', K, HXK.x, ky], ['cl', C, CL.x, cy], ['arx', X, ARX.x, xy]]) {
+    const d = DEV[k]; d.contact.position.x = x; if (k === 'lr') d.contact.position.z = LR.z;
+    d.contact.u.uA.value = Math.pow(clamp(1 + y / m.size.y), 3) * (k === 'arx' ? 1 - 0.7 * clamp(arxLift(t) / 30) : 1);
+  }
+
+  // the current
+  const hs = headsAt(t), cam = camAt(t);
+  heads.forEach((h, i) => {
+    const q = hs[i]; h.visible = !!q; if (!q) return;
+    h.position.x = q.x; h.position.z = q.z; h.setColor(q.color); h.u.uOp.value = 0.95 * q.on;
+    h.scale.setScalar(clamp(cam.d / 300, 0.3, 2.4));
+  });
+  if (hs.length) { pulseLight.position.x = hs[0].x; pulseLight.position.z = hs[0].z; pulseLight.color.set(hs[0].color); pulseLight.intensity = 2.2 * hs[0].on; } else pulseLight.intensity = 0;
+
+  // the shadow map is redrawn only when something that casts moved
+  for (const m of Object.values(M)) m.group.updateMatrixWorld(true);
+  const sig = Object.values(M).map(m => m.group.visible ? m.group.matrixWorld.elements.map(v => v.toFixed(4)).join() + (m.caps ? m.caps.map(c => c.node.position.y.toFixed(4)).join() : '') : '-').join('|') + propAngle(t).toFixed(3);
+  if (sig !== SHADOW_SIG) { renderer.shadowMap.needsUpdate = true; SHADOW_SIG = sig; }
+  placeCamera(camera, cam);
+  POST.render(camera, LENS(t, cam));
+  if (Q.has('hud')) { const el = document.getElementById('hud'); el.style.display = 'block'; el.textContent = `t ${t.toFixed(2)}  d ${cam.d.toFixed(0)}  pitch ${cam.pitch.toFixed(1)}`; }
+  LAST_T = t;
+}
+let LAST_T = 0, SHADOW_SIG = '';
+
+// ─────────────────────────────── contract ───────────────────────────────
+function project(c, pts) { placeCamera(scratch, c); return pts.map(p => { const v = new THREE.Vector3(p[0], p[1] || 0, p[2]).project(scratch); return [(v.x + 1) * W / 2, (1 - v.y) * H / 2, v.z]; }); }
+function movers(t) {
+  // fixed membership, so t0 and t1 compare the same points: every head (parked when idle), every device, every glyph
+  const pts = [], hp = (R, s) => { const p = at(R, s); return [p.x, 0, p.z]; };
+  pts.push(hp(TR.a.R, sA(t)), hp(TR.b.R, sB(t)), hp(TR.c.R, sC(t)));
+  TR.bus.forEach((b, i) => pts.push(hp(b.R, busS(t - (i < 3 ? T.bus0 : T.l4Start)))));
+  pts.push([buggyX(t), rise(t, T.lrRise, M.buggy.size.y, 0.74, 9) + 120, LR.z], [buggyX(t) - 60, rise(t, T.lrRise, M.buggy.size.y, 0.74, 9) + 30, LR.z],
+    [AUR.x, rise(t, T.aurRise, M.auraeyez.size.y) + 47, AUR.z],
+    [HXK.x, rise(t, T.hxk + 0.03, M.hxkeysair.size.y, 0.55, 16) + 80, HXK.z], [CL.x, rise(t, T.cl + 0.03, M.corelink.size.y, 0.6, 14) + 104, CL.z],
+    [ARX.x + 50, rise(t, T.arx + 0.03, M.arx.size.y, 0.6, 14) + arxLift(t) + 28, ARX.z]);
+  const up = ease.expoOut(seg(t, T.hxk + 0.03, T.hxk + 0.2));
+  for (const c of [0, 0.5, 1]) pts.push([HXK.x + (c - 0.5) * 60, rise(t, T.hxk + 0.03, M.hxkeysair.size.y, 0.55, 16) + M.hxkeysair.size.y + 42 * up * (1 - spring(t - (T.hxk + 0.24 + c * 0.16), 0.78, 13)), HXK.z]);
+  const nu = NAME.material.uniforms, gx0 = LOCK.textX;
+  NAME.glyphT.forEach((g, i) => pts.push([gx0 + (i + 0.5) * LOCK.textW / NAME.glyphT.length, 0, BASE_Z + (1 - SETTLE(seg(t, g[0], g[1]))) * nu.uRise.value]));
+  pts.push([LOCK.textX + 100, 0, SUB.z0 + OM.wordRise(t, T.tag, { dist: 9, s0: 1 }).y]);
+  return pts;
+}
+window.__motion = (t0, t1) => {
+  const c0 = camAt(t0), c1 = camAt(t1), grid = [];
+  for (const fx of [0.1, 0.5, 0.9]) for (const fy of [0.15, 0.5, 0.85]) {
+    placeCamera(scratch, c0); const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(fx * 2 - 1, 1 - fy * 2), scratch);
+    const hit = new THREE.Vector3(); if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) grid.push([hit.x, 0, hit.z]);
+  }
+  let far = 0;
+  const onScreen = p => Math.abs(p[2]) < 1 && p[0] > -W && p[0] < 2 * W && p[1] > -H && p[1] < 2 * H;   // ignore points behind or far outside
+  const a = project(c0, grid), b = project(c1, grid); a.forEach((p, i) => { if (onScreen(p) && onScreen(b[i])) far = Math.max(far, Math.hypot(p[0] - b[i][0], p[1] - b[i][1])); });
+  const m0 = movers(t0), m1 = movers(t1), n = Math.min(m0.length, m1.length);
+  const pa = project(c0, m0.slice(0, n)), pb = project(c1, m1.slice(0, n));
+  for (let i = 0; i < n; i++) if (onScreen(pa[i]) && onScreen(pb[i])) far = Math.max(far, Math.hypot(pa[i][0] - pb[i][0], pa[i][1] - pb[i][1]));
+  if (t1 > T.arx && t0 < T.arx + 1.3) far = Math.max(far, 18 * Math.abs(propAngle(t1) - propAngle(t0)));   // prop tips
+  return far;
+};
+window.__track = () => {
+  // boxes on screen: each object's world box, clipped to the frame, dropped when behind the camera or off frame
+  const box = (obj, op = 1) => {
+    if (!obj || !obj.visible || op <= 0.01) return null; const b = new THREE.Box3().setFromObject(obj); if (b.isEmpty()) return null;
+    const P = [];
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+      const v = new THREE.Vector3(x, Math.max(y, 0), z).project(camera); if (v.z < -1 || v.z > 1) return null; P.push([(v.x + 1) * W / 2, (1 - v.y) * H / 2]); }
+    const x0 = Math.max(0, Math.min(...P.map(p => p[0]))), x1 = Math.min(W, Math.max(...P.map(p => p[0])));
+    const y0 = Math.max(0, Math.min(...P.map(p => p[1]))), y1 = Math.min(H, Math.max(...P.map(p => p[1])));
+    return x1 - x0 < 2 || y1 - y0 < 2 ? null : { x: x0, y: y0, w: x1 - x0, h: y1 - y0, op };
+  };
+  const out = {}, t = LAST_T, hs = headsAt(t);
+  if (hs.length) { const [p] = project(camAt(t), [[hs[0].x, 0, hs[0].z]]); if (p[0] > -12 && p[0] < W + 12 && p[1] > -12 && p[1] < H + 12) out.head = { x: p[0] - 12, y: p[1] - 12, w: 24, h: 24, op: hs[0].on }; }
+  const lit = (t0, dur) => clamp((t - t0) / dur);
+  for (const [k, o, op] of [['aur', M.auraeyez.group, 1], ['buggy', M.buggy.group, 1], ['hxk', M.hxkeysair.group, 1], ['cl', M.corelink.group, 1], ['arx', M.arx.group, 1],
+    ['word', NAME, lit(T.word0, T.wordDur)], ['logo', LOGO, t >= T.logo ? 0.08 + 0.92 * lit(T.logo, T.logoFill) : 0], ['pad', PAD, 1]]) { const b = box(o, op); if (b) out[k] = b; }
+  return out;
+};
+window.__events = () => [
+  ['pad', T.padOn], ['shoot', T.aStart], ['arrive', T.aEnd, 'aur'], ['rise', T.aurRise, 'aur'], ['boot', T.aurBoot, 'aur'], ['eyes', T.aurEyes, 'aur'], ['blink', T.aurBlink, 'aur'], ['glance', T.aurGlance, 'aur'],
+  ['shoot', T.bStart], ['arrive', T.bEnd, 'lr'], ['rise', T.lrRise, 'lr'], ['drive', T.drive0, 'buggy'], ['brake', T.drive1 - 0.42, 'buggy'], ['stop', T.drive1, 'buggy'],
+  ['bus', T.bus0], ['hit', T.hxk, 'hxk'], ['caps', T.hxk + 0.36, 'hxk'], ['hit', T.cl, 'cl'], ['hit', T.arx, 'arx'], ['land', T.arx + 0.62, 'arx'],
+  ['shoot', T.l4Start], ['arrive', T.logo, 'logo'], ['word', T.word0, 'word'], ['close', T.close, 'pad'], ['tag', T.tag, 'pad'],
+].map(([name, t, who]) => {
+  const where = { aur: AUR, lr: LR, hxk: HXK, cl: CL, arx: ARX, logo: { x: LOCK.stemX, z: BASE_Z }, buggy: { x: buggyX(t), z: LR.z }, word: { x: LOCK.textX + LOCK.textW / 2, z: BASE_Z }, pad: LOCK.P0 }[who];
+  const hs = headsAt(t), p = where || (hs[0] ? { x: hs[0].x, z: hs[0].z } : { x: LOCK.P0.x, z: LOCK.P0.z });
+  const [q] = project(camAt(t), [[p.x, 0, p.z]]);
+  return { name, t: +t.toFixed(3), who, pan: +clamp((q[0] - W / 2) / (W / 2), -1, 1).toFixed(3) };
+});
+window.__curves = (rate = 240) => {
+  const n = Math.round(DUR * rate), cur = [], pan = [], drive = [], dt = 1 / rate;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate, h0 = headsAt(t), h1 = headsAt(t + dt);
+    let v = 0, pn = 0;
+    if (h0.length && h1.length) { const [a] = project(camAt(t), [[h0[0].x, 0, h0[0].z]]), [b] = project(camAt(t), [[h1[0].x, 0, h1[0].z]]); v = Math.hypot(b[0] - a[0], b[1] - a[1]) / dt * h0[0].on; pn = clamp((a[0] - W / 2) / (W / 2), -1, 1); }
+    cur.push(+v.toFixed(1)); pan.push(+pn.toFixed(3)); drive.push(+(Math.abs(buggyX(t + dt) - buggyX(t)) / dt).toFixed(1));
+  }
+  return { rate, current: cur, pan, drive, heads: Array.from({ length: n }, (_, i) => headsAt(i / rate).length) };
+};
+
+window.__meta = { dur: DUR, fps: 60 };
+window.__ready = (async () => {
+  await build(); addFinalKeys();
+  window.__meta = { dur: DUR, fps: 60, inFrame: { pad: [0, 0.7], head: [0.75, 1.9], aur: [2.6, 4.0], buggy: [5.6, 7.6], word: [12.1, 15, 'whole'], logo: [11.6, 15, 'whole'] } };
+  seek(0); return true;
+})();
+window.__seek = async t => { await window.__ready; seek(t); return true; };
+if (Q.has('play')) window.__ready.then(() => { const t0 = performance.now(); const loop = () => { seek(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); }; loop(); });
+else if (Q.has('t')) window.__ready.then(() => seek(parseFloat(Q.get('t'))));
+</script>
+</body>
+</html>

@@ -39,11 +39,27 @@ orange→yellow.
 Burst times come from the bus lengths at a shared speed (`T.busV`), so the hits are spaced by geometry, not by
 a metronome.
 
+## v3: v1's film in v2's look
+
+`comp_v3.html` merges the two cuts. The base is v2 (`hxstudio-hero.mp4`, `comp.html`). It supplies the renderer
+and post pipeline, light rig, board, device materials, courtyard outlines, designators, type and 60 fps.
+The reference is v1 (`draft_v1.mp4`, commit `0b92de2`). Copied verbatim from it: the timeline, layout,
+routes and colour stops, camera keys and curves, every device's animation, and the current's heads. The
+subtitle reads "— Product Engineer │ hankhsu.com". v1's soundtrack is copied unchanged, because the timeline
+matches v1 to the frame.
+
+```bash
+python3 ../.claude/skills/onetake/scripts/render.py comp_v3.html --out out/v3_video.mp4 --fps 60 --workers 4 --samples-min 2
+python3 export_v3.py out/v3_video.mp4      # → out/v3.mp4 (v1's audio copied) and out/compare.mp4 (v1 | v3)
+```
+
 ## Files
 
 | file | what |
 |---|---|
 | `comp.html` | the composition: `__seek(t)`, `__ready`, `__meta`, `__track`, `__motion`, `__events`, `__curves` |
+| `comp_v3.html` | v3: v1's timeline, camera, routes and animation in v2's look (same contract) |
+| `export_v3.py` | v3's MP4 with v1's audio stream copied, and the v1 / v3 side-by-side |
 | `models.js` | the five GLBs themed as on the site, with the controls the film animates (eyes, wheels, keycaps, props, dashboard) |
 | `motion.js` | onetake's move library (a copy of `lib/motion.js`) |
 | `build_assets.py` | packs GLBs, SVGs and fonts into `gen/assets.js` (generated, git-ignored), because `file://` blocks fetch |

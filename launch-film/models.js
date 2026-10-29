@@ -164,16 +164,18 @@
     screen.rotation.x = -Math.PI / 2; screen.position.copy(m.group.worldToLocal(new THREE.Vector3(gc.x, gb.max.y + 0.4, gc.z)));
     screen.renderOrder = 5; m.group.add(screen);
     let last = '';
-    m.setScreen = ({ eyes = 0, open = 1, gaze = 0, glow = 1 }) => {
-      const key = [eyes, open, gaze, glow].map(v => v.toFixed(3)).join(); if (key === last) return; last = key;
+    // lit: a faint backlight (the boot flicker) · scaleIn: the eyes grow from nothing in both axes (v1 / v3 films)
+    m.setScreen = ({ eyes = 0, open = 1, gaze = 0, glow = 1, lit = 0, scaleIn = false }) => {
+      const key = [eyes, open, gaze, glow, lit, +scaleIn].map(v => v.toFixed(3)).join(); if (key === last) return; last = key;
       g.clearRect(0, 0, W, H);
+      if (lit > 0) { g.fillStyle = `rgba(255,255,255,${(0.05 * lit).toFixed(3)})`; g.fillRect(0, 0, W, H); }
       if (eyes > 0) {
         const grow = 1 - Math.pow(1 - eyes, 3);
-        g.save(); g.globalAlpha = Math.min(1, eyes * 1.4); g.fillStyle = '#ffffff'; g.shadowColor = 'rgba(255,255,255,0.55)'; g.shadowBlur = 22;
+        g.save(); g.globalAlpha = scaleIn ? eyes : Math.min(1, eyes * 1.4); g.fillStyle = '#ffffff'; g.shadowColor = 'rgba(255,255,255,0.55)'; g.shadowBlur = 22;
         for (const side of [-1, 1]) {
-          const lean = 1 + 0.18 * Math.max(0, gaze * side), w = 135 * (0.85 + 0.15 * grow), h = 155 * grow * Math.max(0.05, open) * lean;
+          const lean = 1 + 0.18 * Math.max(0, gaze * side), w = 135 * (scaleIn ? grow : 0.85 + 0.15 * grow), h = 155 * grow * Math.max(scaleIn ? 0.06 : 0.05, open) * lean;
           const cx = W / 2 + side * 96 + gaze * 40, cy = H / 2;
-          roundRect(g, cx - w / 2, cy - h / 2, w, h, Math.min(41, h / 2)); g.fill();
+          roundRect(g, cx - w / 2, cy - h / 2, w, h, Math.min(scaleIn ? 41 * grow : 41, h / 2)); g.fill();
         }
         g.restore();
       }
@@ -211,14 +213,15 @@
       const hit = MATS.find(([stem]) => n.startsWith(stem));
       o.material = hit ? hit[1] : PLATE;
     });
-    const wheels = [];
+    const wheels = [], wheelR = [];
     for (const name of ['Wheel', 'Wheel001']) {
       const w = scene.getObjectByName(name); if (!w || !w.parent) continue;
       const box = new THREE.Box3().setFromObject(w), pivot = new THREE.Group();
       w.parent.add(pivot); pivot.position.copy(w.parent.worldToLocal(box.getCenter(new THREE.Vector3()))); pivot.updateMatrixWorld(true); pivot.attach(w);
-      wheels.push(pivot);
+      wheels.push(pivot); wheelR.push(box.getSize(new THREE.Vector3()).x / 2 * 1000);
     }
     const m = partsOf(THREE, mount(THREE, scene, [Math.PI / 2, 0, 0]));
+    m.wheelR = wheelR.length ? wheelR[0] : 54;                               // mm: rolling by distance (v1 / v3 films)
     m.setRoll = ang => { for (const p of wheels) p.rotation.y = ang; };
     return m;
   }
@@ -242,6 +245,17 @@
       return { mats, x: c.x, z: c.z };
     });
     m.setGlow = (f, color) => { for (const c of m.capGlow) { const k = f(c); for (const mt of c.mats) { mt.emissiveIntensity = k; if (color) mt.emissive.set(color); } } };
+    // per cap: rest position and the local vector for +1 mm of world up (v1 / v3 films lift the caps by this)
+    m.group.updateMatrixWorld(true);
+    m.caps = caps.map((node, i) => {
+      const p = node.parent, inv = new THREE.Matrix4().copy(p.matrixWorld).invert();
+      const o = new THREE.Vector3().applyMatrix4(inv), up = new THREE.Vector3(0, 1, 0).applyMatrix4(inv).sub(o);
+      const x = new THREE.Box3().setFromObject(node).getCenter(new THREE.Vector3()).x;
+      return { node, rest: node.position.clone(), up, x, i };
+    });
+    const cx = m.caps.map(c => c.x), cx0 = Math.min(...cx), cx1 = Math.max(...cx);
+    m.caps.forEach(c => { c.wave = (c.x - cx0) / (cx1 - cx0 || 1); });
+    m.setCaps = f => { for (const c of m.caps) c.node.position.copy(c.rest).addScaledVector(c.up, f(c)); };
     return m;
   }
 

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """build_assets.py — pack the portfolio's own assets into gen/assets.js for the film's file:// composition.
 
-  python3 build_assets.py
+  python3 build_assets.py                      # GLBs straight from web/public
+  python3 build_assets.py --glb-dir lowpoly/   # or simplified copies (same file names), for faster software renders
 
 Chrome blocks fetch() under file://, which is how render.py opens the comp, so every binary the comp needs is
 inlined: the five product GLBs and the h logo from web/public, the site's fonts (copied from the Next dev build into
 assets/fonts), and the three PCB layouts as SVG text. Writes gen/assets.js → window.ASSETS.
 """
-import base64, json, pathlib
+import argparse, base64, json, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 PUB = HERE.parent / "web" / "public"
@@ -26,10 +27,14 @@ def b64(p):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--glb-dir", type=pathlib.Path, default=None, help="take the GLBs from here instead of web/public")
+    a = ap.parse_args()
+    glb = a.glb_dir.resolve() if a.glb_dir else PUB
     out = HERE / "gen"
     out.mkdir(exist_ok=True)
     assets = {
-        "glb": {n: b64(PUB / f"{n}.glb") for n in GLBS},
+        "glb": {n: b64((glb if (glb / f"{n}.glb").exists() else PUB) / f"{n}.glb") for n in GLBS},
         "svg": {n: (PUB / f"{n}.svg").read_text() for n in SVGS},
         "font": {k: b64(HERE / "assets" / "fonts" / f) for k, f in FONTS.items()},
     }

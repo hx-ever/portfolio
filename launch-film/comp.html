@@ -5,16 +5,14 @@
 <title>hxstudio — one copper trace</title>
 <style>
   html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #060607; }
-  #gl, #grain, #vig { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  #gl, #vig { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
   #vig { pointer-events: none; background: radial-gradient(ellipse 78% 74% at 50% 48%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.5) 100%); }
-  #grain { pointer-events: none; }
   #hud { position: absolute; left: 16px; top: 12px; font: 12px/1.4 monospace; color: #f5f5f7; white-space: pre; display: none; }
 </style>
 </head>
 <body>
 <canvas id="gl" width="1920" height="1080"></canvas>
 <div id="vig"></div>
-<canvas id="grain" width="1920" height="1080"></canvas>
 <div id="hud"></div>
 <script src="vendor/three.bundle.js"></script>
 <script src="gen/assets.js"></script>
@@ -38,7 +36,7 @@ const T = {
   bStart: 4.06, bEnd: 4.84,
   lrRise: 5.08, drive0: 6.04, drive1: 7.40,
   bus0: 7.42, busV: 1420, busC: 0.11,
-  l4Start: 10.24, logoFill: 0.40, wordDur: 0.68,
+  l4Start: 10.42, logoFill: 0.40, wordDur: 0.68,
 };
 
 // ─────────────────────────────── layout (mm) ───────────────────────────────
@@ -52,10 +50,10 @@ const FONT_MM = 74, BASE_Z = 26;                  // wordmark size and baseline
 let LOCK;                                         // measured in __ready: logo + wordmark + period pad
 
 // ─────────────────────────────── renderer ───────────────────────────────
-const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: Q.get('aa') !== '0', preserveDrawingBuffer: true });
 renderer.setPixelRatio(1); renderer.setSize(W, H, false);
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.autoUpdate = false;
 renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.02)];   // products rise through the board
 const scene = new THREE.Scene(); scene.background = new THREE.Color('#060607');
 const pmrem = new THREE.PMREMGenerator(renderer);
@@ -82,11 +80,12 @@ const board = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.Shad
       float ringA = (1.0 - smoothstep(0.3 - fw, 0.3 + fw, d));
       vec3 base = vec3(0.034, 0.037, 0.038), via = vec3(0.085, 0.088, 0.088);
       vec3 c = mix(base, via, dotA * fade * 0.9); c = mix(c, base * 0.7, ringA * fade);
-      gl_FragColor = vec4(c, 1.0); }`,
+      float n = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));   // fixed dither against banding
+      gl_FragColor = vec4(c + (n - 0.5) * (2.5 / 255.0), 1.0); }`,
 }));
 board.rotation.x = -Math.PI / 2; scene.add(board);
 const shadowCatch = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: 0.55 }));
-shadowCatch.rotation.x = -Math.PI / 2; shadowCatch.position.y = 0.04; shadowCatch.receiveShadow = true; scene.add(shadowCatch);
+shadowCatch.rotation.x = -Math.PI / 2; shadowCatch.position.y = 0.04; shadowCatch.receiveShadow = true; if (Q.get('sh') !== '0') scene.add(shadowCatch);
 
 // ─────────────────────────────── reveal planes ───────────────────────────────
 // Two textures on one plane: the dim version everywhere, the lit one inside a radius from an origin (mode 0) or left
@@ -270,7 +269,7 @@ async function build() {
   ].map(async ([fam, b64, w]) => { const f = new FontFace(fam, Uint8Array.from(atob(b64), c => c.charCodeAt(0)), { weight: w }); await f.load(); document.fonts.add(f); }));
 
   // the lockup: [h] Hsu Hsin-Wei[.] — the period is the copper pad the film starts on
-  const word = textPlane('Hsu Hsin-Wei', px => `800 ${px}px FilmDisplay`, FONT_MM, '#121212', '#f5f5f7', '#ffffff', { px: 8 });
+  const word = textPlane('Hsu Hsin-Wei', px => `800 ${px}px FilmDisplay`, FONT_MM, '#0f0f0f', '#f5f5f7', '#ffffff', { px: 8 });
   const logoH = FONT_MM * 1.0, logoW = logoH * 208.52 / 232.55, gap = FONT_MM * 0.34, padR = FONT_MM * 0.082;
   const lockW = logoW + gap + word.textW + FONT_MM * 0.3, x0 = -lockW / 2;
   LOCK = { logoX: x0, logoW, logoH, textX: x0 + logoW + gap, textW: word.textW };
@@ -350,11 +349,11 @@ async function build() {
 const rise = (t, t0, h, zeta = 0.72, omega = 11) => t < t0 ? -h - 1 : -h * (1 - spring(t - t0, zeta, omega));
 const buggyX = t => lerp(LR.x, JX, DRIVE(seg(t, T.drive0, T.drive1)));
 function propAngle(t) {
-  const t0 = T.arx + 0.06, t1 = T.arx + 0.78, D = 0.5, w0 = 62;
+  const t0 = T.arx + 0.06, t1 = T.arx + 0.62, D = 0.34, w0 = 62;
   if (t < t0) return 0; const up = Math.min(t, t1) - t0; let a = w0 * (up - 0.05 * (1 - Math.exp(-up / 0.05)));
   if (t > t1) { const u = Math.min(t - t1, D); a += w0 * (u - u * u / (2 * D)); } return a;
 }
-function arxLift(t) { const t0 = T.arx; return 34 * ease.cubicOut(seg(t, t0 + 0.14, t0 + 0.4)) * (1 - Math.pow(seg(t, t0 + 0.52, t0 + 0.74), 3)); }
+function arxLift(t) { const t0 = T.arx; return 30 * ease.cubicOut(seg(t, t0 + 0.12, t0 + 0.34)) * (1 - Math.pow(seg(t, t0 + 0.42, t0 + 0.62), 3)); }
 
 // where the current is: [{x, z, color, on}] for each running head
 function headsAt(t) {
@@ -394,7 +393,7 @@ const KEYS = [
   [T.drive1 + 0.82, 'burst', ease.expoOut], [9.35, 'burst'],
 ];
 function addFinalKeys() { KEYS.push([T.l4Start, 'burst'], [T.logo + 0.35, 'final', ease.cubicInOut], [DUR, 'final']); }
-const SHAKES = () => [[T.drive1, 5, 9], [T.hxk + 0.05, 7, 10], [T.cl + 0.05, 6, 10], [T.arx + 0.74, 6, 10]];
+const SHAKES = () => [[T.drive1, 5, 9], [T.hxk + 0.05, 7, 10], [T.cl + 0.05, 6, 10], [T.arx + 0.62, 6, 10]];
 function shotAt(t) {
   let i = 0; while (i < KEYS.length - 1 && KEYS[i + 1][0] <= t) i++;
   const [ta, na] = KEYS[i]; if (i === KEYS.length - 1) return SH[na](t);
@@ -408,7 +407,7 @@ const handEnv = t => sstep(0.75, 1.2, t) * (1 - sstep(3.0, 3.35, t)) + sstep(4.0
 function camAt(t) {
   const s = shotAt(t), e = handEnv(t) * 0.006 * s.d;
   let x = s.x + e * (Math.sin(1.7 * t) + 0.6 * Math.sin(2.9 * t + 1)), z = s.z + e * (Math.sin(1.3 * t + 2) + 0.5 * Math.sin(3.3 * t)), roll = 0;
-  for (const [th, amp, decay] of SHAKES()) { const k = OM.shake(t, th, { amp, decay, seed: Math.round(th * 100) }); x += k.x * s.d / 1000; z += k.y * s.d / 1000; roll += k.rot * 0.4; }
+  for (const [th, amp, decay] of SHAKES()) { const k = OM.shake(t, th, { amp, decay, seed: Math.round(th * 100) }), g = 1 - sstep(th + 0.3, th + 0.55, t); x += k.x * s.d / 1000 * g; z += k.y * s.d / 1000 * g; roll += k.rot * 0.4 * g; }
   return { x, z, d: s.d, pitch: s.pitch, yaw: s.yaw, roll };
 }
 function placeCamera(cam, c) {
@@ -426,7 +425,7 @@ function setReveal(p, origin, r, w) { const u = p.material.uniforms, o = p.toLoc
 
 function seek(t) {
   // pad: dim copper, lights at padOn, flashes again when the loop closes
-  const on = sstep(T.padOn, T.padOn + 0.18, t), close = t >= T.close ? Math.exp(-(t - T.close) * 3.2) : 0;
+  const on = sstep(T.padOn, T.padOn + 0.18, t), close = t >= T.close ? Math.exp(-(t - T.close) * 3.2) * (1 - sstep(T.close + 0.5, T.close + 1.0, t)) : 0;
   PAD.material.color.set(mixHex('#4a3523', COPPER, on));
   const pr = OM.press(t, T.padOn, { depth: 0.12 }), pr2 = OM.press(t, T.close, { depth: 0.14 });
   PAD.scale.setScalar(1 - pr.sq * 0.6 - pr2.sq * 0.6); PAD.hole.scale.copy(PAD.scale);
@@ -484,8 +483,8 @@ function seek(t) {
   C.setLeds(sstep(T.cl + 0.15, T.cl + 0.45, t)); C.setDash(ease.cubicOut(seg(t, T.cl + 0.2, T.cl + 0.8)));
   RINGS.forEach((r, i) => { const k = seg(t, T.cl + 0.12 + i * 0.2, T.cl + 0.12 + i * 0.2 + 0.75); r.scale.setScalar(30 + 170 * ease.cubicOut(k)); r.material.opacity = k > 0 && k < 1 ? 0.55 * (1 - k) : 0; r.visible = k > 0 && k < 1; });
 
-  const X = M.arx, xy = rise(t, T.arx + 0.03, X.size.y, 0.6, 14), land = OM.impact(t, T.arx + 0.74, { sqx: 0.06, sqy: 0.08 });
-  X.group.position.y = xy + arxLift(t); X.group.visible = xy > -X.size.y - 0.5; X.group.scale.set(land.sx, land.sy, land.sx);
+  const X = M.arx, xy = rise(t, T.arx + 0.03, X.size.y, 0.6, 14), land = OM.impact(t, T.arx + 0.62, { sqx: 0.06, sqy: 0.08 }), lg = 1 - sstep(T.arx + 0.95, T.arx + 1.15, t);
+  X.group.position.y = xy + arxLift(t); X.group.visible = xy > -X.size.y - 0.5; X.group.scale.set(1 + (land.sx - 1) * lg, 1 + (land.sy - 1) * lg, 1 + (land.sx - 1) * lg);
   X.setProps(propAngle(t));
 
   // the current
@@ -497,19 +496,18 @@ function seek(t) {
   });
   if (hs.length) { headLight.position.x = hs[0].x; headLight.position.z = hs[0].z; headLight.color.set(hs[0].color); headLight.intensity = 3.2 * hs[0].on; } else headLight.intensity = 0;
 
+  // the shadow map is redrawn only when something that casts moved: pure, since it depends on the casters alone
+  for (const m of Object.values(M)) m.group.updateMatrixWorld(true);
+  const sig2 = Object.values(M).map(m => m.group.visible ? m.group.matrixWorld.elements.map(v => v.toFixed(4)).join() + (m.caps ? m.caps.map(c => c.node.position.y.toFixed(4)).join() : '') : '-').join('|') + propAngle(t).toFixed(3);
+  if (sig2 !== SHADOW_SIG) { renderer.shadowMap.needsUpdate = true; SHADOW_SIG = sig2; }
   placeCamera(camera, cam);
   renderer.render(scene, camera);
   if (Q.has('hud')) { const el = document.getElementById('hud'); el.style.display = 'block'; el.textContent = `t ${t.toFixed(2)}  d ${cam.d.toFixed(0)}  pitch ${cam.pitch.toFixed(1)}`; }
   LAST_T = t;
 }
-let LAST_T = 0;
+let LAST_T = 0, SHADOW_SIG = '';
 
 // ─────────────────────────────── contract ───────────────────────────────
-function grain() {
-  const c = document.getElementById('grain'), g = c.getContext('2d'), img = g.createImageData(W, H), r = OM.rng(7);
-  for (let i = 0; i < W * H; i++) { const v = r() < 0.5 ? 0 : 255; img.data.set([v, v, v, Math.floor(r() * 7)], i * 4); }
-  g.putImageData(img, 0, 0);
-}
 const scratch = new THREE.PerspectiveCamera(30, W / H, 4, 20000);
 function project(c, pts) { placeCamera(scratch, c); return pts.map(p => { const v = new THREE.Vector3(p[0], p[1] || 0, p[2]).project(scratch); return [(v.x + 1) * W / 2, (1 - v.y) * H / 2, v.z]; }); }
 function movers(t) {
@@ -526,10 +524,11 @@ window.__motion = (t0, t1) => {
     const hit = new THREE.Vector3(); if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) grid.push([hit.x, 0, hit.z]);
   }
   let far = 0;
-  const a = project(c0, grid), b = project(c1, grid); a.forEach((p, i) => { far = Math.max(far, Math.hypot(p[0] - b[i][0], p[1] - b[i][1])); });
+  const onScreen = p => Math.abs(p[2]) < 1 && p[0] > -W && p[0] < 2 * W && p[1] > -H && p[1] < 2 * H;   // ignore points behind or far outside
+  const a = project(c0, grid), b = project(c1, grid); a.forEach((p, i) => { if (onScreen(p) && onScreen(b[i])) far = Math.max(far, Math.hypot(p[0] - b[i][0], p[1] - b[i][1])); });
   const m0 = movers(t0), m1 = movers(t1), n = Math.min(m0.length, m1.length);
   const pa = project(c0, m0.slice(0, n)), pb = project(c1, m1.slice(0, n));
-  for (let i = 0; i < n; i++) if (Math.abs(pa[i][2]) < 1 && Math.abs(pb[i][2]) < 1) far = Math.max(far, Math.hypot(pa[i][0] - pb[i][0], pa[i][1] - pb[i][1]));
+  for (let i = 0; i < n; i++) if (onScreen(pa[i]) && onScreen(pb[i])) far = Math.max(far, Math.hypot(pa[i][0] - pb[i][0], pa[i][1] - pb[i][1]));
   if (t1 > T.arx && t0 < T.arx + 1.3) far = Math.max(far, 18 * Math.abs(propAngle(t1) - propAngle(t0)));   // prop tips
   return far;
 };
@@ -557,7 +556,7 @@ window.__track = () => {
 window.__events = () => [
   ['pad', T.padOn], ['shoot', T.aStart], ['arrive', T.aEnd, 'aur'], ['rise', T.aurRise, 'aur'], ['boot', T.aurBoot, 'aur'], ['eyes', T.aurEyes, 'aur'], ['blink', T.aurBlink, 'aur'], ['glance', T.aurGlance, 'aur'],
   ['shoot', T.bStart], ['arrive', T.bEnd, 'lr'], ['rise', T.lrRise, 'lr'], ['drive', T.drive0, 'buggy'], ['brake', T.drive1 - 0.42, 'buggy'], ['stop', T.drive1, 'buggy'],
-  ['bus', T.bus0], ['hit', T.hxk, 'hxk'], ['caps', T.hxk + 0.36, 'hxk'], ['hit', T.cl, 'cl'], ['hit', T.arx, 'arx'], ['land', T.arx + 0.74, 'arx'],
+  ['bus', T.bus0], ['hit', T.hxk, 'hxk'], ['caps', T.hxk + 0.36, 'hxk'], ['hit', T.cl, 'cl'], ['hit', T.arx, 'arx'], ['land', T.arx + 0.62, 'arx'],
   ['shoot', T.l4Start], ['arrive', T.logo, 'logo'], ['word', T.word0, 'word'], ['close', T.close, 'pad'], ['tag', T.tag, 'pad'],
 ].map(([name, t, who]) => {
   const where = { aur: AUR, lr: LR, hxk: HXK, cl: CL, arx: ARX, logo: { x: LOCK.stemX, z: BASE_Z }, buggy: { x: buggyX(t), z: LR.z }, word: { x: LOCK.textX + LOCK.textW / 2, z: BASE_Z }, pad: LOCK.P0 }[who];
@@ -578,7 +577,7 @@ window.__curves = (rate = 240) => {
 };
 
 window.__ready = (async () => {
-  await build(); addFinalKeys(); grain();
+  await build(); addFinalKeys();
   for (const k of ['tag', 'url']) TXT[k].userData.z0 = TXT[k].position.z;
   window.__meta = { dur: DUR, fps: 30, inFrame: { pad: [0, 0.7], head: [0.75, 1.9], aur: [2.6, 4.0], buggy: [5.6, 7.6], word: [12.0, 15, 'whole'], logo: [12.0, 15, 'whole'] } };
   seek(0); return true;

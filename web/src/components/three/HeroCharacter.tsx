@@ -30,6 +30,8 @@ const JACKET_TO = [0xc8, 0xc4, 0xb0] as const;
 
 // Authored A-pose (== bind pose) arm rotations — the natural "relaxed arms"
 // reference we ease toward in idle, since the Idle clip holds the arms raised.
+// Keys are the Blender bone names; GLTFLoader strips reserved characters
+// (".") from node names, so they're looked up via sanitizeNodeName below.
 const REST_ARMS: Record<string, [number, number, number, number]> = {
   "DEF-upper_arm.L": [-0.0409, 0.8091, -0.5025, 0.302],
   "DEF-upper_arm.R": [-0.0409, -0.8091, 0.5025, 0.302],
@@ -122,7 +124,7 @@ export default function HeroCharacter() {
   const armTargets = useMemo(() => {
     return Object.entries(REST_ARMS)
       .map(([name, q]) => {
-        const bone = scene.getObjectByName(name);
+        const bone = scene.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(name));
         return bone ? { bone, target: new THREE.Quaternion(q[0], q[1], q[2], q[3]) } : null;
       })
       .filter((x): x is { bone: THREE.Object3D; target: THREE.Quaternion } => x !== null);

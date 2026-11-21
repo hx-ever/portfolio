@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import SceneLights from "./SceneLights";
 import { SIGNATURE } from "@/lib/palette";
-import { useM7Dance } from "@/easter-eggs";
+import { isKonamiInProgress, useDanceTriggers } from "@/easter-eggs";
+import { GazeController, M7StateMachine, safeStageY, useBoredom } from "@/m7";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
 
 const ACCENT = SIGNATURE; // signature copper rim light — the hero is chrome
 const MODEL = "/m_7.glb";
@@ -39,6 +41,8 @@ const REST_ARMS: Record<string, [number, number, number, number]> = {
   "DEF-forearm.R": [0.1377, 0, 0, 0.9905],
 };
 
+/** Placement phase of the walk-in (the clips themselves are the state
+ *  machine's job — see src/m7/). */
 type Phase = "walk" | "settle" | "idle";
 
 const restingX = (viewportWidth: number, isMobile: boolean) =>
@@ -73,22 +77,38 @@ function markIntroPlayed() {
  * "Idle". On any later mount (route navigation back to the home page) it
  * appears already standing at the resting position — no walk-in, no offset.
  * Idle arms are eased to the A-pose so they hang naturally.
+ *
+ * Which clip plays is decided by the m_7 state machine (src/m7/): walk-in,
+ * idle, boredom, welcome-back greeting and the Konami dance all go through
+ * it. This component keeps placement (walk path, settle turn, resting spot)
+ * and applies the post-mixer overrides: in-place lock, relaxed arms, gaze.
  */
 export default function HeroCharacter() {
   const root = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(MODEL);
-  const get = useThree((s) => s.get);
 
-  // One mixer, driven manually so the arm override runs after mixer.update.
+  // One mixer, driven manually so the overrides run after mixer.update. Only
+  // the state machine ever touches it.
   const mixer = useMemo(() => new THREE.AnimationMixer(scene), [scene]);
-  const walk = useMemo(() => {
-    const c = animations.find((a) => a.name === "Walk");
-    return c ? mixer.clipAction(c) : null;
-  }, [animations, mixer]);
-  const idle = useMemo(() => {
-    const c = animations.find((a) => a.name === "Idle");
-    return c ? mixer.clipAction(c) : null;
-  }, [animations, mixer]);
+  const machine = useMemo(
+    () => new M7StateMachine(mixer, animations, scene, TARGET_HEIGHT, prefersReducedMotion),
+    [mixer, animations, scene]
+  );
+  const gaze = useMemo(() => new GazeController(scene), [scene]);
+  // identity wrapper the machine nudges to keep m_7 on his resting spot
+  const inPlace = useRef<THREE.Group>(null);
+
+  // The fixed nav's bottom edge (px) — the ceiling for m_7's safe bounds.
+  // The nav is position: fixed, so this only changes on resize.
+  const navBottom = useRef(0);
+  useEffect(() => {
+    const measure = () => {
+      navBottom.current = document.querySelector("nav")?.getBoundingClientRect().bottom ?? 0;
+    };
+    measure();
+    window.addEventListener("resize", measure, { passive: true });
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   const fit = useMemo(() => {
     if (cachedFit) return cachedFit;
@@ -109,16 +129,11 @@ export default function HeroCharacter() {
   const ready = useRef(false);
   const needStart = useRef(false);
 
-  // Hidden easter egg (Konami / five taps): reuses this mixer + the embedded
-  // "Dance" clip; only ever starts from "idle" and dances in place.
-  const { armWeight, lockInPlace, inPlace } = useM7Dance({
-    mixer,
-    idle,
-    animations,
-    scene,
-    phase,
-    height: TARGET_HEIGHT,
-  });
+  // Hidden easter egg (Konami / five taps) → DANCE, and the boredom /
+  // welcome-back reaction → BORED / GREETING. Both only make requests; the
+  // machine decides.
+  useDanceTriggers(machine, scene);
+  useBoredom(machine, isKonamiInProgress);
 
   // Arm bones + their relaxed target quaternions, resolved once.
   const armTargets = useMemo(() => {
@@ -168,26 +183,17 @@ export default function HeroCharacter() {
   // Place the character and decide the entrance once (not on resize).
   useEffect(() => {
     const g = root.current;
-    if (!g || !idle) return;
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const skipIntro = introAlreadyPlayed() || prefersReduced || !walk;
+    if (!g || !machine.has("IDLE")) return;
+    const skipIntro = introAlreadyPlayed() || prefersReducedMotion() || !machine.has("ENTRANCE");
 
-    if (skipIntro) {
-      idle.reset().play();
-      phase.current = "idle";
-    } else {
-      walk.reset().play();
-      phase.current = "walk";
-    }
+    machine.start(skipIntro ? "IDLE" : "ENTRANCE");
+    phase.current = skipIntro ? "idle" : "walk";
     // Defer positioning to the first frame so it uses the measured viewport.
     needStart.current = true;
     ready.current = true;
 
-    return () => {
-      walk?.stop();
-      idle.stop();
-    };
-  }, [walk, idle, get]);
+    return () => machine.dispose();
+  }, [machine]);
 
   const tmpQ = useMemo(() => new THREE.Quaternion(), []);
   const sway = useMemo(() => new THREE.Quaternion(), []);
@@ -196,7 +202,8 @@ export default function HeroCharacter() {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05); // guard against a large first-frame stall
     mixer.update(dt);
-    lockInPlace(); // no-op unless the easter-egg dance is playing
+    machine.update(dt);
+    machine.applyInPlace(inPlace.current); // hips lock + framing (non-idle clips)
     const g = root.current;
     if (!g || !ready.current) return;
 
@@ -208,7 +215,11 @@ export default function HeroCharacter() {
     const worldSpeed = WALK_SPEED_LOCAL * fit.scale * groupScale;
 
     g.scale.setScalar(groupScale);
-    g.position.y = isMobile ? -0.4 : 0;
+    // Stage safe bounds: stand low enough that his highest pose (Win's
+    // raised arm) always clears the nav — framing only, never a resize.
+    const baseY = isMobile ? -0.4 : 0;
+    const safeY = safeStageY(state.camera, state.size.height, navBottom.current, groupScale, baseY);
+    g.position.y = needStart.current ? safeY : THREE.MathUtils.lerp(g.position.y, safeY, 0.1);
 
     // First ready frame: position with the measured viewport.
     if (needStart.current) {
@@ -228,10 +239,7 @@ export default function HeroCharacter() {
       g.position.x += worldSpeed * dt;
       if (g.position.x >= targetX) {
         g.position.x = targetX;
-        if (idle) {
-          idle.reset().play();
-          walk?.crossFadeTo(idle, 0.45, false);
-        }
+        machine.entranceArrived(); // Walk → Idle crossfade; still ENTRANCE
         phase.current = "settle";
       }
     } else if (phase.current === "settle") {
@@ -240,6 +248,7 @@ export default function HeroCharacter() {
       if (Math.abs(g.rotation.y) < 0.01) {
         g.rotation.y = 0;
         phase.current = "idle";
+        machine.entranceComplete(); // now IDLE: queued requests may start
         markIntroPlayed(); // never replay the walk-in this session
       }
     } else {
@@ -250,17 +259,21 @@ export default function HeroCharacter() {
     }
 
     // Idle/settle: ease arms toward the relaxed A-pose (with a subtle sway),
-    // applied after the clip so it overrides the raised authored pose.
-    // The override fades out while m_7 dances (armWeight → 0) so the clip's
-    // own arm motion plays, and back in as he returns to Idle.
-    if (phase.current !== "walk" && armWeight.current > 0) {
+    // applied after the clip so it overrides the raised authored pose. The
+    // machine fades this out for clips that own their arms (Sad/Win/Dance).
+    const armWeight = machine.armWeight;
+    if (phase.current !== "walk" && armWeight > 0) {
       const t = state.clock.elapsedTime;
       armTargets.forEach(({ bone, target }, i) => {
         sway.setFromAxisAngle(swayAxis, Math.sin(t * 0.8 + i) * 0.025);
         tmpQ.copy(target).multiply(sway);
-        bone.quaternion.slerp(tmpQ, 0.2 * armWeight.current);
+        bone.quaternion.slerp(tmpQ, 0.2 * armWeight);
       });
     }
+
+    // Gaze: additive look-at on the neck → head chain, on top of whatever
+    // the clip posed. Weight is 0 during the walk-in, Sad and Dance.
+    gaze.apply(dt, machine.gazeWeight, state.camera, state.gl.domElement, prefersReducedMotion());
   });
 
   return (
@@ -270,7 +283,7 @@ export default function HeroCharacter() {
           and the greige jacket reads as brightly as the light rig allows. */}
       <directionalLight position={[0, 1, 7]} intensity={0.9} color="#ffffff" />
       <group ref={root} visible={false}>
-        {/* identity wrapper; only the dance easter egg ever offsets it */}
+        {/* identity wrapper; the state machine's in-place lock + framing */}
         <group ref={inPlace}>
         <primitive
           object={scene}

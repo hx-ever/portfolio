@@ -3,8 +3,8 @@
  *
  * Two hidden features, both invisible to normal visitors:
  *  1. A styled note in the browser DevTools console (production only).
- *  2. The Konami code (or five quick taps on m_7 on touch devices) makes
- *     the hero mascot crossfade into his embedded "Dance" clip.
+ *  2. The Konami code (or five quick taps on m_7 on touch devices) puts the
+ *     hero mascot into his DANCE state (see src/m7/).
  */
 
 // ---------------------------------------------------------------- console
@@ -48,34 +48,8 @@ export const TAP_MAX_MOVE_PX = 10;
 export const TAP_MAX_DURATION_MS = 350;
 
 // ---------------------------------------------------------------- dance
-export const DANCE = {
-  clipName: "Dance",
-  /** Seconds for the Idle → Dance and Dance → Idle crossfades. */
-  crossfade: 0.35,
-  /**
-   * The embedded clip is 5.25s, so a single loop already lands in the
-   * ~5–6s target. Reduced motion keeps it to one loop as well.
-   */
-  loops: 1,
-  loopsReducedMotion: 1,
-  /** Pause after m_7 reaches Idle before a queued dance (e.g. arriving
-   *  from another page) starts, so it reads as a reaction, not a glitch. */
-  queuedStartDelayMs: 600,
-  /** Bones whose translation tracks are stripped so he dances in place. */
-  lockedRootBones: ["root"],
-  /**
-   * The clip also shifts his hips sideways relative to Idle; this bone is
-   * pinned (horizontally) to where it sat in Idle for the whole dance, so
-   * he never drifts toward the headline or out of ModelStage's safe area.
-   */
-  anchorBone: "DEF-spine",
-  /**
-   * The dance raises his hands well above his head. At full idle size they
-   * would reach the nav's bottom edge, so he eases to this scale (pivoting
-   * at his feet, blended with the crossfades) for the length of the dance.
-   */
-  scale: 0.9,
-} as const;
+// The dance itself (clip, loops, crossfade, in-place lock, framing) is one
+// of m_7's states — configured in src/m7/config.ts with the others.
 
 // ---------------------------------------------------------------- toast
 export const TOAST = {

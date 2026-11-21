@@ -30,6 +30,15 @@ function fallback(progress: number, key: string) {
   return 0;
 }
 
+// Shared progress (one listener is ever installed), so m_7 can tell that a
+// keypress is the start of the code rather than ordinary activity.
+let sharedProgress = 0;
+let sharedLastAt = 0;
+
+/** True while a Konami sequence is partway typed (and hasn't timed out). */
+export const isKonamiInProgress = () =>
+  sharedProgress > 0 && performance.now() - sharedLastAt <= KEY_GAP_RESET_MS;
+
 /**
  * Installs one window keydown listener that tracks Konami progress. It never
  * calls preventDefault, so arrow-key scrolling (and the Experience page's
@@ -58,8 +67,13 @@ export function listenForKonami(onComplete: () => void) {
     } else {
       progress = fallback(progress, key);
     }
+    sharedProgress = progress;
+    sharedLastAt = now;
   };
 
   window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
+  return () => {
+    window.removeEventListener("keydown", onKeyDown);
+    sharedProgress = 0;
+  };
 }

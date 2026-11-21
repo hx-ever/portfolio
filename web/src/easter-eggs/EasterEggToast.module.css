@@ -1,0 +1,55 @@
+/* Same frosted glass as the Contact dock tooltip (Contact.module.css
+   .tooltip): material, radius, and the 200ms fade-and-slide. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  z-index: var(--z-rail);
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  text-align: center;
+  background: rgba(40, 40, 44, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  translate: 0 6px;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease,
+    translate 200ms ease;
+}
+
+.toast[data-visible="true"] {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* Only the away-page toast has a link, and only while it's showing. */
+.toast[data-visible="true"][data-interactive="true"] {
+  pointer-events: auto;
+}
+
+.link {
+  margin-left: 6px;
+  color: var(--signature);
+  font-weight: 600;
+}
+
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Reduced motion: fade only, no slide. */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    translate: 0 0;
+  }
+}

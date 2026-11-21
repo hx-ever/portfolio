@@ -6,6 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import SceneLights from "./SceneLights";
 import { SIGNATURE } from "@/lib/palette";
+import { useM7Dance } from "@/easter-eggs";
 
 const ACCENT = SIGNATURE; // signature copper rim light — the hero is chrome
 const MODEL = "/m_7.glb";
@@ -106,6 +107,17 @@ export default function HeroCharacter() {
   const ready = useRef(false);
   const needStart = useRef(false);
 
+  // Hidden easter egg (Konami / five taps): reuses this mixer + the embedded
+  // "Dance" clip; only ever starts from "idle" and dances in place.
+  const { armWeight, lockInPlace, inPlace } = useM7Dance({
+    mixer,
+    idle,
+    animations,
+    scene,
+    phase,
+    height: TARGET_HEIGHT,
+  });
+
   // Arm bones + their relaxed target quaternions, resolved once.
   const armTargets = useMemo(() => {
     return Object.entries(REST_ARMS)
@@ -182,6 +194,7 @@ export default function HeroCharacter() {
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05); // guard against a large first-frame stall
     mixer.update(dt);
+    lockInPlace(); // no-op unless the easter-egg dance is playing
     const g = root.current;
     if (!g || !ready.current) return;
 
@@ -236,12 +249,14 @@ export default function HeroCharacter() {
 
     // Idle/settle: ease arms toward the relaxed A-pose (with a subtle sway),
     // applied after the clip so it overrides the raised authored pose.
-    if (phase.current !== "walk") {
+    // The override fades out while m_7 dances (armWeight → 0) so the clip's
+    // own arm motion plays, and back in as he returns to Idle.
+    if (phase.current !== "walk" && armWeight.current > 0) {
       const t = state.clock.elapsedTime;
       armTargets.forEach(({ bone, target }, i) => {
         sway.setFromAxisAngle(swayAxis, Math.sin(t * 0.8 + i) * 0.025);
         tmpQ.copy(target).multiply(sway);
-        bone.quaternion.slerp(tmpQ, 0.2);
+        bone.quaternion.slerp(tmpQ, 0.2 * armWeight.current);
       });
     }
   });
@@ -253,6 +268,8 @@ export default function HeroCharacter() {
           and the greige jacket reads as brightly as the light rig allows. */}
       <directionalLight position={[0, 1, 7]} intensity={0.9} color="#ffffff" />
       <group ref={root} visible={false}>
+        {/* identity wrapper; only the dance easter egg ever offsets it */}
+        <group ref={inPlace}>
         <primitive
           object={scene}
           scale={fit.scale}
@@ -262,6 +279,7 @@ export default function HeroCharacter() {
             -fit.center.z * fit.scale,
           ]}
         />
+        </group>
       </group>
     </>
   );

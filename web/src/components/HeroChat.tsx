@@ -123,7 +123,7 @@ export default function HeroChat() {
             <div className={styles.thinking}>
               <ThinkingOrb
                 state="working"
-                size={64}
+                size={32}
                 theme="dark"
                 color={SIGNATURE}
                 aria-label={`${MASCOT_NAME} is thinking`}

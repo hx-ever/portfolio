@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import HeroChat from "./HeroChat";
 import ModelCanvas from "./three/ModelCanvas";
 import HeroCharacter from "./three/HeroCharacter";
 import styles from "./Hero.module.css";
@@ -40,6 +41,7 @@ export default function Hero() {
           </p>
         </div>
       </div>
+      <HeroChat />
       <div className={`${styles.scrollCue} ${scrolledOnce ? styles.hidden : ""}`}>
         SCROLL ↓
       </div>

@@ -3,6 +3,8 @@
  */
 import { DURATION_S } from "@/lib/motion";
 
+export const MASCOT_NAME = "hxever";
+
 export type M7State = "ENTRANCE" | "IDLE" | "BORED" | "GREETING" | "DANCE";
 
 /** Clip names in m_7.glb (all share one rig). The pack's celebration clip

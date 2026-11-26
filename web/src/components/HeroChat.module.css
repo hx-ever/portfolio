@@ -34,7 +34,7 @@
   position: fixed;
   inset: 50% auto auto clamp(24px, 8vw, 120px);
   width: min(380px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  height: min(440px, calc(100dvh - 32px));
   margin: 0;
   border: 1px solid rgba(var(--signature-rgb), 0.32);
   border-radius: 22px;
@@ -45,12 +45,18 @@
   overscroll-behavior: contain;
 }
 
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 .dialog::backdrop {
   background: rgb(6 6 7 / 0.46);
 }
 
 .header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px 8px 20px;
@@ -62,6 +68,16 @@
   font-family: var(--font-mono), monospace;
   font-size: 15px;
   font-weight: 600;
+}
+
+.header h2:focus {
+  outline: none;
+}
+
+.description {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .close {
@@ -78,48 +94,67 @@
   color: var(--fg);
 }
 
-.body {
-  display: grid;
-  gap: 14px;
-  padding: 20px;
+.transcript {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
 }
 
-.body [role="status"]:empty {
-  height: 0;
-  margin-top: -14px;
-}
-
-.prompt,
 .reply,
-.visitor {
+.visitor,
+.typing {
+  flex-shrink: 0;
   width: fit-content;
-  max-width: 100%;
-  padding: 10px 13px;
+  max-width: 90%;
+  padding: 9px 12px;
   border-radius: 14px 14px 14px 4px;
   background: #28211d;
   font-size: 15px;
   font-weight: 400;
   line-height: 1.55;
-}
-
-.prompt:focus {
-  outline: none;
+  overflow-wrap: anywhere;
 }
 
 .visitor {
-  justify-self: end;
+  align-self: flex-end;
   border-radius: 14px 14px 4px 14px;
   background: #3b291c;
   color: #f2d5b8;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.typing {
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.16em;
 }
 
-.actions button {
+.composer {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: #211b17;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+}
+
+.composer button {
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid rgba(var(--signature-rgb), 0.34);
@@ -128,9 +163,23 @@
   font-size: 14px;
 }
 
-.actions button:hover {
+.composer button:hover:not(:disabled) {
   border-color: var(--signature);
   background: #342316;
+}
+
+.composer button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 @media (max-width: 860px) {

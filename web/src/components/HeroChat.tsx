@@ -1,65 +1,82 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { prefersReducedMotion } from "@/lib/reducedMotion";
+import { MASCOT_NAME } from "@/m7/config";
+import { REPLIES, replyTopic, type ReplyTopic } from "@/m7/chatReplies";
 import styles from "./HeroChat.module.css";
 
-const MOODS = [
-  {
-    label: "I’m overwhelmed",
-    replies: [
-      "If today feels like too much, make the next step smaller. One email, one glass of water, one deep breath. Any of those counts.",
-      "Give yourself a minute away from the thing that’s wearing you out. It’ll still be there when you get back, and you’ll have had a minute to yourself.",
-      "If the whole list feels impossible, choose one thing to leave for tomorrow. That’s a decision you can make right now.",
-    ],
-  },
-  {
-    label: "I’m doubting myself",
-    replies: [
-      "Think of something you used to find hard that you can do now. You probably got there one awkward try at a time. This can be another one of those tries.",
-      "One rough attempt tells you how that attempt went. Give yourself room to try again with what you learned.",
-      "You can be nervous and still take the next step. Confidence often shows up after you’ve started.",
-    ],
-  },
-  {
-    label: "I could use a little cheer",
-    replies: [
-      "Here’s a tiny robot cheering for you. Imagine me giving you two very shiny thumbs up.",
-      "I hope the next good thing today is something small and unexpected. The perfect song on shuffle would be a solid start.",
-      "For your next five minutes, I vote for water, a stretch, or the song you always play twice. Pick whichever sounds nicest.",
-    ],
-  },
-] as const;
+type Message = { author: "bot" | "visitor"; text: string };
+
+const GREETING: Message = {
+  author: "bot",
+  text: `Hey, I’m ${MASCOT_NAME}. How’s your day going?`,
+};
+const MAX_MESSAGE_LENGTH = 400;
 
 export default function HeroChat() {
   const dialog = useRef<HTMLDialogElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
-  const choices = useRef<HTMLHeadingElement>(null);
-  const [selection, setSelection] = useState<{ mood: number; reply: number } | null>(null);
-  const active = selection === null ? null : MOODS[selection.mood];
+  const title = useRef<HTMLHeadingElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const transcript = useRef<HTMLDivElement>(null);
+  const timer = useRef<number | null>(null);
+  const previousTopic = useRef<ReplyTopic>("general");
+  const replyCounts = useRef<Partial<Record<ReplyTopic, number>>>({});
+  const [messages, setMessages] = useState<Message[]>([GREETING]);
+  const [draft, setDraft] = useState("");
+  const [isReplying, setIsReplying] = useState(false);
 
-  function selectMood(mood: number) {
-    setSelection({ mood, reply: 0 });
-  }
+  useEffect(() => {
+    const log = transcript.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [messages, isReplying]);
 
-  function nextReply() {
-    setSelection((current) =>
-      current && {
-        ...current,
-        reply: (current.reply + 1) % MOODS[current.mood].replies.length,
-      }
-    );
-  }
-
-  // Move focus only when the available buttons change. New replies are
-  // announced by the live region while focus stays on "One more".
-  const focusChoices = useCallback((element: HTMLHeadingElement | null) => {
-    choices.current = element;
-    if (element && dialog.current?.open) element.focus();
+  useEffect(() => {
+    return () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    };
   }, []);
 
-  const focusReplyActions = useCallback((element: HTMLDivElement | null) => {
-    element?.querySelector("button")?.focus();
-  }, []);
+  function resetChat() {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    previousTopic.current = "general";
+    replyCounts.current = {};
+    setIsReplying(false);
+    setMessages([GREETING]);
+    setDraft("");
+    launcher.current?.focus({ preventScroll: true });
+  }
+
+  function sendMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || timer.current !== null) return;
+
+    const topic = replyTopic(text, previousTopic.current);
+    const replies = REPLIES[topic];
+    const turn = replyCounts.current[topic] ?? 0;
+    const reply = replies[turn % replies.length];
+    replyCounts.current[topic] = turn + 1;
+    if (topic !== "hello" && topic !== "thanks") previousTopic.current = topic;
+
+    setMessages((current) => [...current, { author: "visitor", text }]);
+    setDraft("");
+    input.current?.focus({ preventScroll: true });
+
+    if (prefersReducedMotion()) {
+      setMessages((current) => [...current, { author: "bot", text: reply }]);
+      return;
+    }
+
+    setIsReplying(true);
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      setMessages((current) => [...current, { author: "bot", text: reply }]);
+      setIsReplying(false);
+    }, 560);
+  }
 
   return (
     <>
@@ -70,23 +87,24 @@ export default function HeroChat() {
         aria-haspopup="dialog"
         onClick={() => {
           dialog.current?.showModal();
-          choices.current?.focus();
+          title.current?.focus();
         }}
       >
         <span className={styles.indicator} aria-hidden="true" />
-        Talk to m_7
+        Talk to {MASCOT_NAME}
       </button>
       <dialog
         ref={dialog}
         className={styles.dialog}
-        aria-labelledby="m7-chat-title"
-        onClose={() => {
-          setSelection(null);
-          launcher.current?.focus({ preventScroll: true });
-        }}
+        aria-labelledby="hxever-chat-title"
+        aria-describedby="hxever-chat-description"
+        onClose={resetChat}
       >
         <header className={styles.header}>
-          <h2 id="m7-chat-title">m_7</h2>
+          <div>
+            <h2 ref={title} id="hxever-chat-title" tabIndex={-1}>{MASCOT_NAME}</h2>
+            <p id="hxever-chat-description" className={styles.description}>Preset replies</p>
+          </div>
           <button
             className={styles.close}
             type="button"
@@ -96,30 +114,29 @@ export default function HeroChat() {
             <span aria-hidden="true">×</span>
           </button>
         </header>
-        <div className={styles.body}>
-          {selection && active ? (
-            <p className={styles.visitor}>{active.label}</p>
-          ) : (
-            <h3 ref={focusChoices} tabIndex={-1} className={styles.prompt}>
-              Hey, I’m m_7. How’s your day going?
-            </h3>
-          )}
-          <div role="status" aria-atomic="true">
-            {selection && active && <p className={styles.reply}>{active.replies[selection.reply]}</p>}
-          </div>
-          {selection ? (
-            <div ref={focusReplyActions} className={styles.actions}>
-              <button type="button" onClick={nextReply}>One more</button>
-              <button type="button" onClick={() => setSelection(null)}>Pick another mood</button>
-            </div>
-          ) : (
-            <div className={styles.actions}>
-              {MOODS.map(({ label }, index) => (
-                <button key={label} type="button" onClick={() => selectMood(index)}>{label}</button>
-              ))}
-            </div>
-          )}
+        <div ref={transcript} className={styles.transcript} role="log" aria-label="Conversation">
+          {messages.map(({ author, text }, index) => (
+            <p key={index} className={author === "bot" ? styles.reply : styles.visitor}>
+              <span className={styles.srOnly}>{author === "bot" ? MASCOT_NAME : "You"}: </span>
+              {text}
+            </p>
+          ))}
+          {isReplying && <span className={styles.typing} aria-hidden="true">···</span>}
         </div>
+        <form className={styles.composer} onSubmit={sendMessage}>
+          <label className={styles.srOnly} htmlFor="hxever-message">Your message</label>
+          <input
+            ref={input}
+            id="hxever-message"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            maxLength={MAX_MESSAGE_LENGTH}
+            autoComplete="off"
+            enterKeyHint="send"
+            placeholder="Say something…"
+          />
+          <button type="submit" disabled={!draft.trim() || isReplying}>Send</button>
+        </form>
       </dialog>
     </>
   );

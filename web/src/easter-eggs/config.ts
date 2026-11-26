@@ -1,3 +1,5 @@
+import { MASCOT_NAME } from "@/m7/config";
+
 /**
  * Easter eggs — every piece of copy and every tunable lives here.
  *
@@ -18,7 +20,7 @@ export const CONSOLE = {
     "This site was hand-built: Three.js models converted from my own CAD files, physics-based animations, and no templates.",
   contactLead: "Let's talk: ",
   contactLinks: "intern@hankhsu.com · github.com/hx-ever",
-  hint: "P.S. m_7 has a secret move. Some codes never get old. ↑ ↑ ↓ ↓ ← → ← → B A",
+  hint: `P.S. ${MASCOT_NAME} has a secret move. Some codes never get old. ↑ ↑ ↓ ↓ ← → ← → B A`,
 } as const;
 
 // ---------------------------------------------------------------- konami
@@ -53,8 +55,8 @@ export const TAP_MAX_DURATION_MS = 350;
 
 // ---------------------------------------------------------------- toast
 export const TOAST = {
-  homeMessage: "Achievement unlocked: you found m_7's secret move.",
-  awayMessage: "m_7 is dancing on the homepage.",
+  homeMessage: `Achievement unlocked: you found ${MASCOT_NAME}'s secret move.`,
+  awayMessage: `${MASCOT_NAME} is dancing on the homepage.`,
   awayLinkLabel: "Go say hi →",
   /** How long the toast stays up before it fades + slides out. */
   visibleMs: 3000,

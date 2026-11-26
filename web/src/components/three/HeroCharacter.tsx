@@ -7,7 +7,7 @@ import * as THREE from "three";
 import SceneLights from "./SceneLights";
 import { SIGNATURE } from "@/lib/palette";
 import { isKonamiInProgress, useDanceTriggers } from "@/easter-eggs";
-import { GazeController, M7StateMachine, safeStageY, useBoredom } from "@/m7";
+import { M7StateMachine, safeStageY, useBoredom } from "@/m7";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 
 const ACCENT = SIGNATURE; // signature copper rim light — the hero is chrome
@@ -81,7 +81,7 @@ function markIntroPlayed() {
  * Which clip plays is decided by the m_7 state machine (src/m7/): walk-in,
  * idle, boredom, welcome-back greeting and the Konami dance all go through
  * it. This component keeps placement (walk path, settle turn, resting spot)
- * and applies the post-mixer overrides: in-place lock, relaxed arms, gaze.
+ * and applies the post-mixer overrides: in-place lock and relaxed arms.
  */
 export default function HeroCharacter() {
   const root = useRef<THREE.Group>(null);
@@ -94,7 +94,6 @@ export default function HeroCharacter() {
     () => new M7StateMachine(mixer, animations, scene, TARGET_HEIGHT, prefersReducedMotion),
     [mixer, animations, scene]
   );
-  const gaze = useMemo(() => new GazeController(scene), [scene]);
   // identity wrapper the machine nudges to keep m_7 on his resting spot
   const inPlace = useRef<THREE.Group>(null);
 
@@ -270,10 +269,6 @@ export default function HeroCharacter() {
         bone.quaternion.slerp(tmpQ, 0.2 * armWeight);
       });
     }
-
-    // Gaze: additive look-at on the neck → head chain, on top of whatever
-    // the clip posed. Weight is 0 during the walk-in, Sad and Dance.
-    gaze.apply(dt, machine.gazeWeight, state.camera, state.gl.domElement, prefersReducedMotion());
   });
 
   return (

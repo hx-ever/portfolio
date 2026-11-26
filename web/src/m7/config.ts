@@ -1,6 +1,5 @@
 /**
- * m_7 behaviour — every tunable for the hero mascot's animation states,
- * gaze tracking and boredom/welcome-back reaction lives here.
+ * Settings for m_7's animation states and boredom/welcome-back reactions.
  */
 import { DURATION_S } from "@/lib/motion";
 
@@ -69,42 +68,6 @@ export const ARM_RELAX_WEIGHT: Record<M7State, number> = {
   GREETING: 0,
   DANCE: 0,
 };
-
-// ------------------------------------------------------------ gaze
-export const GAZE = {
-  /** Rotation split along the neck → head chain (Rigify DEF bones):
-   *  40% neck (two segments), 60% head. */
-  bones: [
-    { name: "DEF-spine.004", share: 0.15 }, // lower neck
-    { name: "DEF-spine.005", share: 0.25 }, // upper neck
-    { name: "DEF-spine.006", share: 0.6 }, // head
-  ],
-  maxYawDeg: 35,
-  maxPitchDeg: 20,
-  /**
-   * The cursor is projected onto a camera-facing plane at head depth, then
-   * the look target is pulled this far (world units) from that point toward
-   * the camera. Cursor on his face → eye contact with the viewer; smaller
-   * values make him turn further for the same cursor offset.
-   */
-  lookDistance: 1.0,
-  /** Exponential easing rate (1/s) toward the target — the natural lag. */
-  easeRate: 6,
-  /** prefers-reduced-motion: angles × this, and a slower ease. */
-  reducedMotionAngleScale: 0.5,
-  reducedMotionEaseRate: 3,
-  /** Touch: look at the touch point, back to neutral this long after. */
-  touchReleaseMs: 1500,
-  /** Weight changes between states fade over this long. */
-  weightFadeS: 0.3,
-  weight: {
-    ENTRANCE: 0,
-    IDLE: 1,
-    GREETING: 0.4,
-    BORED: 0,
-    DANCE: 0,
-  } as Record<M7State, number>,
-} as const;
 
 // ------------------------------------------------------------ boredom
 /** No activity for this long (m_7 on screen, IDLE) → BORED. Also the

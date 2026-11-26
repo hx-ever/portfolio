@@ -5,7 +5,6 @@ import {
   CLIPS,
   CROSSFADE_S,
   FRAMING_SCALE,
-  GAZE,
   LOCKED_ROOT_BONES,
   LOOPS,
   PRIORITY,
@@ -37,8 +36,7 @@ const approach = (from: number, to: number, rate: number, dt: number) => {
  *  - root lock: "root" translation is stripped from every clip, and while a
  *    non-idle clip plays the hips are pinned (horizontally) to where they
  *    sat in Idle, so m_7 never drifts off his resting spot;
- *  - per-state weights for the gaze override, the relaxed-arm override and
- *    the framing scale, each eased rather than switched.
+ *  - eased transitions for the relaxed-arm override and the framing scale.
  *
  * No React in here: HeroCharacter constructs it and drives `update()` from
  * its render loop (so it pauses with the loop when m_7 is off-screen).
@@ -57,7 +55,6 @@ export class M7StateMachine {
   private readonly tmp = new THREE.Vector3();
 
   /** Eased weights, read by HeroCharacter each frame. */
-  gazeWeight = 0;
   armWeight = 1;
   framing = 1;
 
@@ -110,7 +107,6 @@ export class M7StateMachine {
     this.state = initial;
     this.stateTime = 0;
     this.idleSince = performance.now();
-    this.gazeWeight = GAZE.weight[initial];
     this.armWeight = ARM_RELAX_WEIGHT[initial];
     this.framing = FRAMING_SCALE[initial];
   }
@@ -161,7 +157,6 @@ export class M7StateMachine {
     }
 
     // eased per-state weights
-    this.gazeWeight = approach(this.gazeWeight, GAZE.weight[this.state], 1 / GAZE.weightFadeS, dt);
     this.armWeight = approach(this.armWeight, ARM_RELAX_WEIGHT[this.state], 1 / CROSSFADE_S, dt);
     this.framing = approach(this.framing, FRAMING_SCALE[this.state], FRAMING_RATE, dt);
 

@@ -42,6 +42,7 @@ const approach = (from: number, to: number, rate: number, dt: number) => {
  * its render loop (so it pauses with the loop when m_7 is off-screen).
  */
 export class M7StateMachine {
+  private readonly clips = new Map<M7State, THREE.AnimationClip>();
   private readonly actions = new Map<M7State, THREE.AnimationAction>();
   private readonly anchor: THREE.Object3D | null;
   private readonly listeners = new Set<ChangeListener>();
@@ -68,21 +69,13 @@ export class M7StateMachine {
   ) {
     for (const s of STATES) {
       const source = animations.find((a) => a.name === CLIPS[s]);
-      if (!source) continue;
-      const clip = source.clone();
-      clip.tracks = clip.tracks.filter((t) => {
-        const dot = t.name.lastIndexOf(".");
-        return !(t.name.slice(dot + 1) === "position" && LOCKED_ROOT_BONES.includes(t.name.slice(0, dot)));
-      });
-      const action = mixer.clipAction(clip);
-      action.clampWhenFinished = true; // hold the last pose, never snap to bind
-      this.actions.set(s, action);
+      if (source) this.clips.set(s, source);
     }
     this.anchor = scene.getObjectByName(THREE.PropertyBinding.sanitizeNodeName(ANCHOR_BONE)) ?? null;
   }
 
   has(state: M7State) {
-    return this.actions.has(state);
+    return this.clips.has(state);
   }
 
   getState() {
@@ -102,7 +95,7 @@ export class M7StateMachine {
 
   /** Begin in ENTRANCE (walk-in) or straight in IDLE — no crossfade. */
   start(initial: "ENTRANCE" | "IDLE") {
-    const action = this.actions.get(initial) ?? this.actions.get("IDLE");
+    const action = this.actionFor(initial) ?? this.actionFor("IDLE");
     action?.reset().setEffectiveWeight(1).play();
     this.state = initial;
     this.stateTime = 0;
@@ -114,8 +107,9 @@ export class M7StateMachine {
   /** The walk-in reached its spot: blend Walk → Idle. Still ENTRANCE (he
    *  turns to face the camera next), so nothing can interrupt yet. */
   entranceArrived() {
-    const idle = this.actions.get("IDLE");
-    if (this.state === "ENTRANCE" && idle) this.fadeTo(idle);
+    if (this.state !== "ENTRANCE") return;
+    const idle = this.actionFor("IDLE");
+    if (idle) this.fadeTo(idle);
   }
 
   /** The walk-in has fully settled facing the camera: now IDLE. */
@@ -132,7 +126,7 @@ export class M7StateMachine {
    */
   request(next: M7State): RequestResult {
     if (next === this.state || next === "ENTRANCE" || next === "IDLE") return "ignored";
-    if (!this.actions.has(next)) return "ignored";
+    if (!this.has(next)) return "ignored";
     if (this.state === "ENTRANCE" || (this.state === "IDLE" && !this.idleLongEnough())) {
       if (!this.queued || PRIORITY[next] > PRIORITY[this.queued]) this.queued = next;
       return "queued";
@@ -194,6 +188,25 @@ export class M7StateMachine {
 
   // ---------------------------------------------------------------- private
 
+  private actionFor(state: M7State) {
+    const existing = this.actions.get(state);
+    if (existing) return existing;
+    const source = this.clips.get(state);
+    if (!source) return undefined;
+
+    const tracks = source.tracks.filter((track) => {
+      const dot = track.name.lastIndexOf(".");
+      return !(track.name.slice(dot + 1) === "position" && LOCKED_ROOT_BONES.includes(track.name.slice(0, dot)));
+    });
+    // The mixer only reads the keyframes. Share those arrays and bind each
+    // clip to the rig when it first plays, including the optional reactions.
+    const clip = new THREE.AnimationClip(source.name, source.duration, tracks, source.blendMode);
+    const action = this.mixer.clipAction(clip);
+    action.clampWhenFinished = true;
+    this.actions.set(state, action);
+    return action;
+  }
+
   private idleLongEnough() {
     return performance.now() - this.idleSince >= QUEUED_START_DELAY_MS;
   }
@@ -204,7 +217,7 @@ export class M7StateMachine {
   }
 
   private enter(next: M7State) {
-    const action = this.actions.get(next)!;
+    const action = this.actionFor(next)!;
     // pin the hips where they are in Idle; chained states keep that origin
     if (!this.lockFrom && this.anchor) this.lockFrom = this.anchorLocal(new THREE.Vector3());
 
@@ -224,7 +237,7 @@ export class M7StateMachine {
   }
 
   private returnToIdle() {
-    const idle = this.actions.get("IDLE");
+    const idle = this.actionFor("IDLE");
     if (idle) {
       idle.setLoop(THREE.LoopRepeat, Infinity);
       this.fadeTo(idle);

@@ -18,3 +18,17 @@ npx @gltf-transform/cli quantize /tmp/<name>-simp.glb  public/<name>.glb
   supports it natively, no decoder needed.
 
 Re-run this pipeline whenever a source model is re-exported.
+
+### hxever
+
+From the repository root, repack the mascot with:
+
+```sh
+python3 tools/pack-hero-glb.py web/models-src/m_7.glb web/public/m_7-web-v2.glb
+```
+
+The packer retains the original mesh, skin, texture, and five website clips.
+Held channels retain their start and end times and collapse only when every
+component remains within `1e-6` of its first sample. When publishing a new
+model, use a new filename and update `MASCOT_MODEL_URL` in `src/m7/config.ts`
+so the site's immutable asset cache serves the new version.

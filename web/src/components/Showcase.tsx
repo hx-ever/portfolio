@@ -1,14 +1,9 @@
 "use client";
 
-import { useRef, useState, type ComponentType, type RefObject } from "react";
+import { useRef, useState, type RefObject } from "react";
 import Image from "next/image";
 import CaseStudyCta from "./CaseStudy";
-import ModelCanvas from "./three/ModelCanvas";
-import AuraEyezModel from "./three/AuraEyezModel";
-import BuggyModel from "./three/BuggyModel";
-import KeycapModel from "./three/KeycapModel";
-import PulseModel from "./three/PulseModel";
-import EchoModel from "./three/EchoModel";
+import ModelCanvas, { type ModelLoader } from "./three/ModelCanvas";
 import { useSectionProgress } from "@/lib/useSectionProgress";
 import {
   useSectionPointer,
@@ -19,18 +14,17 @@ import styles from "./Showcase.module.css";
 
 type ModelProps = { progress: number; pointer?: RefObject<SectionPointer> };
 
-const MODELS: Record<string, ComponentType<ModelProps>> = {
-  auraeyez: AuraEyezModel,
-  landrover: BuggyModel,
-  hxkeysair: KeycapModel,
-  corelink: PulseModel,
-  arx: EchoModel,
+const MODELS: Record<string, ModelLoader<ModelProps>> = {
+  auraeyez: () => import("./three/AuraEyezModel"),
+  landrover: () => import("./three/BuggyModel"),
+  hxkeysair: () => import("./three/KeycapModel"),
+  corelink: () => import("./three/PulseModel"),
+  arx: () => import("./three/EchoModel"),
 };
 
 export default function Showcase({ section }: { section: ShowcaseSection }) {
   const { ref, progress } = useSectionProgress<HTMLElement>();
   const pointer = useSectionPointer(ref, section.id === "auraeyez");
-  const Model = MODELS[section.id];
 
   return (
     <section
@@ -57,12 +51,12 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
               the entry happens at the section's top edge, never mid-stage —
               EchoModel compensates the composition for the extra headroom */}
           <ModelCanvas
+            loadModel={MODELS[section.id]}
+            modelProps={{ progress, pointer }}
             cameraPosition={[0, 0, 4]}
             fov={34}
             className={section.id === "arx" ? styles.bleedTop : undefined}
-          >
-            <Model progress={progress} pointer={pointer} />
-          </ModelCanvas>
+          />
         </div>
 
         <div className={styles.copy}>

@@ -251,9 +251,9 @@ export default function PulseModel({ progress }: { progress: number }) {
     drawnKey: "",
   });
 
-  const { scene } = useGLTF(MODEL);
-  const { scene: airScene } = useGLTF(AIR_MODEL);
-  const { scene: lightScene } = useGLTF(LIGHT_MODEL);
+  const { scene } = useGLTF(MODEL, false, false);
+  const { scene: airScene } = useGLTF(AIR_MODEL, false, false);
+  const { scene: lightScene } = useGLTF(LIGHT_MODEL, false, false);
 
   const layout = useMemo(() => {
     scene.updateWorldMatrix(true, true);

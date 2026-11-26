@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { preload } from "react-dom";
+import { MASCOT_MODEL_URL } from "@/m7/config";
 import HeroChat from "./HeroChat";
 import ModelCanvas from "./three/ModelCanvas";
-import HeroCharacter from "./three/HeroCharacter";
 import styles from "./Hero.module.css";
 
+const loadHeroCharacter = () => import("./three/HeroCharacter");
+
 export default function Hero() {
+  preload(MASCOT_MODEL_URL, { as: "fetch", crossOrigin: "anonymous", fetchPriority: "low" });
   const [scrolledOnce, setScrolledOnce] = useState(false);
 
   useEffect(() => {
@@ -23,9 +27,12 @@ export default function Hero() {
       {/* Full-width character layer: sits above the background and text so the
           walk-in path is never clipped by a container edge or covered. */}
       <div className={styles.characterLayer} aria-hidden="true">
-        <ModelCanvas cameraPosition={[0, 0.15, 4.6]} fov={30}>
-          <HeroCharacter />
-        </ModelCanvas>
+        <ModelCanvas
+          loadModel={loadHeroCharacter}
+          modelProps={{}}
+          cameraPosition={[0, 0.15, 4.6]}
+          fov={30}
+        />
       </div>
 
       <div className={styles.content}>

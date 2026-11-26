@@ -6,12 +6,12 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import SceneLights from "./SceneLights";
 import { SIGNATURE } from "@/lib/palette";
-import { isKonamiInProgress, useDanceTriggers } from "@/easter-eggs";
-import { M7StateMachine, safeStageY, useBoredom } from "@/m7";
+import { isKonamiInProgress } from "@/easter-eggs/konami";
+import { useDanceTriggers } from "@/easter-eggs/useDanceTriggers";
+import { MASCOT_MODEL_URL, M7StateMachine, safeStageY, useBoredom } from "@/m7";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 
 const ACCENT = SIGNATURE; // signature copper rim light — the hero is chrome
-const MODEL = "/m_7.glb";
 const TARGET_HEIGHT = 2.15; // world units the base model is scaled to fill
 const WALK_SPEED_LOCAL = 0.72; // root units/sec from the "Walk (RM)" clip
 const FACING_WALK = Math.PI / 2; // side profile, walking toward +X (screen right)
@@ -61,7 +61,6 @@ function introAlreadyPlayed() {
     return false;
   }
 }
-
 function markIntroPlayed() {
   try {
     sessionStorage.setItem(INTRO_KEY, "1");
@@ -85,7 +84,7 @@ function markIntroPlayed() {
  */
 export default function HeroCharacter() {
   const root = useRef<THREE.Group>(null);
-  const { scene, animations } = useGLTF(MODEL);
+  const { scene, animations } = useGLTF(MASCOT_MODEL_URL, false, false);
 
   // One mixer, driven manually so the overrides run after mixer.update. Only
   // the state machine ever touches it.
@@ -295,4 +294,6 @@ export default function HeroCharacter() {
   );
 }
 
-useGLTF.preload(MODEL);
+// This module loads near the viewport. Parse the prefetched asset while the
+// canvas initializes so a fast connection does not wait on a second stage.
+useGLTF.preload(MASCOT_MODEL_URL, false, false);

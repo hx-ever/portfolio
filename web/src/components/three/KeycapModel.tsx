@@ -130,7 +130,7 @@ export default function KeycapModel({ progress }: { progress: number }) {
     asm.current = { phase: assembled() || prefersReducedMotion() ? "done" : "waiting", t: 0 };
   }
 
-  const { scene } = useGLTF(MODEL);
+  const { scene } = useGLTF(MODEL, false, false);
 
   // Procedural room environment (no assets), scoped to this section's own
   // Canvas — it's what gives the plastics believable surface response instead

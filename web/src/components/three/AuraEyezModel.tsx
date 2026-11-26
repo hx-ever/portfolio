@@ -192,7 +192,7 @@ export default function AuraEyezModel({
   // ambient-bloom step; resolved lazily from the canvas' ancestors.
   const sectionEl = useRef<HTMLElement | null>(null);
 
-  const { scene } = useGLTF(MODEL);
+  const { scene } = useGLTF(MODEL, false, false);
 
   // A procedural room environment (no assets), scoped to this section's own
   // Canvas: it's what makes the graphite knobs read as metal — punctual

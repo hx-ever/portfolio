@@ -180,7 +180,7 @@ export default function BuggyModel({ progress }: { progress: number }) {
     };
   }
 
-  const { scene } = useGLTF(MODEL);
+  const { scene } = useGLTF(MODEL, false, false);
 
   const gl = useThree((s) => s.gl);
   const envTex = useMemo(() => {

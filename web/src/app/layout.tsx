@@ -5,7 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import Nav from "@/components/Nav";
 import ScrollProgress from "@/components/ScrollProgress";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
-import { EasterEggs } from "@/easter-eggs";
+import EasterEggs from "@/easter-eggs/EasterEggs";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({

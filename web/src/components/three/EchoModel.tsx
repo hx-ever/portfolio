@@ -247,7 +247,7 @@ export default function EchoModel({ progress }: { progress: number }) {
         };
   }
 
-  const { scene } = useGLTF(MODEL);
+  const { scene } = useGLTF(MODEL, false, false);
   const bladeGeo = useMemo(() => buildBladeGeometry(), []);
 
   const layout = useMemo(() => {

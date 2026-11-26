@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ThinkingOrb } from "thinking-orbs";
+import { SIGNATURE } from "@/lib/palette";
 import { prefersReducedMotion } from "@/lib/reducedMotion";
 import { MASCOT_NAME } from "@/m7/config";
 import { REPLIES, replyTopic, type ReplyTopic } from "@/m7/chatReplies";
@@ -97,14 +99,10 @@ export default function HeroChat() {
         ref={dialog}
         className={styles.dialog}
         aria-labelledby="hxever-chat-title"
-        aria-describedby="hxever-chat-description"
         onClose={resetChat}
       >
         <header className={styles.header}>
-          <div>
-            <h2 ref={title} id="hxever-chat-title" tabIndex={-1}>{MASCOT_NAME}</h2>
-            <p id="hxever-chat-description" className={styles.description}>Preset replies</p>
-          </div>
+          <h2 ref={title} id="hxever-chat-title" tabIndex={-1}>{MASCOT_NAME}</h2>
           <button
             className={styles.close}
             type="button"
@@ -121,7 +119,17 @@ export default function HeroChat() {
               {text}
             </p>
           ))}
-          {isReplying && <span className={styles.typing} aria-hidden="true">···</span>}
+          {isReplying && (
+            <div className={styles.thinking}>
+              <ThinkingOrb
+                state="working"
+                size={20}
+                theme="dark"
+                color={SIGNATURE}
+                aria-label={`${MASCOT_NAME} is thinking`}
+              />
+            </div>
+          )}
         </div>
         <form className={styles.composer} onSubmit={sendMessage}>
           <label className={styles.srOnly} htmlFor="hxever-message">Your message</label>

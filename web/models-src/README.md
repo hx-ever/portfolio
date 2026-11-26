@@ -24,10 +24,11 @@ Re-run this pipeline whenever a source model is re-exported.
 From the repository root, repack the mascot with:
 
 ```sh
-python3 tools/pack-hero-glb.py web/models-src/m_7.glb web/public/m_7-web-v2.glb
+python3 tools/pack-hero-glb.py web/models-src/m_7.glb web/public/m_7-web-v3.glb
 ```
 
-The packer retains the original mesh, skin, texture, and five website clips.
+The packer retains the skin, texture, and five website clips. It offsets the
+upper collar seam on this export to give it clearance over the jacket.
 Held channels retain their start and end times and collapse only when every
 component remains within `1e-6` of its first sample. When publishing a new
 model, use a new filename and update `MASCOT_MODEL_URL` in `src/m7/config.ts`

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 from pathlib import Path
 import struct
 
@@ -111,8 +112,24 @@ def pack(source, output):
 
     for mesh in model["meshes"]:
         for primitive in mesh["primitives"]:
+            attributes = primitive["attributes"]
+            positions = view_payload(old_accessors[attributes["POSITION"]]["bufferView"])
+            uv = view_payload(old_accessors[attributes["TEXCOORD_0"]]["bufferView"])
+            # The collar is a separate layer over the jacket. Give its upper
+            # seam clearance so the surfaces don't cross as the shoulders bend.
+            vertices = list(struct.iter_unpack("<3f", positions))
+            for i, ((x, y, z), (u, v)) in enumerate(zip(vertices, struct.iter_unpack("<2f", uv))):
+                if abs(u - .73466) < .0001 and .382 < v < .392 and y > 1.35:
+                    blend = min(1, (y - 1.35) / .04)
+                    radius = max(math.hypot(x, z + .02), .01)
+                    vertices[i] = (x + .006 * blend * x / radius, y + .006 * blend,
+                                   z + .006 * blend * (z + .02) / radius)
+            position_index = copy_accessor(
+                attributes["POSITION"], b"".join(struct.pack("<3f", *p) for p in vertices)
+            )
             primitive["attributes"] = {
-                name: copy_accessor(index) for name, index in primitive["attributes"].items()
+                name: position_index if name == "POSITION" else copy_accessor(index)
+                for name, index in attributes.items()
             }
             if "indices" in primitive:
                 primitive["indices"] = copy_accessor(primitive["indices"])

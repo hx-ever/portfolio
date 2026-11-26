@@ -4,7 +4,7 @@
 import { DURATION_S } from "@/lib/motion";
 
 export const MASCOT_NAME = "hxever";
-export const MASCOT_MODEL_URL = "/m_7-web-v2.glb";
+export const MASCOT_MODEL_URL = "/m_7-web-v3.glb";
 
 export type M7State = "ENTRANCE" | "IDLE" | "BORED" | "GREETING" | "DANCE";
 

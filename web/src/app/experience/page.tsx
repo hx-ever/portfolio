@@ -6,7 +6,7 @@ const DESCRIPTION =
   "Where Hsu Hsin-Wei has been — education, roles, and projects, 2022 → 2026.";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: "Experience",
   description: DESCRIPTION,
   alternates: { canonical: "/experience" },
   openGraph: {

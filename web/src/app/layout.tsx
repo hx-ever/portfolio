@@ -31,7 +31,7 @@ const DESCRIPTION =
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: TITLE,
+  title: "Design and experience",
   description: DESCRIPTION,
   alternates: { canonical: "/" },
   openGraph: {

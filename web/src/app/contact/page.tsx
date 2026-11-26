@@ -8,7 +8,7 @@ const DESCRIPTION =
   "Get in touch with Hsu Hsin-Wei — open to design engineering roles in Singapore, Taiwan, and Shanghai.";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: "Contact",
   description: DESCRIPTION,
   alternates: { canonical: "/contact" },
   openGraph: {

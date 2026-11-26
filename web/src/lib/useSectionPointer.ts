@@ -18,14 +18,15 @@ export interface SectionPointer {
  * read `ref.current` inside their own animation frame. When the cursor leaves
  * the section, `inside` flips to false so consumers can ease back to rest.
  */
-export function useSectionPointer(ref: RefObject<HTMLElement | null>) {
+export function useSectionPointer(ref: RefObject<HTMLElement | null>, enabled: boolean) {
   const pointer = useRef<SectionPointer>({ x: 0, y: 0, inside: false });
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !enabled) return;
 
     const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
       const rect = el.getBoundingClientRect();
       const inside =
         e.clientX >= rect.left &&
@@ -45,18 +46,17 @@ export function useSectionPointer(ref: RefObject<HTMLElement | null>) {
       };
     };
 
-    // Pointer leaving the window entirely also counts as leaving the section.
     const onLeave = () => {
       pointer.current.inside = false;
     };
 
-    window.addEventListener("pointermove", onMove, { passive: true });
-    window.addEventListener("pointerleave", onLeave);
+    el.addEventListener("pointermove", onMove, { passive: true });
+    el.addEventListener("pointerleave", onLeave);
     return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerleave", onLeave);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerleave", onLeave);
     };
-  }, [ref]);
+  }, [enabled, ref]);
 
   return pointer;
 }

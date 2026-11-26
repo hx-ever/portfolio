@@ -14,18 +14,21 @@ const RADIUS = 130; // falloff radius; neighbors shrink proportionally
 const ICONS = [
   {
     key: "email",
+    shortLabel: "Email",
     label: "Email Me",
     href: "mailto:intern@hankhsu.com",
     external: false,
   },
   {
     key: "github",
+    shortLabel: "GitHub",
     label: "View GitHub",
     href: "https://github.com/hx-ever",
     external: true,
   },
   {
     key: "linkedin",
+    shortLabel: "LinkedIn",
     label: "Connect on LinkedIn",
     href: "https://www.linkedin.com/in/hsinweihsu",
     external: true,
@@ -136,7 +139,7 @@ export default function Contact() {
 
   const onDockMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     // touch devices get plain tappable icons — no magnification to un-stick
-    if (!hoverCapable.current) return;
+    if (!hoverCapable.current || window.innerWidth <= 480) return;
     cursor.current = { x: event.clientX, y: event.clientY };
     if (!moveFrame.current) {
       moveFrame.current = requestAnimationFrame(applyDockCursor);
@@ -166,6 +169,7 @@ export default function Contact() {
   // Soft ripple expanding from the clicked icon. The host span is owned by
   // React; ripples are appended imperatively and clean themselves up.
   const onIconClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (reducedMotion.current) return;
     const host = event.currentTarget.querySelector(`.${styles.rippleHost}`);
     if (!host) return;
     const ripple = document.createElement("span");
@@ -183,7 +187,7 @@ export default function Contact() {
       <div className={styles.glow} aria-hidden="true" />
 
       <span className={styles.eyebrow}>CONTACT</span>
-      <h2 className={styles.headline}>Let&rsquo;s Build</h2>
+      <h1 className={styles.headline}>Let&rsquo;s Build</h1>
       <p className={styles.support}>Interested in design engineering roles.</p>
 
       <div className={styles.dockWrap}>
@@ -220,6 +224,7 @@ export default function Contact() {
                 <IconGlyph name={icon.key} />
                 <span className={styles.rippleHost} aria-hidden="true" />
               </span>
+              <span className={styles.dockLabel} aria-hidden="true">{icon.shortLabel}</span>
             </a>
           ))}
         </div>

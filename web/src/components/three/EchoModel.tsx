@@ -462,7 +462,3 @@ export default function EchoModel({ progress }: { progress: number }) {
     </>
   );
 }
-
-// No module-level useGLTF.preload here: the five showcase GLBs are warmed
-// in page order by ModelPrefetcher during idle time after first paint,
-// instead of six parallel fetches competing with the initial load.

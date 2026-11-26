@@ -1,7 +1,7 @@
 .section {
   position: relative;
   /* top padding clears the fixed liquid-glass nav on the standalone route */
-  padding: clamp(130px, 16vh, 180px) clamp(24px, 6vw, 120px) 50vh;
+  padding: clamp(116px, 16vh, 180px) clamp(20px, 6vw, 120px) clamp(56px, 12vh, 120px);
   max-width: 1440px;
   margin: 0 auto;
   overflow: hidden;
@@ -148,13 +148,17 @@
   background: rgba(28, 28, 30, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 20px;
-  will-change: filter, transform, opacity;
-  /* touch-side of the magnetic focus effect (wheel gets JS friction) */
-  scroll-snap-align: center;
-  /* Hover tilt/scale: matched to the connector's 220ms draw so the card
-     and line resolve as one motion; the gentle overshoot in the curve
-     gives the scale-up a controlled spring feel without a JS library. */
-  transition: transform 220ms var(--ease-spring);
+  transition: transform 220ms var(--ease-spring), border-color 220ms ease;
+}
+
+.card[data-active="true"] {
+  border-color: rgba(var(--signature-rgb), 0.35);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card {
+    transform: perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(var(--hover-scale));
+  }
 }
 
 .card[data-side="left"] {
@@ -171,6 +175,7 @@
   font-family: var(--font-mono), monospace;
   font-size: 11.5px;
   letter-spacing: 0.12em;
+  color: var(--accent);
 }
 
 .badge {
@@ -179,7 +184,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.14em;
-  color: #fff;
+  color: var(--bg);
   background: linear-gradient(90deg, #c98a4e, var(--signature));
   padding: 4px 10px;
   border-radius: 999px;
@@ -202,13 +207,13 @@
 .description {
   font-size: 14.5px;
   line-height: 1.55;
-  color: var(--dim);
+  color: var(--muted);
 }
 
 @media (max-width: 760px) {
   .timeline {
-    --cgap: 20px;
-    grid-template-columns: 40px 1fr;
+    --cgap: 14px;
+    grid-template-columns: 24px minmax(0, 1fr);
   }
   .spineTrack {
     grid-column: 1;
@@ -221,6 +226,7 @@
     grid-column: 2;
     justify-self: stretch;
     max-width: none;
+    padding: 18px;
   }
   /* single-column layout: every card sits right of the spine */
   .connector[data-side="left"],
@@ -229,7 +235,7 @@
     justify-self: end;
     margin-left: 0;
     margin-right: calc(-1 * var(--cgap));
-    width: calc(20px + var(--cgap));
+    width: calc(12px + var(--cgap));
     transform-origin: left center; /* spine end */
   }
 }

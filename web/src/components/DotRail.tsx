@@ -12,7 +12,7 @@ export default function DotRail() {
   const visible = activeIndex !== -1;
 
   return (
-    <div className={styles.rail} data-visible={visible}>
+    <nav className={styles.rail} aria-label="Projects" data-visible={visible} inert={!visible}>
       {SHOWCASES.map((section, i) => (
         <a
           key={section.id}
@@ -20,6 +20,7 @@ export default function DotRail() {
           aria-label={`Jump to ${section.name}`}
           className={styles.dot}
           data-active={i === activeIndex}
+          aria-current={i === activeIndex ? "location" : undefined}
           style={
             i === activeIndex
               ? ({ "--dot-color": section.accent } as React.CSSProperties)
@@ -27,6 +28,6 @@ export default function DotRail() {
           }
         />
       ))}
-    </div>
+    </nav>
   );
 }

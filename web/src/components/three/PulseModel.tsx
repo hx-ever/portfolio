@@ -705,7 +705,3 @@ export default function PulseModel({ progress }: { progress: number }) {
     </>
   );
 }
-
-// No module-level useGLTF.preload here: the showcase GLBs are warmed in page
-// order by ModelPrefetcher during idle time after first paint, instead of
-// parallel fetches competing with the initial load.

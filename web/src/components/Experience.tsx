@@ -4,15 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { hasHover, prefersReducedMotion } from "@/lib/reducedMotion";
 import { EXPERIENCE, type ExperienceEntry } from "@/lib/experience";
 import { HERO_ACCENT } from "@/lib/sections";
-import { useActiveEntry, useFocusDistance, useSpineFill } from "@/lib/useFocusDistance";
-import { useScrollFriction } from "@/lib/useScrollFriction";
+import { useActiveEntry, useSpineFill } from "@/lib/useFocusDistance";
 import styles from "./Experience.module.css";
 
 export default function Experience() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const { ref: trackRef, fraction } = useSpineFill<HTMLDivElement>();
   const activeIndex = useActiveEntry(sectionRef);
-  useScrollFriction(sectionRef);
 
   return (
     <section
@@ -25,9 +23,9 @@ export default function Experience() {
 
       <div className={styles.header}>
         <span className={styles.eyebrow}>EXPERIENCE — 2022 → 2026</span>
-        <h2 className={styles.title}>
+        <h1 className={styles.title}>
           Where I&rsquo;ve been<span className={styles.dot}>.</span>
-        </h2>
+        </h1>
       </div>
 
       <div className={styles.timeline}>
@@ -61,8 +59,7 @@ function Row({
   row: number;
   active: boolean;
 }) {
-  const { ref, t } = useFocusDistance<HTMLDivElement>();
-  const focus = 1 - t;
+  const ref = useRef<HTMLElement>(null);
 
   const [hovered, setHovered] = useState(false);
 
@@ -70,10 +67,9 @@ function Row({
   // the card, and the rendered transform reads them via var(). A cursor
   // stream never re-renders anything; the card's 220ms spring transition
   // still supplies the eased feel.
-  const onMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!active || !hasHover()) return; // no tilt/clarity path on touch
+  const onMouseMove = (event: React.MouseEvent<HTMLElement>) => {
+    if (!active || !hasHover() || prefersReducedMotion()) return;
     if (!hovered) setHovered(true);
-    if (prefersReducedMotion()) return; // hover clarity only, no tilt
     const el = event.currentTarget;
     const rect = el.getBoundingClientRect();
     const px = (event.clientX - rect.left) / rect.width - 0.5;
@@ -82,7 +78,7 @@ function Row({
     el.style.setProperty("--ry", `${(px * 2 * MAX_TILT).toFixed(2)}deg`);
   };
 
-  const onMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+  const onMouseLeave = (event: React.MouseEvent<HTMLElement>) => {
     setHovered(false);
     event.currentTarget.style.setProperty("--rx", "0deg");
     event.currentTarget.style.setProperty("--ry", "0deg");
@@ -90,9 +86,9 @@ function Row({
 
   // Everything hover-driven is gated on `active` at render time, so a
   // card that drops out of the plateau mid-hover (scrolling with the
-  // cursor parked on it) loses tilt and clarity immediately even though
+  // cursor parked on it) loses tilt immediately even though
   // no mouse event fires; mouseleave still resets the stale state.
-  const clear = hovered && active; // hover clarity outranks scroll blur
+  const tilted = hovered && active;
 
   // The imperative tilt vars must also reset when the card leaves the
   // plateau under a parked cursor (no mouse event fires in that case).
@@ -103,46 +99,33 @@ function Row({
     }
   }, [active, ref]);
 
-  const scale = (1 + Math.pow(focus, 3) * 0.03) * (clear ? HOVER_SCALE : 1);
-  // Blur quantized to 0.5px steps: visually identical to the continuous
-  // value, but the expensive re-rasterization happens ~14 times per card
-  // transit instead of on every scroll frame.
-  const blur = Math.round(t * 7 * 2) / 2;
-
-  const cardStyle = {
-    gridRow: row,
-    filter: clear || blur === 0 ? "none" : `blur(${blur}px)`,
-    opacity: clear ? 1 : 0.22 + focus * 0.78,
-    transform: `perspective(700px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(${scale.toFixed(3)})`,
-    "--focus": focus,
-  } as React.CSSProperties;
-
   return (
     <>
-      <div
+      <article
         ref={ref}
         className={styles.card}
         data-side={entry.side}
         data-focal=""
         data-active={active}
-        style={cardStyle}
+        style={{ gridRow: row, "--hover-scale": tilted ? HOVER_SCALE : 1 } as React.CSSProperties}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
       >
-        <span className={styles.range} style={{ color: `color-mix(in oklab, var(--accent) ${focus * 100}%, var(--dim))` }}>
+        <span className={styles.range}>
           {entry.range}
           {entry.qualifier ? ` · ${entry.qualifier}` : ""}
         </span>
         {entry.incoming && <span className={styles.badge}>INCOMING · AUG 2026</span>}
-        <span className={styles.entryTitle}>{entry.title}</span>
+        <h2 className={styles.entryTitle}>{entry.title}</h2>
         <span className={styles.org}>{entry.org}</span>
         <p className={styles.description}>{entry.description}</p>
-      </div>
+      </article>
 
       <div
         className={styles.node}
         data-incoming={entry.incoming ?? false}
-        style={{ gridRow: row, "--focus": focus } as React.CSSProperties}
+        style={{ gridRow: row, "--focus": active ? 1 : 0 } as React.CSSProperties}
+        aria-hidden="true"
       />
 
       {/* Spine-to-card connector: visible only for the active entry, and
@@ -152,7 +135,7 @@ function Row({
       <div
         className={styles.connector}
         data-side={entry.side}
-        data-visible={active && !hovered}
+        data-visible={active && !tilted}
         style={{ gridRow: row }}
         aria-hidden="true"
       />

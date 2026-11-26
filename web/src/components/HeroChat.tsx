@@ -22,6 +22,7 @@ export default function HeroChat() {
   const title = useRef<HTMLHeadingElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
   const timer = useRef<number | null>(null);
   const previousTopic = useRef<ReplyTopic>("general");
   const replyCounts = useRef<Partial<Record<ReplyTopic, number>>>({});
@@ -31,8 +32,32 @@ export default function HeroChat() {
 
   useEffect(() => {
     const log = transcript.current;
-    if (log) log.scrollTop = log.scrollHeight;
+    if (log && followLatest.current) log.scrollTop = log.scrollHeight;
   }, [messages, isReplying]);
+
+  useEffect(() => {
+    const panel = dialog.current;
+    const viewport = window.visualViewport;
+    if (!panel || !viewport) return;
+
+    const syncViewport = () => {
+      if (!panel.open) return;
+      const keyboardInset = viewport.scale === 1
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0;
+      panel.style.setProperty("--chat-keyboard-inset", `${keyboardInset}px`);
+      panel.style.setProperty("--chat-viewport-height", keyboardInset ? `${viewport.height}px` : "100dvh");
+
+      const log = transcript.current;
+      if (log && followLatest.current) log.scrollTop = log.scrollHeight;
+    };
+    viewport.addEventListener("resize", syncViewport);
+    viewport.addEventListener("scroll", syncViewport);
+    return () => {
+      viewport.removeEventListener("resize", syncViewport);
+      viewport.removeEventListener("scroll", syncViewport);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -43,6 +68,9 @@ export default function HeroChat() {
   function resetChat() {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
+    followLatest.current = true;
+    dialog.current?.style.removeProperty("--chat-keyboard-inset");
+    dialog.current?.style.removeProperty("--chat-viewport-height");
     previousTopic.current = "general";
     replyCounts.current = {};
     setIsReplying(false);
@@ -63,6 +91,7 @@ export default function HeroChat() {
     replyCounts.current[topic] = turn + 1;
     if (topic !== "hello" && topic !== "thanks") previousTopic.current = topic;
 
+    followLatest.current = true;
     setMessages((current) => [...current, { author: "visitor", text }]);
     setDraft("");
     input.current?.focus({ preventScroll: true });
@@ -89,7 +118,7 @@ export default function HeroChat() {
         aria-haspopup="dialog"
         onClick={() => {
           dialog.current?.showModal();
-          title.current?.focus();
+          title.current?.focus({ preventScroll: true });
         }}
       >
         <span className={styles.indicator} aria-hidden="true" />
@@ -112,7 +141,15 @@ export default function HeroChat() {
             <span aria-hidden="true">×</span>
           </button>
         </header>
-        <div ref={transcript} className={styles.transcript} role="log" aria-label="Conversation">
+        <div
+          ref={transcript}
+          className={styles.transcript}
+          role="log"
+          aria-label="Conversation"
+          onScroll={({ currentTarget: log }) => {
+            followLatest.current = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+          }}
+        >
           {messages.map(({ author, text }, index) => (
             <p key={index} className={author === "bot" ? styles.reply : styles.visitor}>
               <span className={styles.srOnly}>{author === "bot" ? MASCOT_NAME : "You"}: </span>

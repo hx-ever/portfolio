@@ -164,7 +164,6 @@ export default function WorldMap() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = W * dpr;
       canvas.height = H * dpr;
-      canvas.style.height = `${H}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       buildSprites(dpr);
 
@@ -352,6 +351,7 @@ export default function WorldMap() {
     };
 
     const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
       const rect = canvas.getBoundingClientRect();
       cursor.x = event.clientX - rect.left;
       cursor.y = event.clientY - rect.top;
@@ -365,17 +365,18 @@ export default function WorldMap() {
       start();
     };
 
-    // Only animate while the map is on screen.
+    // Build the map when it enters view, and pause the animation on exit.
     const io = new IntersectionObserver(([entry]) => {
       running = entry.isIntersecting;
-      if (running) start();
-      else if (frame) {
+      if (running) {
+        if (wrap.clientWidth !== W) build();
+        start();
+      } else if (frame) {
         cancelAnimationFrame(frame);
         frame = 0;
       }
     });
 
-    build();
     // Debounced rebuild: build() rasterizes the landmass mask and re-samples
     // ~10k dot sites — far too heavy to run on every intermediate tick of a
     // window drag. Rebuild once the resize settles; the canvas keeps its
@@ -383,13 +384,15 @@ export default function WorldMap() {
     let resizeTimer = 0;
     const ro = new ResizeObserver(() => {
       window.clearTimeout(resizeTimer);
+      if (!running || wrap.clientWidth === W) return;
       resizeTimer = window.setTimeout(() => {
+        if (!running) return;
         build();
         start();
       }, 180);
     });
     ro.observe(wrap);
-    io.observe(canvas);
+    io.observe(wrap);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerleave", onPointerLeave);
     return () => {

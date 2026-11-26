@@ -1,74 +1,73 @@
-/* In-site case study overlay — the site's glass language at full-screen
-   scale: dim-blurred backdrop, one frosted panel, 200ms fade with a slight
-   scale/rise (the overlay counterpart of the tooltip fade-and-slide). */
-
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: var(--z-modal);
-  display: grid;
-  place-items: center;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
   padding: clamp(12px, 3vh, 32px) clamp(12px, 3vw, 32px);
-  background: rgba(6, 6, 7, 0.62);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
-  opacity: 0;
-  transition: opacity 200ms ease;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
 }
 
-.overlay[data-shown="true"] {
-  opacity: 1;
+.overlay::backdrop {
+  background: rgba(6, 6, 7, 0.62);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.overlay[open] {
+  display: grid;
+  place-items: center;
 }
 
 .panel {
   position: relative;
   width: min(920px, 100%);
-  max-height: 100%;
+  max-height: calc(100dvh - 2 * clamp(12px, 3vh, 32px));
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: clamp(24px, 4vw, 44px);
   border-radius: 24px;
-  background: rgba(24, 24, 28, 0.72);
+  background: #18181c;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 32px 90px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   outline: none;
-  transform: scale(0.96) translateY(10px);
-  transition: transform 200ms ease;
+  animation: panelIn 200ms var(--ease-glide);
 }
 
-.overlay[data-shown="true"] .panel {
-  transform: scale(1) translateY(0);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .panel,
-  .overlay[data-shown="true"] .panel {
-    transform: none; /* fade only */
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    translate: 0 8px;
   }
 }
 
 .close {
   position: sticky;
   top: 0;
+  z-index: 1;
   float: right;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  margin: -6px -6px 0 0;
+  width: 44px;
+  height: 44px;
+  margin: -6px -6px 8px 10px;
   border-radius: 999px;
   font-size: 14px;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.06);
+  background: #29292e;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: color 0.2s ease, background 0.2s ease;
 }
 
 .close:hover {
   color: var(--fg);
-  background: rgba(255, 255, 255, 0.12);
+  background: #38383e;
 }
 
 .header {
@@ -95,6 +94,10 @@
   line-height: 1;
   letter-spacing: -0.03em;
   color: var(--fg);
+}
+
+.title:focus {
+  outline: none;
 }
 
 .lede {
@@ -144,8 +147,11 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.sideToggle button {
-  padding: 6px 18px;
+.sideToggle button,
+.zoomControls button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
@@ -153,34 +159,59 @@
   transition: color 0.2s ease, background 0.2s ease;
 }
 
-.sideToggle button[data-active="true"] {
+.sideToggle button[aria-pressed="true"] {
   color: var(--fg);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 5px 17px; /* border compensation keeps the pill size stable */
+}
+
+.zoomControls {
+  display: flex;
+  gap: 4px;
+}
+
+.zoomControls button {
+  min-width: 44px;
+  padding-inline: 10px;
+  border-color: var(--hairline);
+}
+
+.zoomControls button:hover:not([aria-disabled="true"]) {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.zoomControls button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .viewerHint {
   font-family: var(--font-mono), monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--dim);
+  margin-bottom: 12px;
 }
 
 .viewerFrame {
   position: relative;
   aspect-ratio: 1 / 1;
-  max-height: 52vh;
+  width: min(100%, 52dvh);
   margin: 0 auto;
   overflow: hidden;
   border-radius: 16px;
   background: rgba(10, 10, 12, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  cursor: grab;
-  touch-action: none; /* single-finger drag pans instead of scrolling */
+  touch-action: pan-y pinch-zoom;
 }
 
-.viewerFrame:active {
+.viewerFrame[data-zoomed="true"] {
+  cursor: grab;
+  touch-action: pinch-zoom;
+}
+
+.viewerFrame[data-zoomed="true"]:active {
   cursor: grabbing;
 }
 
@@ -217,9 +248,15 @@
 
 /* ============ firmware diagram ============ */
 
+.diagramScroll {
+  overflow-x: auto;
+  margin-block: 10px;
+}
+
 .diagram {
   display: block;
   width: 100%;
+  min-width: 520px;
   height: auto;
   margin-top: 4px;
 }

@@ -1,36 +1,50 @@
 .rail {
   position: fixed;
-  right: clamp(16px, 3vw, 40px);
+  right: clamp(6px, 2.5vw, 32px);
   top: 50%;
   transform: translateY(-50%);
   z-index: var(--z-rail);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  visibility: hidden;
   opacity: 0;
   transition: opacity 0.4s ease;
 }
 
 .rail[data-visible="true"] {
+  visibility: visible;
   opacity: 1;
 }
 
 .dot {
-  display: block;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+}
+
+.dot::before {
+  content: "";
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #3e3e44;
+  background: var(--dim);
   transition:
     height 0.3s ease,
     background 0.3s ease,
     box-shadow 0.3s ease;
 }
 
-.dot[data-active="true"] {
+.dot[data-active="true"]::before {
   height: 22px;
   border-radius: 999px;
   background: var(--dot-color, var(--signature));
   box-shadow: 0 0 12px color-mix(in oklab, var(--dot-color, var(--signature)) 65%, transparent);
+}
+
+@media (max-width: 860px) {
+  .rail {
+    right: 4px;
+  }
 }

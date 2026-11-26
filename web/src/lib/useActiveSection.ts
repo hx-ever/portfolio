@@ -12,20 +12,28 @@ export function useActiveSection(ids: string[]) {
       .filter((el): el is HTMLElement => !!el);
     if (els.length === 0) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length === 0) return;
-        const top = visible.reduce((a, b) =>
-          a.intersectionRatio > b.intersectionRatio ? a : b
-        );
-        setActive(top.target.id);
-      },
-      { rootMargin: "-50% 0px -50% 0px", threshold: 0 }
-    );
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const center = window.innerHeight / 2;
+      const section = els.find((el) => {
+        const { top, bottom } = el.getBoundingClientRect();
+        return top <= center && bottom > center;
+      });
+      setActive(section?.id ?? "");
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
 
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      cancelAnimationFrame(frame);
+    };
   }, [ids]);
 
   return active;

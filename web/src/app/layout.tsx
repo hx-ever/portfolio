@@ -88,6 +88,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${display.variable} ${mono.variable} ${body.variable}`}
     >
       <body>

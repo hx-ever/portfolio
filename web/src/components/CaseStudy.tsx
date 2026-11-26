@@ -1,8 +1,9 @@
 "use client";
 
 import {
-  useCallback,
   useEffect,
+  useEffectEvent,
+  useId,
   useRef,
   useState,
   type ComponentType,
@@ -434,50 +435,36 @@ const CASE_STUDIES: Record<string, CaseStudyConfig> = {
 // Shell
 // ---------------------------------------------------------------------------
 
-/**
- * The case-study CTA for sections that have an in-site case study: opens a
- * full-screen glass overlay (portal) instead of navigating anywhere. Entrance
- * is the site's overlay language — 200ms fade with a slight scale/rise.
- */
 export default function CaseStudyCta({ section }: { section: ShowcaseSection }) {
-  const [mounted, setMounted] = useState(false);
-  const [shown, setShown] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const closeTimer = useRef(0);
-
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   const study = CASE_STUDIES[section.id];
 
-  const open = () => {
-    window.clearTimeout(closeTimer.current);
-    setMounted(true);
-    // two frames so the hidden state paints before the transition starts —
-    // with a timer fallback, because rAF never fires in a hidden tab and the
-    // overlay must not stall half-open (setShown is idempotent)
-    requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
-    window.setTimeout(() => setShown(true), 80);
-  };
-  const close = useCallback(() => {
-    setShown(false);
-    closeTimer.current = window.setTimeout(() => {
-      setMounted(false);
-      triggerRef.current?.focus();
-    }, 220); // matches the CSS fade duration
-  }, []);
-
-  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
-
-  if (!study) return null; // a caseStudy section must have a registry entry
+  if (!study) return null;
 
   return (
     <>
-      <button ref={triggerRef} className={ctaStyles.cta} onClick={open}>
+      <button
+        ref={trigger}
+        type="button"
+        className={ctaStyles.cta}
+        aria-haspopup="dialog"
+        aria-label={`${section.cta} for ${section.name}`}
+        onClick={() => setOpen(true)}
+      >
         {section.cta} →
       </button>
-      {mounted &&
-        createPortal(
-          <CaseStudyModal section={section} study={study} shown={shown} onClose={close} />,
-          document.body
-        )}
+      {open && createPortal(
+        <CaseStudyModal
+          section={section}
+          study={study}
+          onClose={() => {
+            setOpen(false);
+            trigger.current?.focus({ preventScroll: true });
+          }}
+        />,
+        document.body
+      )}
     </>
   );
 }
@@ -485,69 +472,43 @@ export default function CaseStudyCta({ section }: { section: ShowcaseSection }) 
 function CaseStudyModal({
   section,
   study,
-  shown,
   onClose,
 }: {
   section: ShowcaseSection;
   study: CaseStudyConfig;
-  shown: boolean;
   onClose: () => void;
 }) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
+  const titleId = useId();
+  const pressedBackdrop = useRef(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      // Focus trap: while the dialog is up, Tab cycles within the panel
-      // instead of escaping into the page hidden behind the backdrop.
-      if (e.key === "Tab" && panelRef.current) {
-        const focusables = panelRef.current.querySelectorAll<HTMLElement>(
-          'button, a[href], summary, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        const active = document.activeElement;
-        if (e.shiftKey && (active === first || active === panelRef.current)) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && active === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    // <html> is the scroll container — lock it while the overlay is up
-    const prev = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    panelRef.current?.focus();
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.documentElement.style.overflow = prev;
-    };
-  }, [onClose]);
+    dialog.current?.showModal();
+    title.current?.focus({ preventScroll: true });
+  }, []);
 
   return (
-    <div
+    <dialog
+      ref={dialog}
       className={styles.overlay}
-      data-shown={shown}
+      aria-labelledby={titleId}
       style={{ "--accent": section.accent } as React.CSSProperties}
-      onClick={onClose}
+      onClose={onClose}
+      onPointerDown={(event) => {
+        pressedBackdrop.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        if (pressedBackdrop.current && event.target === event.currentTarget) dialog.current?.close();
+      }}
     >
-      <div
-        ref={panelRef}
-        className={styles.panel}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${section.name} case study`}
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button className={styles.close} onClick={onClose} aria-label="Close case study">
+      <div className={styles.panel}>
+        <button
+          className={styles.close}
+          type="button"
+          onClick={() => dialog.current?.close()}
+          aria-label="Close case study"
+        >
           ✕
         </button>
 
@@ -555,8 +516,7 @@ function CaseStudyModal({
           <span className={styles.eyebrow}>
             <span style={{ color: section.accent }}>{section.index}</span> · {section.tag}
           </span>
-          <h2 className={styles.title}>{section.name}</h2>
-          {/* the section's technical description, relocated here from the card */}
+          <h2 ref={title} id={titleId} className={styles.title} tabIndex={-1}>{section.name}</h2>
           <p className={styles.lede}>{section.description}</p>
         </header>
 
@@ -570,7 +530,9 @@ function CaseStudyModal({
           <section className={styles.block} aria-label="Firmware architecture">
             <h3 className={styles.blockTitle}>Firmware</h3>
             {study.firmwareNote && <p className={styles.blockNote}>{study.firmwareNote}</p>}
-            <study.Diagram accent={section.accent} />
+            <div className={styles.diagramScroll} role="region" aria-label="Firmware diagram" tabIndex={0}>
+              <study.Diagram accent={section.accent} />
+            </div>
             <div className={styles.cards}>
               {study.capabilities.map((cap) => (
                 <article key={cap.label} className={styles.card}>
@@ -603,17 +565,15 @@ function CaseStudyModal({
           </footer>
         )}
       </div>
-    </div>
+    </dialog>
   );
 }
 
 /**
  * Top/bottom board viewer over the KiCad layout exports (kicad-cli, editor
  * theme — red front copper, blue back copper; the bottom side is mirrored as
- * if the board were flipped over). Wheel zooms toward the cursor (1–6x),
- * drag pans, double-click resets — all written straight to the transform (no
- * per-frame React work). The wheel listener is attached natively because
- * React's synthetic wheel handlers are passive.
+ * if the board were flipped over). Explicit controls zoom from 1–6x.
+ * Alt-wheel zooms around the pointer, and drag or arrow keys pan a zoomed view.
  */
 function PcbViewer({
   name,
@@ -623,10 +583,12 @@ function PcbViewer({
   pcb: NonNullable<CaseStudyConfig["pcb"]>;
 }) {
   const [side, setSide] = useState(pcb.sides[0].id);
+  const [scale, setScale] = useState(1);
+  const instructionsId = useId();
   const frameRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const view = useRef({ s: 1, x: 0, y: 0 });
-  const drag = useRef({ x: 0, y: 0, active: false });
+  const drag = useRef<{ x: number; y: number; pointerId: number } | null>(null);
 
   const apply = () => {
     const el = innerRef.current;
@@ -644,44 +606,78 @@ function PcbViewer({
   };
   const reset = () => {
     view.current = { s: 1, x: 0, y: 0 };
+    setScale(1);
     apply();
   };
+
+  const zoomTo = (requested: number, cx = 0, cy = 0) => {
+    const v = view.current;
+    const next = Math.min(6, Math.max(1, requested));
+    v.x = cx - ((cx - v.x) * next) / v.s;
+    v.y = cy - ((cy - v.y) * next) / v.s;
+    v.s = next;
+    setScale(next);
+    clampPan();
+    apply();
+  };
+
+  const onWheel = useEffectEvent((e: WheelEvent) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    const rect = frameRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    e.preventDefault();
+    const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    zoomTo(
+      view.current.s * Math.exp(-delta * 0.0016),
+      e.clientX - rect.left - rect.width / 2,
+      e.clientY - rect.top - rect.height / 2,
+    );
+  });
 
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault(); // the board zooms; the modal must not scroll
-      const v = view.current;
-      const next = Math.min(6, Math.max(1, v.s * Math.exp(-e.deltaY * 0.0016)));
-      const rect = frame.getBoundingClientRect();
-      const cx = e.clientX - rect.left - rect.width / 2;
-      const cy = e.clientY - rect.top - rect.height / 2;
-      v.x = cx - ((cx - v.x) * next) / v.s;
-      v.y = cy - ((cy - v.y) * next) / v.s;
-      v.s = next;
+    const handleWheel = (e: WheelEvent) => onWheel(e);
+    const observer = new ResizeObserver(() => {
       clampPan();
       apply();
+    });
+    observer.observe(frame);
+    frame.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      observer.disconnect();
+      frame.removeEventListener("wheel", handleWheel);
     };
-    frame.addEventListener("wheel", onWheel, { passive: false });
-    return () => frame.removeEventListener("wheel", onWheel);
   }, []);
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    drag.current = { x: e.clientX, y: e.clientY, active: true };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.isPrimary || e.button !== 0 || view.current.s <= 1) return;
+    drag.current = { x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!drag.current.active) return;
-    view.current.x += e.clientX - drag.current.x;
-    view.current.y += e.clientY - drag.current.y;
-    drag.current.x = e.clientX;
-    drag.current.y = e.clientY;
+    const point = drag.current;
+    if (point?.pointerId !== e.pointerId) return;
+    view.current.x += e.clientX - point.x;
+    view.current.y += e.clientY - point.y;
+    point.x = e.clientX;
+    point.y = e.clientY;
     clampPan();
     apply();
   };
-  const endDrag = () => {
-    drag.current.active = false;
+  const endDrag = (e: React.PointerEvent) => {
+    if (drag.current?.pointerId === e.pointerId) drag.current = null;
+  };
+
+  const onFrameKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (view.current.s <= 1 || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    e.preventDefault();
+    if (e.key === "ArrowUp") view.current.y += 40;
+    if (e.key === "ArrowDown") view.current.y -= 40;
+    if (e.key === "ArrowLeft") view.current.x += 40;
+    if (e.key === "ArrowRight") view.current.x -= 40;
+    clampPan();
+    apply();
   };
 
   const active = pcb.sides.find((s) => s.id === side)!;
@@ -689,13 +685,12 @@ function PcbViewer({
   return (
     <div>
       <div className={styles.viewerBar}>
-        <div className={styles.sideToggle} role="tablist" aria-label="Board side">
+        <div className={styles.sideToggle} role="group" aria-label="Board side">
           {pcb.sides.map((s) => (
             <button
               key={s.id}
-              role="tab"
-              aria-selected={side === s.id}
-              data-active={side === s.id}
+              type="button"
+              aria-pressed={side === s.id}
               onClick={() => {
                 setSide(s.id);
                 reset(); // fresh side, fresh framing
@@ -705,16 +700,30 @@ function PcbViewer({
             </button>
           ))}
         </div>
-        <span className={styles.viewerHint}>scroll to zoom · drag to pan · double-click to reset</span>
+        <div className={styles.zoomControls} role="group" aria-label="Board zoom">
+          <button type="button" aria-label="Zoom out" aria-disabled={scale === 1} onClick={() => zoomTo(scale / 1.5)}>−</button>
+          <button type="button" aria-label="Zoom in" aria-disabled={scale === 6} onClick={() => zoomTo(scale * 1.5)}>+</button>
+          <button type="button" aria-disabled={scale === 1} onClick={reset}>Reset</button>
+        </div>
       </div>
+      <p id={instructionsId} className={styles.viewerHint}>
+        Zoom in, then drag or use the arrow keys to pan.
+      </p>
 
       <div
         ref={frameRef}
         className={styles.viewerFrame}
+        data-zoomed={scale > 1}
+        role="group"
+        aria-label="Board preview"
+        aria-describedby={instructionsId}
+        tabIndex={scale > 1 ? 0 : -1}
+        onKeyDown={onFrameKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onLostPointerCapture={endDrag}
         onDoubleClick={reset}
       >
         <div ref={innerRef} className={styles.viewerInner}>
@@ -724,7 +733,7 @@ function PcbViewer({
             width={pcb.width}
             height={pcb.height}
             draggable={false}
-            priority
+            sizes="(max-width: 560px) 90vw, 520px"
             // inline so next/image's own sizing styles can't override the
             // letterboxed fill of the square frame
             style={{ width: "100%", height: "100%", objectFit: "contain" }}

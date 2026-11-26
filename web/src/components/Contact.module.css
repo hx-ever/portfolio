@@ -1,6 +1,7 @@
 .section {
   position: relative;
   min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -172,10 +173,15 @@
 
 /* keyboard focus mirrors the fully-magnified hover state */
 .icon:focus-visible {
-  outline: none;
+  outline: 2px solid var(--signature);
+  outline-offset: 3px;
   transform: translateY(-18px) scale(1.35);
   filter: brightness(1.28);
   --glow: 1;
+}
+
+.dockLabel {
+  display: none;
 }
 
 .iconInner {
@@ -249,10 +255,35 @@
   }
 }
 
-/* Touch devices: no hover to track — the cursor-following glass light is
-   meaningless there (JS already skips the magnification path). */
-@media (hover: none) {
-  .dock::before {
+@media (hover: none), (max-width: 480px) {
+  .dock {
+    height: auto;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 24px;
+  }
+
+  .dock::before,
+  .tooltip {
     display: none;
+  }
+
+  .icon {
+    width: 68px;
+    height: 68px;
+    grid-template-rows: 1fr auto;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .icon:focus-visible {
+    transform: none;
+  }
+
+  .dockLabel {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1;
   }
 }

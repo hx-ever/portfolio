@@ -29,9 +29,8 @@ const MODELS: Record<string, ComponentType<ModelProps>> = {
 
 export default function Showcase({ section }: { section: ShowcaseSection }) {
   const { ref, progress } = useSectionProgress<HTMLElement>();
-  const pointer = useSectionPointer(ref);
+  const pointer = useSectionPointer(ref, section.id === "auraeyez");
   const Model = MODELS[section.id];
-  const reveal = Math.min(1, progress / 0.2);
 
   return (
     <section
@@ -66,16 +65,7 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
           </ModelCanvas>
         </div>
 
-        <div
-          className={styles.copy}
-          style={{
-            opacity: reveal,
-            // cleared once revealed: a lingering transform would make .copy
-            // the containing block for the fixed-position case-study preview
-            transform:
-              reveal >= 1 ? undefined : `translateY(${(1 - reveal) * 24}px)`,
-          }}
-        >
+        <div className={styles.copy}>
           <span className={styles.tag}>
             <span style={{ color: section.accent }}>{section.index}</span> ·{" "}
             {section.tag}
@@ -87,7 +77,7 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
           {section.caseStudy ? (
             <CaseStudyCta section={section} />
           ) : (
-            <CtaLink section={section} revealed={reveal >= 1} />
+            <CtaLink section={section} />
           )}
         </div>
       </div>
@@ -106,13 +96,7 @@ export default function Showcase({ section }: { section: ShowcaseSection }) {
  * moving the cursor from the link onto the panel keeps it open; leaving both
  * fades it out.
  */
-function CtaLink({
-  section,
-  revealed,
-}: {
-  section: ShowcaseSection;
-  revealed: boolean;
-}) {
+function CtaLink({ section }: { section: ShowcaseSection }) {
   const wrapRef = useRef<HTMLSpanElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
@@ -129,9 +113,6 @@ function CtaLink({
   if (!preview) return <a {...anchorProps}>{section.cta} →</a>;
 
   const show = () => {
-    // during the copy's reveal slide the link is at the viewport's bottom
-    // edge (and .copy's transform would break fixed positioning) — skip
-    if (!revealed) return;
     const wrap = wrapRef.current;
     const panel = panelRef.current;
     if (wrap && panel) {

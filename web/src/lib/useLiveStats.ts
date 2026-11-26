@@ -14,8 +14,7 @@ export interface LiveStats {
 
 /**
  * Polls /api/analytics/stats on mount and every 18s (deliberately not per
- * second). Re-subscribes when the path changes so currentPageViews tracks the
- * page in view. Any failure or an { error: true } payload surfaces as isError.
+ * second), while the tab is visible. Refreshes when the visitor returns.
  */
 export function useLiveStats(): LiveStats {
   const pathname = usePathname();
@@ -27,20 +26,21 @@ export function useLiveStats(): LiveStats {
   });
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    let inFlight = false;
 
     const fetchStats = async () => {
+      if (document.hidden || inFlight) return;
+      inFlight = true;
       try {
         const res = await fetch(
           `/api/analytics/stats?path=${encodeURIComponent(pathname)}`,
-          { cache: "no-store" }
+          { cache: "no-store", signal: controller.signal }
         );
+        if (!res.ok) throw new Error("Stats request failed");
         const data = await res.json();
-        if (cancelled) return;
-        if (data?.error) {
-          setStats((s) => ({ ...s, isError: true }));
-          return;
-        }
+        if (controller.signal.aborted) return;
+        if (data?.error) throw new Error("Stats unavailable");
         setStats({
           online: data.online,
           totalViews: data.totalViews,
@@ -48,15 +48,19 @@ export function useLiveStats(): LiveStats {
           isError: false,
         });
       } catch {
-        if (!cancelled) setStats((s) => ({ ...s, isError: true }));
+        if (!controller.signal.aborted) setStats((s) => ({ ...s, isError: true }));
+      } finally {
+        inFlight = false;
       }
     };
 
     fetchStats();
     const id = setInterval(fetchStats, POLL_MS);
+    document.addEventListener("visibilitychange", fetchStats);
     return () => {
-      cancelled = true;
+      controller.abort();
       clearInterval(id);
+      document.removeEventListener("visibilitychange", fetchStats);
     };
   }, [pathname]);
 

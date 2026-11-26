@@ -16,7 +16,6 @@ export default function Nav() {
   const [pastHero, setPastHero] = useState(false);
 
   const navRef = useRef<HTMLElement | null>(null);
-  const linksRef = useRef<HTMLDivElement | null>(null);
   const displaceRef = useRef<SVGFEDisplacementMapElement | null>(null);
   const reducedMotion = useRef(false);
   const hoverCapable = useRef(true);
@@ -33,7 +32,11 @@ export default function Nav() {
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
 
   // Cursor-tracked specular highlight: writes a CSS var directly on the
@@ -110,7 +113,7 @@ export default function Nav() {
           priority
         />
       </Link>
-      <div ref={linksRef} className={styles.links} onMouseLeave={onLinksLeave}>
+      <div className={styles.links} onMouseLeave={onLinksLeave}>
         <span
           className={`${styles.pill} ${pill.snap ? styles.snap : ""}`}
           data-visible={pill.visible}
@@ -121,6 +124,7 @@ export default function Nav() {
           href="/#auraeyez"
           onMouseEnter={onLinkEnter}
           className={onHome && pastHero ? styles.active : undefined}
+          aria-current={onHome && pastHero ? "location" : undefined}
         >
           Designs
         </Link>

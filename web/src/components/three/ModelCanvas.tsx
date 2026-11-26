@@ -57,7 +57,7 @@ export default function ModelCanvas({
           mountObserver.disconnect();
         }
       },
-      { rootMargin: "500px" }
+      { rootMargin: "72px 0px" }
     );
     mountObserver.observe(el);
     // render-loop gate (continuous): a modest margin so the loop is already

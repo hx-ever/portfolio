@@ -79,6 +79,9 @@
   align-items: center;
   position: relative;
   z-index: 1;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
 }
 
 .links {
@@ -94,6 +97,9 @@
   position: relative;
   z-index: 1; /* text sits on top of the glass pill */
   padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   border-radius: 999px;
   color: var(--muted); /* solid color, full contrast */
   transition: color 0.25s ease;
@@ -154,6 +160,12 @@
   }
   .links a {
     padding: 8px 9px;
+  }
+}
+
+@media (max-width: 340px) {
+  .links a {
+    padding-inline: 6px;
   }
 }
 
